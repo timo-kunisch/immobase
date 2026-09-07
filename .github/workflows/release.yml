@@ -50,19 +50,80 @@ jobs:
       - run: npm run build
       - run: npm run electron:build
 
+      # macOS-Code-Signing: Keychain selbst anlegen statt electron-builder die
+      # bei gesetztem CSC_LINK automatisch erzeugte temporäre Keychain nutzen
+      # zu lassen. Grund ist ein electron-builder-Fehler (app-builder-lib,
+      # macCodeSign/importCerts): Die temporäre Keychain wird mit einem
+      # Zufalls-Passwort angelegt, bei "security set-key-partition-list -k"
+      # wird aber irrtümlich das ZERTIFIKATS-Passwort (CSC_KEY_PASSWORD)
+      # übergeben. Ältere macOS-Versionen tolerierten das bei bereits
+      # entsperrter Keychain, aktuelle macOS-Runner brechen hart ab:
+      #   security: SecKeychainUnlock: The user name or passphrase you
+      #   entered is not correct.
+      # Mit einer selbst angelegten Keychain (Passwort unter eigener Kontrolle)
+      # und CSC_KEYCHAIN als Verweis darauf wird dieser Codepfad komplett
+      # umgangen; die "Developer ID Application"-Identität findet
+      # electron-builder per Auto-Discovery in dieser Keychain.
+      - name: Code-Signing-Keychain vorbereiten (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -z "${CSC_LINK:-}" ]; then
+            echo "CSC_LINK nicht gesetzt - das macOS-Paket wird unsigniert gebaut."
+            exit 0
+          fi
+
+          KEYCHAIN_PATH="$RUNNER_TEMP/immobase-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 32)"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # kein automatisches Sperren (kein Timeout, kein Sperren bei Ruhezustand)
+          security set-keychain-settings "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          CERT_PATH="$RUNNER_TEMP/immobase-signing.p12"
+          echo "$CSC_LINK" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" -k "$KEYCHAIN_PATH" -P "$CSC_KEY_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/productbuild
+          rm -f "$CERT_PATH"
+
+          # Zugriff durch codesign ohne interaktive Nachfrage erlauben - hier
+          # mit dem KORREKTEN Keychain-Passwort (s. Kommentar am Schritt).
+          security set-key-partition-list -S apple-tool:,apple: -s \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Keychain in die Suchliste aufnehmen (Zertifikatskette/WWDRCA wird
+          # nur über die Suchliste aufgelöst), bestehende Einträge behalten.
+          security list-keychains -d user -s "$KEYCHAIN_PATH" \
+            $(security list-keychains -d user | tr -d '"')
+
+          # Folgeschritte: electron-builder nutzt diese Keychain (CSC_KEYCHAIN).
+          # Das Passwort liegt nur in einer Runner-temp-Datei (Rechte 600) zum
+          # erneuten Entsperren in späteren Schritten.
+          echo "CSC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          printf '%s' "$KEYCHAIN_PASSWORD" > "$RUNNER_TEMP/.immobase-keychain-password"
+          chmod 600 "$RUNNER_TEMP/.immobase-keychain-password"
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+
       - name: electron-builder
         shell: bash
         run: |
-          # Nicht gesetzte Signing-Secrets werden von GitHub Actions als leere
-          # Strings exportiert. electron-builder wertet CSC_LINK="" als
-          # relativen Dateipfad aus und bricht auf macOS mit
-          # "<projektverzeichnis> not a file" ab - daher leere Variablen vor
-          # dem Aufruf entfernen (ohne Zertifikat wird unsigniert gebaut).
-          # Zusätzlich wird CSC_LINK (Apple Developer ID) nur dem macOS-
-          # Runner zugeführt: Auf Windows/Linux würde electron-builder das
-          # Apple-Zertifikat sonst (nutzlos) für die Signatur verwenden.
-          if [ -z "${CSC_LINK:-}" ] || [ "$RUNNER_OS" != "macOS" ]; then
-            unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          # CSC_LINK/CSC_KEY_PASSWORD niemals an electron-builder durchreichen:
+          # - Nicht gesetzte Signing-Secrets werden von GitHub Actions als leere
+          #   Strings exportiert; electron-builder wertet CSC_LINK="" als
+          #   relativen Dateipfad aus und bricht auf macOS mit
+          #   "<projektverzeichnis> not a file" ab.
+          # - Auf Windows/Linux würde electron-builder das Apple-Zertifikat
+          #   sonst (nutzlos) für die Signatur verwenden.
+          # - Auf macOS ist der CSC_LINK-Pfad von electron-builder defekt
+          #   (set-key-partition-list mit falschem Passwort, s. voriger Schritt);
+          #   die Signatur läuft dort über die vorbereitete Keychain
+          #   (CSC_KEYCHAIN) - ohne Zertifikat wird unsigniert gebaut.
+          unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          if [ "$RUNNER_OS" = "macOS" ] && [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security unlock-keychain -p "$(cat "$RUNNER_TEMP/.immobase-keychain-password")" "$CSC_KEYCHAIN"
           fi
           npx electron-builder --publish never
         env:
@@ -92,9 +153,11 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
-          # Siehe Kommentar im Schritt "electron-builder" oben.
-          if [ -z "${CSC_LINK:-}" ] || [ "$RUNNER_OS" != "macOS" ]; then
-            unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          # Siehe Kommentare in den Schritten "Code-Signing-Keychain
+          # vorbereiten (macOS)" und "electron-builder" oben.
+          unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          if [ "$RUNNER_OS" = "macOS" ] && [ -n "${CSC_KEYCHAIN:-}" ]; then
+            security unlock-keychain -p "$(cat "$RUNNER_TEMP/.immobase-keychain-password")" "$CSC_KEYCHAIN"
           fi
           npx electron-builder --publish always
         env:

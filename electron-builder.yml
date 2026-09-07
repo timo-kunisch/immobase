@@ -13,7 +13,12 @@
 #   (ohne sie: nur eine Warnung, der Build läuft unsigniert durch).
 #   CSC_LINK wird im Release-Workflow bewusst NUR dem macOS-Runner
 #   zugeführt, damit das Apple-Zertifikat nicht versehentlich für die
-#   Windows-Signatur verwendet wird.
+#   Windows-Signatur verwendet wird. Dort importiert der Workflow das
+#   Zertifikat in eine selbst angelegte Keychain und übergibt sie per
+#   CSC_KEYCHAIN an electron-builder - dessen eigener CSC_LINK-Keychain-Pfad
+#   ist defekt (set-key-partition-list mit Zertifikats- statt Keychain-
+#   Passwort) und bricht auf aktuellen macOS-Runnern ab (Details im
+#   Workflow-Kommentar in .github/workflows/release.yml).
 # - Windows: aktuell unsigniert (SmartScreen-Hinweis). Ein eigenes Windows-
 #   Code-Signing-Zertifikat (OV/EV) ist ein separater Schritt.
 appId: de.immobase.app
