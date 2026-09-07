@@ -48,6 +48,18 @@ interface SmtpConfig {
 	pass: string;
 }
 
+/**
+ * Gibt an, ob ein SMTP-Versandweg konfiguriert ist. Wenn nicht, können
+ * E-Mails den Server-Rechner nicht verlassen (sie landen nur in der
+ * Outbox-Logdatei, siehe logToOutbox) - der Auth-Flow behandelt die
+ * E-Mail-Verifizierung dann als automatisch erfüllt, weil sie ohne
+ * funktionierenden Versand keinen Sicherheitsgewinn bringt, sondern nur
+ * den Login blockiert (siehe register/login actions).
+ */
+export function isSmtpConfigured(): boolean {
+	return getSmtpConfig() !== null;
+}
+
 /** Liest die SMTP-Konfiguration (App-Einstellungen, Fallback Umgebungsvariablen). */
 function getSmtpConfig(): SmtpConfig | null {
 	const host = getSettingWithEnvFallback("smtp.host", "SMTP_HOST");

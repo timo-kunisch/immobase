@@ -2,10 +2,10 @@
 
 import { redirect } from "next/navigation";
 
-import { getUserByEmail } from "@/data/users";
+import { getUserByEmail, markEmailVerified } from "@/data/users";
 import { destroySession } from "@/lib/auth/session";
 import { createVerificationToken } from "@/lib/auth/tokens";
-import { sendVerificationEmail } from "@/lib/email/mailer";
+import { isSmtpConfigured, sendVerificationEmail } from "@/lib/email/mailer";
 import { normalizeEmail } from "@/lib/auth/validation";
 import { ActionState } from "@/lib/action-state";
 
@@ -31,8 +31,22 @@ export async function resendVerificationAction(_prevState: ActionState, formData
 	const user = getUserByEmail(email);
 
 	if (user && !user.emailVerified) {
-		const token = await createVerificationToken(email);
-		await sendVerificationEmail(email, token);
+		if (isSmtpConfigured()) {
+			const token = await createVerificationToken(email);
+			await sendVerificationEmail(email, token);
+		} else {
+			// Ohne SMTP ist kein Versand möglich - die Adresse direkt als
+			// bestätigt markieren (analog zum Self-Healing im Login).
+			markEmailVerified(email);
+		}
+	}
+
+	if (!isSmtpConfigured()) {
+		return {
+			success: true,
+			message:
+				"Falls ein Konto mit dieser E-Mail-Adresse existiert und noch nicht bestätigt war, wurde die Adresse jetzt bestätigt. Sie können sich anmelden.",
+		};
 	}
 
 	return {

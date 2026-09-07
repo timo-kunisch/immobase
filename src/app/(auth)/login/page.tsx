@@ -12,18 +12,29 @@ export default async function LoginPage({
 	searchParams: Promise<{
 		registered?: string;
 		firstAdmin?: string;
+		emailSent?: string;
 		email?: string;
 		from?: string;
 		passwordReset?: string;
 	}>;
 }) {
-	const { registered, firstAdmin, email, from, passwordReset } = await searchParams;
+	const { registered, firstAdmin, emailSent, email, from, passwordReset } = await searchParams;
 
+	// emailSent=1 signalisiert, dass die Registrierung eine Verifizierungs-
+	// E-Mail verschickt hat (nur bei konfiguriertem SMTP). Ohne SMTP ist die
+	// Adresse bereits bei der Registrierung bestätigt worden - der Hinweis
+	// auf den E-Mail-Schritt entfällt dann.
 	let infoMessage: string | undefined;
 	if (registered) {
-		infoMessage = firstAdmin
-			? "Konto erstellt! Sie sind der erste Nutzer und wurden automatisch als Administrator freigeschaltet. Bitte bestätigen Sie zunächst Ihre E-Mail-Adresse, um sich anzumelden."
-			: "Konto erstellt! Bitte bestätigen Sie Ihre E-Mail-Adresse. Danach muss ein Administrator Ihr Konto noch freischalten.";
+		if (firstAdmin) {
+			infoMessage = emailSent
+				? "Konto erstellt! Sie sind der erste Nutzer und wurden automatisch als Administrator freigeschaltet. Bitte bestätigen Sie zunächst Ihre E-Mail-Adresse, um sich anzumelden."
+				: "Konto erstellt! Sie sind der erste Nutzer und wurden automatisch als Administrator freigeschaltet. Sie können sich jetzt anmelden.";
+		} else {
+			infoMessage = emailSent
+				? "Konto erstellt! Bitte bestätigen Sie Ihre E-Mail-Adresse. Danach muss ein Administrator Ihr Konto noch freischalten."
+				: "Konto erstellt! Sobald ein Administrator Ihr Konto freigeschaltet hat, können Sie sich anmelden.";
+		}
 	} else if (passwordReset) {
 		infoMessage = "Ihr Passwort wurde erfolgreich geändert. Bitte melden Sie sich mit dem neuen Passwort an.";
 	}

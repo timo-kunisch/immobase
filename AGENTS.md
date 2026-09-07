@@ -107,8 +107,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   automatisch `ADMIN` + `isApproved=true`. Alle weiteren: `USER` + `isApproved=false`, bis ein Admin
   sie unter `/admin/users` freischaltet.
 - **Login-Bedingungen** (beide erforderlich): `emailVerified != null` UND `isApproved == true`.
-  Ohne SMTP-Konfiguration landet die Verifizierungs-Mail in `logs/outbox.log` – den Link von dort
-  übernehmen.
+  Die E-Mail-Verifizierung ist an `isSmtpConfigured()` (`src/lib/email/mailer.ts`) gekoppelt: **Ohne
+  SMTP-Konfiguration** (Normalfall der offline laufenden Desktop-App) kann eine Verifizierungs-Mail
+  niemanden erreichen – Registrierung markiert die Adresse daher sofort als bestätigt und der Login
+  bestätigt sie nach erfolgreicher Passwortprüfung automatisch nach (Self-Healing für Bestands-
+  konten). **Mit SMTP** gilt der klassische Verifizierungslink-Flow. Passwort-Reset-Links landen
+  ohne SMTP weiterhin nur in `logs/outbox.log` (Hinweis im UI der Forgot-Password-Seite).
 - **WICHTIGE Falle bei `"use server"`-Dateien:** nur async Funktionen exportieren (+
   `export type`). Keine Objekt-/Wert-Exporte. Daher liegen `LoginState`/`initialLoginState`
   (`src/lib/auth/login-state.ts`) und `TemplatePreviewState`/`initialPreviewState`
