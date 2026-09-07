@@ -7,7 +7,7 @@ Konventionen.
 
 ## 1. Projektzweck
 
-„ImmoBase" ist eine **offline lauffähige Electron-Desktop-App** (Windows + macOS) zur
+„ImmoBase" ist eine **offline lauffähige Electron-Desktop-App** (Windows, macOS, Linux) zur
 Verwaltung von **Mietobjekten** – Liegenschaften, Mieteinheiten, Mieter, Mietverträge,
 Instandhaltungs-Tickets, Finanzen (Kaution/Mieteingänge), Nebenkostenabrechnung und Dokumente (DMS).
 Additive Erweiterung um die **WEG-Verwaltung** (Wohnungseigentümergemeinschaften nach deutschem WEG
@@ -16,18 +16,14 @@ Hausgeld, Erhaltungsrücklage, Eigentümerversammlungen/Beschluss-Sammlung. Beid
 nebeneinander modelliert (eine Liegenschaft KANN, muss aber nicht, eine WEG sein) und beeinflussen
 sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eigentumswohnungen.
 
-**Historie:** Die App war ursprünglich eine Cloudflare-Workers-Anwendung (D1/R2/Email Service) und
-wurde vollständig auf Electron + SQLite portiert. Alle Portierungs-Entscheidungen sind in
-**PORT.md** dokumentiert. Cloudflare-Bezüge existieren nicht mehr.
-
 ## 2. Tech-Stack & Architektur
 
 - **Next.js 16** (App Router, TypeScript, Turbopack für `dev`/`build`) als **eingebetteter lokaler
   Server**: Der Electron-Main-Prozess startet den Next.js-Standalone-Build **in-process** auf
   `127.0.0.1` mit dynamischem Port (bevorzugt zuletzt verwendeter Port aus `settings.json`, sonst
   Port `0`; tatsächlicher Port wird nach `listen()` aus `server.address()` gelesen). Das
-  BrowserWindow lädt diese lokale URL. Es gibt **keinen** separaten Renderer-Build (kein
-  Hono/Express-Ersatz, kein Vite-Renderer).
+  BrowserWindow lädt diese lokale URL. Es gibt **keinen** separaten Renderer-Build (kein separater
+  HTTP-Server, kein Vite-Renderer).
   - Quellcode liegt unter `src/` (Pfad-Alias `@/*` → `./src/*`).
   - `src/proxy.ts` ist nur der günstige, optimistische Cookie-Check (kein DB-Zugriff). Der
     Token-Check für den Host-Modus liegt im HTTP-Proxy des Main-Prozesses
@@ -35,7 +31,7 @@ wurde vollständig auf Electron + SQLite portiert. Alle Portierungs-Entscheidung
   - Dynamische Request-APIs (`cookies()`, `headers()`, `params`, `searchParams`) sind **async**.
   - Datenbank-Zugriffe erfolgen direkt in async Server Components; Seiten mit DB-Zugriff haben
     `export const dynamic = "force-dynamic";`.
-- **SQLite über `better-sqlite3`** (synchron, KEIN ORM/Drizzle): `src/data/` ist der
+- **SQLite über `better-sqlite3`** (synchron, KEIN ORM): `src/data/` ist der
   **Repository-Layer** – Domänen-Operationen (`createX`, `listY`), **kein SQL außerhalb dieses
   Ordners**.
   - `src/data/db.ts` – Lazy-Singleton (kein Top-Level-Open beim Import, damit `next build` keine
@@ -48,13 +44,13 @@ wurde vollständig auf Electron + SQLite portiert. Alle Portierungs-Entscheidung
     Konsistenz-Test `src/data/schema.test.ts`).
   - Echte Transaktionen (`db.transaction(...)`) für zusammenhängende Mehr-Schreib-Operationen
     (z. B. `finalizeBillingPeriod`, `finalizeEconomicPlan`, `finalizeAnnualStatement`,
-    `generateDueTransactions`, Beschluss-Nummernvergabe) – unter D1 war das unmöglich.
+    `generateDueTransactions`, Beschluss-Nummernvergabe).
   - better-sqlite3 liefert Booleans als `0/1` und die JSON-Spalte `protocols.photo_paths` als TEXT –
     Mapping ausschließlich im Repository (`src/data/helpers.ts`: `boolToInt`/`intToBool`/
     `jsonStringify`/`jsonParseArray`).
   - Geldbeträge als **Decimal-String** in `TEXT` (`src/lib/money.ts`), Datumswerte ISO-8601-`TEXT`,
     Enums als `TEXT` mit TS-Union-Typen (Gültigkeit anwendungsseitig).
-- **Dateiablage** unter `<userData>/files/` (früher R2): ausschließlich über `src/lib/storage.ts`
+- **Dateiablage** unter `<userData>/files/`: ausschließlich über `src/lib/storage.ts`
   (einzige Datei mit direktem Dateisystem-Zugriff für Uploads). Original-Dateiname/MIME-Type in
   Sidecar-Dateien (`<name>.meta.json`). Auslieferung nur über den geschützten Route Handler
   `src/app/api/uploads/[...path]/route.ts` (autoritativ `requireUser()`-geprüft).
@@ -155,7 +151,7 @@ src/
     migrations/             # versionierte Migrationsschritte (TS-Module mit SQL-Strings)
     schema.sql              # generierte Referenz (npm run schema:dump)
     backup.ts               # Export/Import (ZIP, Manifest, SHA-256, db.backup)
-    app-settings.ts         # Key/Value-App-Konfiguration (ersetzt frühere Env/Secrets)
+    app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
     auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, actions.ts
@@ -173,7 +169,7 @@ src/
   proxy.ts                  # Auth-Guard (optimistischer Cookie-Check)
 scripts/dump-schema.mjs     # Regeneriert src/data/schema.sql aus den Migrationen
 electron.vite.config.ts     # electron-vite (nur main+preload)
-electron-builder.yml        # Packaging (NSIS/DMG, extraResources, publish)
+electron-builder.yml        # Packaging (NSIS/ZIP/AppImage, extraResources, publish)
 .github/workflows/release.yml
 ```
 
@@ -190,7 +186,7 @@ npm run lint                # eslint .
 npm run test                # vitest run
 npm run schema:dump         # src/data/schema.sql aus Migrationen neu erzeugen
 npm run pack                # vollständiger Build + electron-builder --dir (ungepackter Smoke-Test)
-npm run dist                # vollständiger Build + Installer (NSIS/DMG) für die aktuelle Plattform
+npm run dist                # vollständiger Build + Pakete (NSIS/ZIP/AppImage) für die aktuelle Plattform
 npx tsc -p electron/tsconfig.json   # Typcheck der Electron-Sourcen (electron-vite transpiliert nur!)
 ```
 

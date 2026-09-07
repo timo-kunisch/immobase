@@ -1,7 +1,7 @@
 # ImmoBase
 
 **Desktop-App zur Miet- und WEG-Verwaltung – vollständig offline, alle Daten lokal.**
-Windows + macOS · Electron · Next.js · SQLite
+Windows · macOS · Linux · Electron · Next.js · SQLite
 
 [![CI](https://github.com/timo-kunisch/immobase/actions/workflows/release.yml/badge.svg)](https://github.com/timo-kunisch/immobase/actions/workflows/release.yml)
 [![Aktuelles Release](https://img.shields.io/github/v/release/timo-kunisch/immobase)](https://github.com/timo-kunisch/immobase/releases)
@@ -40,13 +40,43 @@ es einen optionalen Host-/Client-Modus im eigenen Netzwerk.
 
 ## Download
 
-Fertige Installer für Windows (NSIS) und macOS (DMG, Apple Silicon + Intel)
-gibt es unter **[Releases](https://github.com/timo-kunisch/immobase/releases)**.
+Fertige Pakete gibt es unter
+**[Releases](https://github.com/timo-kunisch/immobase/releases)**:
 
-> Hinweis: Die Installer sind aktuell nicht signiert. macOS zeigt einmalig
+- **Windows:** NSIS-Installer (`…-win-x64.exe`)
+- **macOS:** ZIP mit der App (Apple Silicon + Intel) – entpacken und
+  `ImmoBase.app` in den Programme-Ordner ziehen, keine Installation nötig
+- **Linux:** AppImage (`…-linux-x64.AppImage`) – einmal ausführbar machen
+  (`chmod +x`) und direkt starten, keine Installation nötig
+
+> Hinweis: Die Pakete sind aktuell nicht signiert. macOS zeigt einmalig
 > eine Gatekeeper-Warnung – App per Rechtsklick → „Öffnen" starten.
 > Windows zeigt ggf. einen SmartScreen-Hinweis („Weitere Informationen" →
-> „Trotzdem ausführen").
+> „Trotzdem ausführen"). Siehe Abschnitt „Code-Signing" weiter unten.
+
+## Code-Signing (macOS)
+
+Der Release-Workflow ist für Signatur + Notarisierung vorbereitet: Sobald
+die folgenden fünf Repository-Secrets gesetzt sind (GitHub →
+*Settings → Secrets and variables → Actions*), werden die macOS-Pakete
+automatisch signiert und notarisiert; ohne sie bleibt alles unsigniert und
+der Build läuft trotzdem durch:
+
+| Secret | Inhalt |
+| --- | --- |
+| `CSC_LINK` | „Developer ID Application"-Zertifikat inkl. privatem Schlüssel, als `.p12` exportiert und base64-kodiert (`base64 -i cert.p12 \| pbcopy`) |
+| `CSC_KEY_PASSWORD` | Passwort des `.p12`-Exports |
+| `APPLE_ID` | E-Mail der Apple-ID (Entwicklerkonto) |
+| `APPLE_APP_SPECIFIC_PASSWORD` | App-spezifisches Passwort von [appleid.apple.com](https://appleid.apple.com) |
+| `APPLE_TEAM_ID` | 10-stellige Team-ID aus der Apple-Developer-Mitgliedschaft |
+
+Voraussetzung ist ein bezahltes Apple-Developer-Program-Konto; das
+Zertifikat wird unter
+[developer.apple.com](https://developer.apple.com/account/resources/certificates)
+(Typ **Developer ID Application**, CSR aus der Schlüsselbundverwaltung)
+oder direkt in Xcode (*Settings → Accounts → Manage Certificates*)
+erzeugt. Windows bleibt vorerst unsigniert; ein eigenes
+Windows-Zertifikat (OV/EV) wäre ein separater Schritt.
 
 ## Technik
 
@@ -58,7 +88,7 @@ gibt es unter **[Releases](https://github.com/timo-kunisch/immobase/releases)**.
 | UI | Tailwind CSS v4, shadcn/ui, Lucide |
 | PDF | pdfkit |
 | Backup | archiver/yauzl (Streaming-ZIP, SHA-256-Manifest) |
-| Build/Release | electron-builder (NSIS/DMG), electron-updater (GitHub Releases) |
+| Build/Release | electron-builder (NSIS/ZIP/AppImage), electron-updater (GitHub Releases) |
 
 Die Desktop-Shell startet den Next.js-Standalone-Server in-process auf
 `127.0.0.1` (dynamischer Port) und zeigt ihn in einem Fenster an – es gibt
@@ -93,6 +123,7 @@ Alle Daten liegen unter `app.getPath("userData")`:
 
 - Windows: `%APPDATA%\ImmoBase\`
 - macOS: `~/Library/Application Support/ImmoBase/`
+- Linux: `~/.config/ImmoBase/`
 
 Darunter: `data.db` (SQLite), `files/` (Uploads/generierte PDFs), `logs/`,
 `backups/` (automatische Sicherungen vor Importen), `settings.json`.
@@ -124,8 +155,7 @@ Einträge ergänzen, lokaler Bestand gewinnt).
 
 Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md).
 Architektur- und Arbeitsregeln für Mensch und Maschine stehen in
-[AGENTS.md](AGENTS.md); die Entscheidungen der Portierung von Cloudflare
-Workers auf die Desktop-App sind in [PORT.md](PORT.md) dokumentiert.
+[AGENTS.md](AGENTS.md).
 
 ## Nutzungsrechte
 

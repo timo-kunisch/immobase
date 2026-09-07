@@ -2,7 +2,7 @@
   "name": "immobase",
   "version": "0.2.0",
   "private": true,
-  "description": "ImmoBase – Miet- + WEG-Verwaltung als offline lauffähige Desktop-App (Electron, Windows + macOS)",
+  "description": "ImmoBase – Miet- + WEG-Verwaltung als offline lauffähige Desktop-App (Electron, Windows, macOS, Linux)",
   "author": "Timo Kunisch",
   "main": "dist-electron/main/index.js",
   "scripts": {

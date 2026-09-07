@@ -1,14 +1,21 @@
-# electron-builder-Konfiguration (NSIS für Windows, DMG für macOS x64+arm64).
+# electron-builder-Konfiguration: NSIS-Installer für Windows, ZIP mit der
+# .app für macOS (x64+arm64), AppImage für Linux (x64).
+# Auslieferung bewusst "direkt" statt Installer, wo sinnvoll: macOS-ZIP und
+# AppImage starten ohne Installation. Windows bleibt NSIS, weil
+# electron-updater dort nur NSIS-Pakete aktualisieren kann (macOS: nur ZIP,
+# Linux: nur AppImage).
 #
-# Code-Signing / Notarisierung:
-# - Windows: Zertifikat über Umgebungsvariablen CSC_LINK + CSC_KEY_PASSWORD
-#   (siehe README-Abschnitt "Code-Signing"). Ohne diese Variablen wird ein
-#   UNSIGNIERTER Installer gebaut (Windows SmartScreen-Warnung).
-# - macOS: Signatur mit "Developer ID Application"-Zertifikat im Login-
-#   Schlüsselbund (CI: CSC_LINK/CSC_KEY_PASSWORD + APPLE_ID /
-#   APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID für die Notarisierung).
-#   Ohne Zugangsdaten bleibt die DMG unsigniert - siehe README für die
-#   benötigten Artefakte.
+# Code-Signing / Notarisierung (Schritt-für-Schritt-Anleitung: README,
+# Abschnitt "Code-Signing"):
+# - macOS: Signatur mit "Developer ID Application"-Zertifikat aus CSC_LINK +
+#   CSC_KEY_PASSWORD; Notarisierung (notarytool) läuft automatisch, sobald
+#   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID gesetzt sind
+#   (ohne sie: nur eine Warnung, der Build läuft unsigniert durch).
+#   CSC_LINK wird im Release-Workflow bewusst NUR dem macOS-Runner
+#   zugeführt, damit das Apple-Zertifikat nicht versehentlich für die
+#   Windows-Signatur verwendet wird.
+# - Windows: aktuell unsigniert (SmartScreen-Hinweis). Ein eigenes Windows-
+#   Code-Signing-Zertifikat (OV/EV) ist ein separater Schritt.
 appId: de.immobase.app
 productName: ImmoBase
 copyright: Copyright © 2026
@@ -67,13 +74,25 @@ nsis:
 
 mac:
   target:
-    - target: dmg
+    # ZIP statt DMG: liefert die .app direkt aus (entpacken -> starten) und
+    # ist das einzige macOS-Format, das electron-updater verarbeiten kann.
+    - target: zip
       arch: [x64, arm64]
   category: public.app-category.business
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
   hardenedRuntime: true
   gatekeeperAssess: false
-  # Notarisierung wird nur aktiv, wenn die Apple-Zugangsdaten als
-  # Umgebungsvariablen gesetzt sind (siehe README). Ohne sie baut die DMG
-  # unsigniert.
-  notarize: false
+  # Notarisierung via notarytool: Läuft automatisch, sobald APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD und APPLE_TEAM_ID gesetzt sind; ohne sie
+  # wird sie mit einer Warnung übersprungen (Build läuft durch).
+  notarize: true
+
+linux:
+  target:
+    # AppImage: eine einzelne, direkt ausführbare Datei (chmod +x -> starten),
+    # keine Installation nötig - und das einzige Linux-Format mit
+    # electron-updater-Unterstützung.
+    - target: AppImage
+      arch: [x64]
+  category: Office
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}
