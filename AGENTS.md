@@ -294,6 +294,13 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Netzlaufwerk-Check** beim Start nie umgehen/abschwächen (Datenkorruptionsrisiko).
 - `electron-vite` typecheckt nicht – für die Shell immer `npx tsc -p electron/tsconfig.json`
   mitlaufen lassen.
+- **Packaging-Falle (electron-builder):** Beim Verzeichnis-Kopieren via `extraResources` wird ein
+  **direkt im `from`-Verzeichnis liegendes `node_modules` hart herausgefiltert**
+  (`createFilter` in app-builder-lib, nicht per Pattern übersteuerbar). Deshalb hat der getracete
+  Standalone-`node_modules`-Baum (next, react, …) in `electron-builder.yml` einen **eigenen
+  Eintrag** (`from: .next/standalone/node_modules`) – ohne ihn schlägt `require("next")` im Paket
+  mit „Cannot find module 'next'" fehl. Nach Änderungen am Packaging immer `npm run pack` und den
+  Inhalt von `dist/mac-*/ImmoBase.app/Contents/Resources/standalone/node_modules` prüfen.
 
 ## 9. Bekannte, bewusst offene Punkte
 

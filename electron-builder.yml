@@ -51,6 +51,15 @@ files:
 extraResources:
   - from: .next/standalone
     to: standalone
+  # WICHTIG: electron-builder filtert das DIREKT im from-Verzeichnis liegende
+  # node_modules beim Verzeichnis-Kopieren hart heraus (createFilter in
+  # app-builder-lib: relative === "node_modules" -> false; nicht per Pattern
+  # übersteuerbar). Der getracete Standalone-node_modules-Baum (next, react,
+  # ...) braucht daher einen eigenen Eintrag, dessen from das node_modules-
+  # Verzeichnis selbst ist - sonst schlägt require("next") im Paket mit
+  # "Cannot find module 'next'" fehl.
+  - from: .next/standalone/node_modules
+    to: standalone/node_modules
   - from: .next/static
     to: standalone/.next/static
   - from: public
