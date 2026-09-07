@@ -305,6 +305,16 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Eintrag** (`from: .next/standalone/node_modules`) – ohne ihn schlägt `require("next")` im Paket
   mit „Cannot find module 'next'" fehl. Nach Änderungen am Packaging immer `npm run pack` und den
   Inhalt von `dist/mac-*/ImmoBase.app/Contents/Resources/standalone/node_modules` prüfen.
+- **Tracing-Falle (Turbopack-Standalone):** Bei Routen mit Dateisystem-/Stream-Zugriff
+  (`src/lib/storage.ts`, `src/data/backup.ts`, PDF-Erzeugung) über-traced Turbopack das
+  **komplette Projektverzeichnis** in `.next/standalone` – inkl. `dist/`, sodass jeder Build die
+  Artefakte aller Vorbuilds rekursiv einbettet (mehrere GB pro Paket). Deshalb stehen in
+  `next.config.ts` unter `outputFileTracingExcludes` neben `better-sqlite3` auch alle
+  Projektverzeichnisse (`dist`, `dist-electron`, `electron`, `scripts`, `src`, `public`, `build`,
+  `.github`) – die Laufzeit braucht nur die kompilierten Chunks; statische Assets kommen via
+  `extraResources` ins Paket. Nach Änderungen daran Standalone-Größe (`du -sh .next/standalone`,
+  ~30 MB) und Boot-Test (`node .next/standalone/server.js`, better-sqlite3-Symlink beachten)
+  prüfen.
 
 ## 9. Bekannte, bewusst offene Punkte
 

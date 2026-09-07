@@ -28,7 +28,33 @@ const nextConfig: NextConfig = {
 	// .next/standalone/server.js) muss das Ziel analog gelegt werden, z. B.
 	// ln -s ../../node_modules/better-sqlite3 .next/standalone/node_modules/better-sqlite3
 	outputFileTracingExcludes: {
-		"*": ["./node_modules/better-sqlite3/**/*", "node_modules/better-sqlite3/**/*"],
+		"*": [
+			"./node_modules/better-sqlite3/**/*",
+			"node_modules/better-sqlite3/**/*",
+			// Turbopack ueber-traced bei Routen mit Dateisystem-/Stream-Zugriff
+			// (storage/backup/pdf) das KOMPLETTE Projektverzeichnis - inkl.
+			// dist/, sodass jeder Build die Artefakte aller vorherigen Builds
+			// rekursiv in den Standalone-Output (und damit ins Electron-Paket)
+			// einbettet. Diese Pfade werden zur Laufzeit nicht benoetigt: Der
+			// Server laeuft aus den kompilierten Chunks unter .next/server,
+			// statische Assets und public/ kommen via extraResources ins Paket.
+			"./dist/**/*",
+			"dist/**/*",
+			"./dist-electron/**/*",
+			"dist-electron/**/*",
+			"./electron/**/*",
+			"electron/**/*",
+			"./scripts/**/*",
+			"scripts/**/*",
+			"./src/**/*",
+			"src/**/*",
+			"./public/**/*",
+			"public/**/*",
+			"./build/**/*",
+			"build/**/*",
+			"./.github/**/*",
+			".github/**/*",
+		],
 	},
 };
 
