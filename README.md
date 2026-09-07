@@ -157,8 +157,6 @@ Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md).
 Architektur- und Arbeitsregeln für Mensch und Maschine stehen in
 [AGENTS.md](AGENTS.md).
 
-## Nutzungsrechte
+## Lizenz
 
-Der Quellcode ist öffentlich einsehbar. **Alle Rechte vorbehalten.** Für
-Nutzung, Verbreitung oder abgeleitete Werke ist eine ausdrückliche Genehmigung
-des Rechteinhabers erforderlich – Anfragen gerne über ein GitHub-Issue.
+Siehe [LICENSE](LICENSE).
