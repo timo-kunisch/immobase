@@ -1,0 +1,123 @@
+import Link from "next/link";
+import { Gavel } from "lucide-react";
+
+import { listHoas, listOwnerResolutions } from "@/data/meetings";
+import { SiteHeader } from "@/components/layout/site-header";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { HoaFilter } from "@/components/weg/hoa-filter";
+import { formatDate } from "@/lib/format";
+import { isContestationDeadlinePassed, resolutionVotingResultLabels, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Vollständige, chronologisch fortlaufend nummerierte Beschluss-Sammlung
+ * (§ 24 Abs. 6 WEG) über ALLE Versammlungen einer WEG hinweg - anders als
+ * die Beschluss-Liste innerhalb einer einzelnen Versammlungs-Detailseite
+ * (/weg/versammlungen/[meetingId]) ist dies eine reine Lesansicht ohne
+ * Bearbeiten/Löschen (Bearbeitung erfolgt ausschließlich über die
+ * jeweilige Versammlung, siehe Verlinkung je Zeile). Flache Top-Level-
+ * Seite mit optionalem hoaId-Filter (siehe HoaFilter), analog zu den
+ * übrigen WEG-Funktionen.
+ */
+export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
+	const { hoaId } = await searchParams;
+
+	const hoaList = listHoas();
+
+	if (hoaList.length === 0) {
+		return (
+			<div className="flex flex-1 flex-col">
+				<SiteHeader title="Beschluss-Sammlung" description="Fortlaufende Beschluss-Sammlung je WEG (§ 24 Abs. 6 WEG)." />
+				<div className="flex-1 p-4 sm:p-6">
+					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+				</div>
+			</div>
+		);
+	}
+
+	const selectedHoa = hoaId ? hoaList.find((h) => h.id === hoaId) : undefined;
+
+	const resolutionList = listOwnerResolutions(selectedHoa ? { hoaId: selectedHoa.id } : undefined);
+
+	const now = new Date();
+
+	return (
+		<div className="flex flex-1 flex-col">
+			<SiteHeader title="Beschluss-Sammlung" description="Fortlaufende Beschluss-Sammlung je WEG (§ 24 Abs. 6 WEG)." />
+
+			<div className="flex-1 space-y-4 p-4 sm:p-6">
+				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/beschluesse" />
+
+				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
+					Vollständige, unveränderliche Beschluss-Sammlung (§ 24 Abs. 6 WEG) - jeder Beschluss erhält beim Erfassen eine fortlaufende Nummer. Die einmonatige Anfechtungsfrist (§ 45
+					WEG) wird je Beschluss automatisch berechnet.
+				</div>
+
+				<Card>
+					<CardContent className="p-0">
+						{resolutionList.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+								<Gavel className="size-8" />
+								<p>Noch keine Beschlüsse erfasst.</p>
+							</div>
+						) : (
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead className="w-[60px]">Nr.</TableHead>
+										{!selectedHoa ? <TableHead>WEG</TableHead> : null}
+										<TableHead>Titel</TableHead>
+										<TableHead>Versammlung</TableHead>
+										<TableHead>Datum</TableHead>
+										<TableHead>Ergebnis</TableHead>
+										<TableHead>Anfechtbar bis</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{resolutionList.map((resolution) => {
+										const deadlinePassed = resolution.contestedUntil ? isContestationDeadlinePassed(new Date(resolution.contestedUntil), now) : true;
+										return (
+											<TableRow key={resolution.id} id={`resolution-collection-${resolution.sequenceNumber}`}>
+												<TableCell className="font-medium">{resolution.sequenceNumber}</TableCell>
+												{!selectedHoa ? <TableCell className="text-muted-foreground">{resolution.hoaName}</TableCell> : null}
+												<TableCell>
+													<Link href={`/weg/versammlungen/${resolution.meetingId}#resolution-${resolution.id}`} className="hover:underline">
+														{resolution.title}
+													</Link>
+												</TableCell>
+												<TableCell className="text-muted-foreground">{resolution.meetingTitle}</TableCell>
+												<TableCell className="text-muted-foreground">{formatDate(resolution.resolvedAt)}</TableCell>
+												<TableCell>
+													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${resolutionVotingResultStyles[resolution.votingResult]}`}>
+														{resolutionVotingResultLabels[resolution.votingResult]}
+													</span>
+												</TableCell>
+												<TableCell>
+													{resolution.contestedUntil ? (
+														<span className="flex items-center gap-2 text-muted-foreground">
+															{formatDate(resolution.contestedUntil)}
+															{!deadlinePassed ? (
+																<Badge variant="outline" className="text-amber-700 dark:text-amber-400">
+																	Frist läuft
+																</Badge>
+															) : null}
+														</span>
+													) : (
+														"–"
+													)}
+												</TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						)}
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	);
+}

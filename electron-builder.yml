@@ -1,0 +1,79 @@
+# electron-builder-Konfiguration (NSIS für Windows, DMG für macOS x64+arm64).
+#
+# Code-Signing / Notarisierung:
+# - Windows: Zertifikat über Umgebungsvariablen CSC_LINK + CSC_KEY_PASSWORD
+#   (siehe README-Abschnitt "Code-Signing"). Ohne diese Variablen wird ein
+#   UNSIGNIERTER Installer gebaut (Windows SmartScreen-Warnung).
+# - macOS: Signatur mit "Developer ID Application"-Zertifikat im Login-
+#   Schlüsselbund (CI: CSC_LINK/CSC_KEY_PASSWORD + APPLE_ID /
+#   APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID für die Notarisierung).
+#   Ohne Zugangsdaten bleibt die DMG unsigniert - siehe README für die
+#   benötigten Artefakte.
+appId: de.immobase.app
+productName: ImmoBase
+copyright: Copyright © 2026
+
+directories:
+  output: dist
+
+# Next.js-App (Standalone-Build) und Shell-Seiten liegen außerhalb der asar-
+# gepackten App in resources/ - der Main-Prozess lädt sie von dort.
+# WICHTIG: better-sqlite3 wird von electron-builder automatisch gegen die
+# Electron-ABI neu gebaut (npmRebuild) und als extraResources unter
+# resources/node_modules/better-sqlite3 abgelegt - der Next-Standalone-Server
+# löst es von dort per Node-Modulauflösung auf (es ist bewusst NICHT im
+# Standalone-Trace enthalten, siehe outputFileTracingExcludes in
+# next.config.ts).
+npmRebuild: true
+asar: true
+
+files:
+  - dist-electron/**
+  - package.json
+  - "!**/*.map"
+
+extraResources:
+  - from: .next/standalone
+    to: standalone
+  - from: .next/static
+    to: standalone/.next/static
+  - from: public
+    to: standalone/public
+  - from: node_modules/better-sqlite3
+    to: node_modules/better-sqlite3
+  - from: electron/shell
+    to: shell
+
+# electron-updater: GitHub-Releases. OFFLINE-TOLERANT - die App funktioniert
+# ohne Update-Server vollständig (die Prüfung schlägt dann still fehl).
+publish:
+  provider: github
+  owner: timo-kunisch
+  repo: immobase
+  releaseType: release
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-Setup-${version}-win-x64.${ext}
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  shortcutName: ImmoBase
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+  category: public.app-category.business
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Notarisierung wird nur aktiv, wenn die Apple-Zugangsdaten als
+  # Umgebungsvariablen gesetzt sind (siehe README). Ohne sie baut die DMG
+  # unsigniert.
+  notarize: false

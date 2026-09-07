@@ -1,0 +1,40 @@
+import { NextResponse } from "next/server";
+
+import { importBackup } from "@/data/backup";
+import { requireAdmin } from "@/lib/auth/dal";
+
+/**
+ * Backup-Import (Ersetzen oder Zusammenführen, siehe src/data/backup.ts).
+ * Der Pfad zur Backup-ZIP wird aus der Desktop-App übergeben (nativer
+ * Dateidialog im Electron-Main-Prozess); der eigentliche Import läuft hier
+ * serverseitig (dort liegt die aktive Datenbankverbindung).
+ *
+ * Nur für Admins.
+ */
+export async function POST(request: Request) {
+	await requireAdmin();
+
+	let body: unknown;
+	try {
+		body = await request.json();
+	} catch {
+		return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+	}
+
+	const path = typeof (body as { path?: unknown })?.path === "string" ? (body as { path: string }).path : null;
+	const mode = (body as { mode?: unknown })?.mode === "merge" ? ("merge" as const) : ("replace" as const);
+	if (!path) {
+		return NextResponse.json({ error: "Pfad zur Sicherungsdatei fehlt." }, { status: 400 });
+	}
+
+	try {
+		const result = await importBackup(path, mode);
+		return NextResponse.json({ ok: true, ...result });
+	} catch (error) {
+		console.error("Backup-Import fehlgeschlagen", error);
+		return NextResponse.json(
+			{ error: `Import fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}` },
+			{ status: 400 }
+		);
+	}
+}

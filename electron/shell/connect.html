@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="de">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>ImmoBase – Verbindung</title>
+	<style>
+		:root {
+			color-scheme: light dark;
+			--bg: #f7f7f8; --fg: #1a1a1a; --muted: #6b7280; --card: #ffffff;
+			--border: #e5e7eb; --accent: #2563eb; --accent-fg: #ffffff;
+			--ok: #059669; --err: #dc2626;
+		}
+		@media (prefers-color-scheme: dark) {
+			:root {
+				--bg: #0f1115; --fg: #e5e7eb; --muted: #9ca3af; --card: #171a21;
+				--border: #2a2f3a; --accent: #3b82f6; --accent-fg: #0b1020;
+			}
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+			background: var(--bg); color: var(--fg); line-height: 1.5;
+			display: flex; justify-content: center; padding: 40px 16px;
+		}
+		main { width: 100%; max-width: 720px; }
+		h1 { font-size: 22px; margin: 0 0 4px; }
+		h2 { font-size: 16px; margin: 0 0 8px; }
+		.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+		.card {
+			background: var(--card); border: 1px solid var(--border);
+			border-radius: 10px; padding: 20px; margin-bottom: 16px;
+		}
+		.modes { display: flex; gap: 10px; flex-wrap: wrap; }
+		.mode-btn {
+			flex: 1; min-width: 160px; text-align: left; padding: 14px; cursor: pointer;
+			border: 1px solid var(--border); border-radius: 8px; background: transparent; color: var(--fg);
+		}
+		.mode-btn.active { border-color: var(--accent); outline: 2px solid var(--accent); }
+		.mode-btn strong { display: block; margin-bottom: 4px; }
+		.mode-btn span { font-size: 13px; color: var(--muted); }
+		button.primary {
+			background: var(--accent); color: var(--accent-fg); border: none;
+			padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px;
+		}
+		button.secondary {
+			background: transparent; color: var(--fg); border: 1px solid var(--border);
+			padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px;
+		}
+		button:disabled { opacity: 0.5; cursor: not-allowed; }
+		input {
+			width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+			background: transparent; color: var(--fg); font-size: 14px; margin-bottom: 10px;
+		}
+		label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+		.status { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 12px; }
+		.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+		.dot.ok { background: var(--ok); } .dot.err { background: var(--err); }
+		.error { color: var(--err); font-size: 13px; white-space: pre-wrap; }
+		.host-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+		.host-item {
+			display: flex; justify-content: space-between; align-items: center; gap: 8px;
+			border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 14px;
+		}
+		.host-item code { color: var(--muted); }
+		code.token {
+			display: block; word-break: break-all; background: var(--bg);
+			border: 1px solid var(--border); border-radius: 8px; padding: 10px; font-size: 13px; margin-bottom: 10px;
+		}
+		.hidden { display: none; }
+		.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+		.small { font-size: 12px; color: var(--muted); }
+	</style>
+</head>
+<body>
+<main>
+	<h1>ImmoBase</h1>
+	<p class="sub">Verbindung &amp; Mehrbenutzer-Betrieb</p>
+
+	<div class="card">
+		<div class="status"><span id="status-dot" class="dot"></span><span id="status-text">Status wird geladen …</span></div>
+		<div id="last-error" class="error hidden"></div>
+	</div>
+
+	<div class="card">
+		<h2>Betriebsmodus</h2>
+		<div class="modes">
+			<button class="mode-btn" data-mode="local">
+				<strong>Lokal</strong>
+				<span>Nur dieser Rechner. Alle Daten bleiben hier. (Standard)</span>
+			</button>
+			<button class="mode-btn" data-mode="host">
+				<strong>Host</strong>
+				<span>Dieser Rechner stellt die Daten im lokalen Netzwerk bereit.</span>
+			</button>
+			<button class="mode-btn" data-mode="client">
+				<strong>Client</strong>
+				<span>Mit einem Host im lokalen Netzwerk verbinden (keine lokalen Daten).</span>
+			</button>
+		</div>
+		<p class="small" style="margin-top:12px">
+			Hinweis: Die Datenbank liegt immer auf der lokalen Festplatte des Hosts – niemals auf einem
+			Netzlaufwerk (SMB/NFS). Clients benötigen die Adresse des Hosts und das Zugangs-Token.
+		</p>
+		<div class="row" style="margin-top:12px">
+			<button id="apply-mode" class="primary" disabled>Modus übernehmen</button>
+		</div>
+	</div>
+
+	<div id="section-host" class="card hidden">
+		<h2>Host-Einstellungen</h2>
+		<p class="small">Clients verbinden sich über eine dieser Adressen (Port und Token erforderlich):</p>
+		<div id="host-urls" class="host-list"></div>
+		<label>Zugangs-Token (an Client-Nutzer weitergeben):</label>
+		<code class="token" id="host-token">…</code>
+		<button id="regenerate-token" class="secondary">Neues Token erzeugen</button>
+		<p class="small">Nach dem Erzeugen eines neuen Tokens müssen alle Clients das neue Token eingeben.</p>
+	</div>
+
+	<div id="section-client" class="card hidden">
+		<h2>Mit einem Host verbinden</h2>
+		<div id="discovered-wrap">
+			<label>Gefundene Hosts im Netzwerk (automatische Suche):</label>
+			<div id="host-found-list" class="host-list"><p class="small">Suche läuft …</p></div>
+		</div>
+		<label>Host-Adresse (manuell, z. B. http://192.168.1.10:38300):</label>
+		<input id="client-url" type="text" placeholder="http://<host>:<port>" autocomplete="off" />
+		<label>Zugangs-Token:</label>
+		<input id="client-token" type="password" placeholder="Token des Hosts" autocomplete="off" />
+		<div class="row">
+			<button id="connect" class="primary">Verbinden</button>
+			<button id="retry" class="secondary hidden">Erneut versuchen</button>
+		</div>
+	</div>
+
+	<p class="small">Version <span id="app-version">?</span></p>
+</main>
+
+<script>
+(function () {
+	"use strict";
+	var iv = window.iv;
+	var state = null;
+	var selectedMode = null;
+	var retryTimer = null;
+	var retryDelay = 1000;
+
+	function $(id) { return document.getElementById(id); }
+
+	function setStatus(connected, mode) {
+		var dot = $("status-dot");
+		var text = $("status-text");
+		dot.className = "dot " + (connected ? "ok" : mode === "client" ? "err" : "");
+		if (connected) {
+			text.textContent = mode === "client" ? "Verbunden mit Host." : "Lokaler Server läuft.";
+		} else if (mode === "client") {
+			text.textContent = "Nicht verbunden.";
+		} else {
+			text.textContent = "Nicht gestartet.";
+		}
+	}
+
+	function render() {
+		if (!state) return;
+		setStatus(state.connection.connected, state.connection.mode);
+		$("app-version").textContent = state.appVersion;
+
+		var err = state.connection.lastError;
+		$("last-error").classList.toggle("hidden", !err);
+		$("last-error").textContent = err ? "Letzter Fehler: " + err : "";
+
+		document.querySelectorAll(".mode-btn").forEach(function (btn) {
+			btn.classList.toggle("active", btn.dataset.mode === (selectedMode || state.settings.mode));
+		});
+
+		$("section-host").classList.toggle("hidden", state.settings.mode !== "host");
+		$("section-client").classList.toggle("hidden", state.settings.mode !== "client");
+
+		if (state.settings.mode === "host") {
+			$("host-token").textContent = state.settings.hostToken || "(wird erzeugt …)";
+			var urls = $("host-urls");
+			urls.innerHTML = "";
+			var port = state.connection.hostPort || state.settings.lastHostPort || "?";
+			(state.lanAddresses.length ? state.lanAddresses : ["<LAN-IP>"]).forEach(function (addr) {
+				var div = document.createElement("div");
+				div.className = "host-item";
+				div.innerHTML = "<code>http://" + addr + ":" + port + "</code>";
+				urls.appendChild(div);
+			});
+		}
+
+		if (state.settings.mode === "client") {
+			$("client-url").value = state.settings.clientHostUrl || "";
+			$("retry").classList.toggle("hidden", !state.connection.lastError);
+			renderDiscovered();
+			scheduleRetryIfNeeded();
+		}
+	}
+
+	function renderDiscovered() {
+		var list = $("host-found-list");
+		if (!state.discovered.length) {
+			list.innerHTML = '<p class="small">Kein Host gefunden. Manuell verbinden oder später erneut suchen.</p>';
+			return;
+		}
+		list.innerHTML = "";
+		state.discovered.forEach(function (host) {
+			var addr = (host.addresses && host.addresses[0]) || host.host || "?";
+			var url = "http://" + addr + ":" + host.port;
+			var div = document.createElement("div");
+			div.className = "host-item";
+			var label = document.createElement("code");
+			label.textContent = host.name + " – " + url;
+			var btn = document.createElement("button");
+			btn.className = "secondary";
+			btn.textContent = "Auswählen";
+			btn.onclick = function () { $("client-url").value = url; };
+			div.appendChild(label);
+			div.appendChild(btn);
+			list.appendChild(div);
+		});
+	}
+
+	function scheduleRetryIfNeeded() {
+		if (!state.connection.lastError || state.connection.connected) return;
+		if (retryTimer) return;
+		retryTimer = setTimeout(function () {
+			retryTimer = null;
+			iv.shellRetry().then(refresh);
+			retryDelay = Math.min(retryDelay * 2, 15000);
+		}, retryDelay);
+	}
+
+	function refresh() {
+		return iv.shellGetState().then(function (s) {
+			state = s;
+			render();
+		});
+	}
+
+	document.querySelectorAll(".mode-btn").forEach(function (btn) {
+		btn.onclick = function () {
+			selectedMode = btn.dataset.mode;
+			$("apply-mode").disabled = false;
+			render();
+		};
+	});
+
+	$("apply-mode").onclick = function () {
+		if (!selectedMode) return;
+		$("apply-mode").disabled = true;
+		iv.shellSetMode(selectedMode).then(function (result) {
+			if (!result.ok) alert("Wechsel fehlgeschlagen: " + (result.error || "unbekannt"));
+			return refresh();
+		});
+	};
+
+	$("regenerate-token").onclick = function () {
+		if (!confirm("Wirklich ein neues Token erzeugen? Alle Clients müssen das neue Token eingeben.")) return;
+		iv.shellRegenerateHostToken().then(refresh);
+	};
+
+	$("connect").onclick = function () {
+		var url = $("client-url").value.trim();
+		var token = $("client-token").value.trim();
+		if (!url || !token) { alert("Bitte Host-Adresse und Token eingeben."); return; }
+		$("connect").disabled = true;
+		iv.shellSetClientConnection(url, token).then(function (result) {
+			$("connect").disabled = false;
+			if (!result.ok) alert("Verbindung fehlgeschlagen: " + (result.error || "unbekannt"));
+			return refresh();
+		});
+	};
+
+	$("retry").onclick = function () {
+		retryDelay = 1000;
+		iv.shellRetry().then(refresh);
+	};
+
+	if (iv && iv.onConnectionState) {
+		iv.onConnectionState(function () { refresh(); });
+	}
+
+	iv.shellGetState().then(function (s) {
+		state = s;
+		render();
+		if (s.settings.mode === "client") iv.discoveryStart();
+	});
+
+	window.addEventListener("beforeunload", function () {
+		if (iv && iv.discoveryStop) iv.discoveryStop();
+	});
+})();
+</script>
+</body>
+</html>
