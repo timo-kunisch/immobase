@@ -1,8 +1,9 @@
 name: Release
 
-# Baut die Electron-Installer für Windows (NSIS) und macOS (DMG, x64+arm64).
-# Auf Tags "v*" wird zusätzlich ein GitHub-Release mit den Installern
-# angelegt (electron-updater liest daraus seine Update-Feeds).
+# Baut die Electron-Pakete für Windows (NSIS), macOS (ZIP mit .app,
+# x64+arm64) und Linux (AppImage, x64). Auf Tags "v*" wird zusätzlich ein
+# GitHub-Release mit den Paketen angelegt (electron-updater liest daraus
+# seine Update-Feeds).
 
 on:
   push:
@@ -31,7 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest]
+        os: [windows-latest, macos-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +51,20 @@ jobs:
       - run: npm run electron:build
 
       - name: electron-builder
-        run: npx electron-builder --publish never
+        shell: bash
+        run: |
+          # Nicht gesetzte Signing-Secrets werden von GitHub Actions als leere
+          # Strings exportiert. electron-builder wertet CSC_LINK="" als
+          # relativen Dateipfad aus und bricht auf macOS mit
+          # "<projektverzeichnis> not a file" ab - daher leere Variablen vor
+          # dem Aufruf entfernen (ohne Zertifikat wird unsigniert gebaut).
+          # Zusätzlich wird CSC_LINK (Apple Developer ID) nur dem macOS-
+          # Runner zugeführt: Auf Windows/Linux würde electron-builder das
+          # Apple-Zertifikat sonst (nutzlos) für die Signatur verwenden.
+          if [ -z "${CSC_LINK:-}" ] || [ "$RUNNER_OS" != "macOS" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          fi
+          npx electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Code-Signing (optional - ohne diese Secrets werden unsignierte
@@ -68,15 +82,21 @@ jobs:
           name: installer-${{ matrix.os }}
           path: |
             dist/*.exe
-            dist/*.dmg
             dist/*.zip
+            dist/*.AppImage
             dist/*.blockmap
             dist/latest*.yml
           if-no-files-found: warn
 
       - name: Release-Upload (nur Tags)
         if: startsWith(github.ref, 'refs/tags/v')
-        run: npx electron-builder --publish always
+        shell: bash
+        run: |
+          # Siehe Kommentar im Schritt "electron-builder" oben.
+          if [ -z "${CSC_LINK:-}" ] || [ "$RUNNER_OS" != "macOS" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD CSC_IDENTITY_AUTO_DISCOVERY
+          fi
+          npx electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK: ${{ secrets.CSC_LINK }}
