@@ -18,11 +18,15 @@ const nextConfig: NextConfig = {
 	// better-sqlite3 bewusst NICHT in den Standalone-Trace aufnehmen: Im
 	// Electron-Packaging wird das native Binary gegen die Electron-ABI neu
 	// gebaut und über electron-builder (extraResources ->
-	// resources/node_modules/better-sqlite3) bereitgestellt; der im Trace
-	// enthaltene Build wäre ein Node-ABI-Binary und würde in der
-	// Electron-Laufzeit abstürzen. Für lokale Standalone-Tests (node
-	// .next/standalone/server.js) löst der Node-Modulresolver automatisch
-	// auf das Projekt-root node_modules auf (walk-up).
+	// resources/standalone/node_modules/better-sqlite3) bereitgestellt; der
+	// im Trace enthaltene Build wäre ein Node-ABI-Binary und würde in der
+	// Electron-Laufzeit abstürzen. Der Turbopack-Standalone-Output enthält
+	// für das externalisierte Paket nur einen gehashten Symlink
+	// (.next/node_modules/better-sqlite3-<hash> -> ../../node_modules/
+	// better-sqlite3) - das extraResources-Ziel macht genau dieses
+	// Symlink-Ziel im Paket real. Für lokale Standalone-Tests (node
+	// .next/standalone/server.js) muss das Ziel analog gelegt werden, z. B.
+	// ln -s ../../node_modules/better-sqlite3 .next/standalone/node_modules/better-sqlite3
 	outputFileTracingExcludes: {
 		"*": ["./node_modules/better-sqlite3/**/*", "node_modules/better-sqlite3/**/*"],
 	},

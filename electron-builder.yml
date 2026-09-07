@@ -32,10 +32,14 @@ directories:
 # gepackten App in resources/ - der Main-Prozess lädt sie von dort.
 # WICHTIG: better-sqlite3 wird von electron-builder automatisch gegen die
 # Electron-ABI neu gebaut (npmRebuild) und als extraResources unter
-# resources/node_modules/better-sqlite3 abgelegt - der Next-Standalone-Server
-# löst es von dort per Node-Modulauflösung auf (es ist bewusst NICHT im
-# Standalone-Trace enthalten, siehe outputFileTracingExcludes in
-# next.config.ts).
+# resources/standalone/node_modules/better-sqlite3 abgelegt. Das Ziel ist
+# nicht willkürlich: Der Turbopack-Standalone-Build referenziert das
+# externalisierte Paket über einen gehashten Symlink
+#   .next/node_modules/better-sqlite3-<hash> -> ../../node_modules/better-sqlite3
+# (es ist bewusst NICHT im Standalone-Trace enthalten, siehe
+# outputFileTracingExcludes in next.config.ts). Nur wenn das Symlink-Ziel im
+# Paket existiert, löst der require() der Server-Chunks zur Laufzeit auf -
+# und der macOS-Signierlauf bricht nicht mit ENOENT am toten Symlink ab.
 npmRebuild: true
 asar: true
 
@@ -52,7 +56,7 @@ extraResources:
   - from: public
     to: standalone/public
   - from: node_modules/better-sqlite3
-    to: node_modules/better-sqlite3
+    to: standalone/node_modules/better-sqlite3
   - from: electron/shell
     to: shell
 
