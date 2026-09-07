@@ -15,6 +15,9 @@ export async function checkForUpdatesQuietly(): Promise<void> {
 		const { autoUpdater } = await import("electron-updater");
 		autoUpdater.autoDownload = true;
 		autoUpdater.autoInstallOnAppQuit = true;
+		// Semver-Prereleases (z. B. 1.0.0-alpha) ebenfalls als Update-Kandidaten
+		// zulassen, solange sich die App selbst in der Alpha-/Beta-Phase befindet.
+		autoUpdater.allowPrerelease = true;
 		// electron-updater erwartet einen Logger mit info/warn/error/debug.
 		autoUpdater.logger = { ...log, debug: log.info };
 		autoUpdater.on("error", (error) => {
