@@ -48,7 +48,3 @@ next-env.d.ts
 
 # Lokale App-Daten (Web-Entwicklung ohne Electron, siehe src/data/paths.ts)
 /data-dev/
-
-# wrangler files (Cloudflare-Ära, entfernt)
-.wrangler
-.dev.vars*
