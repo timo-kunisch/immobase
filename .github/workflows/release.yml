@@ -11,6 +11,13 @@ on:
       - "v*"
   workflow_dispatch:
 
+# Der Release-Upload-Schritt (electron-builder --publish always) legt auf
+# Tags das GitHub-Release an und lädt die Pakete hoch - dafür braucht der
+# GITHUB_TOKEN contents: write (Standard in diesem Repo ist read-only, sonst
+# schlägt der Upload mit 403 "Resource not accessible by integration" fehl).
+permissions:
+  contents: write
+
 jobs:
   test:
     name: Lint / Tests / Next-Build
