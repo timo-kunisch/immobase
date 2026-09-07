@@ -239,9 +239,9 @@ export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId:
 		})),
 	});
 
-	// Läuft (anders als früher unter D1) in EINER Transaktion: Löschen
-	// etwaiger Alt-Zeilen, Einfügen der Einzelwirtschaftspläne und
-	// Statuswechsel sind atomar (siehe src/data/economic-plans.ts).
+	// Läuft in EINER Transaktion: Löschen etwaiger Alt-Zeilen, Einfügen
+	// der Einzelwirtschaftspläne und Statuswechsel sind atomar (siehe
+	// src/data/economic-plans.ts).
 	try {
 		finalizeEconomicPlan(
 			economicPlanId,

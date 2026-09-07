@@ -9,11 +9,11 @@ import type { Property } from "./types";
  * - SELECTs verwenden Spalten-Aliase (`zip_code AS zipCode`), sodass die
  *   Zeilen direkt dem camelCase-Typ aus ./types entsprechen - keine
  *   separate Mapper-Schicht nötig.
- * - create* erzeugt id/createdAt/updatedAt anwendungsseitig (Konsistenz mit
- *   dem bisherigen Verhalten, siehe src/lib/id.ts).
+ * - create* erzeugt id/createdAt/updatedAt anwendungsseitig (siehe
+ *   src/lib/id.ts).
  * - Synchroner better-sqlite3-Zugriff - Aufrufer können die Funktionen
- *   trotzdem mit `await` aufrufen (harmlose Angewohnheit aus der
- *   D1-Async-Welt).
+ *   trotzdem mit `await` aufrufen (harmlos: await auf Nicht-Promises
+ *   ist ein No-Op).
  */
 
 const PROPERTY_COLUMNS = `

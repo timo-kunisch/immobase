@@ -3,18 +3,9 @@ import type { Migration } from "../migrate.ts";
 /**
  * 0001_init - initiales Gesamtschema.
  *
- * Entspricht exakt dem finalen D1-Schema des Cloudflare-Vorgängers
- * (migrations/0000_init.sql + 0001_bright_the_twelve.sql +
- * 0002_certain_proteus.sql, zusammengeführt; die nachträglich per ALTER
- * hinzugefügte Spalte `units.co_ownership_share` ist hier direkt im CREATE
- * TABLE enthalten). Da keine Datenmigration stattfindet (D1 war leer), gibt
- * es keine Konvertierung bestehender Inhalte - nur das Schema wurde
- * übernommen.
- *
- * Unterschiede zum D1-Stand: `integer DEFAULT false/true` wurde durch
- * `integer DEFAULT 0/1` ersetzt (kanonische SQLite-Literale; inhaltlich
- * identisch - D1/drizzle-kit hatte die JS-Default-Werte true/false in die
- * DDL übernommen).
+ * Hinweis: Booleans werden als `integer DEFAULT 0/1` (kanonische
+ * SQLite-Literale) angelegt; das Mapping 0/1 <-> boolean erfolgt
+ * anwendungsseitig im Repository-Layer (src/data/helpers.ts).
  */
 export const migration0001: Migration = {
 	version: 1,

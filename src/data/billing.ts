@@ -25,9 +25,8 @@ import type {
  * Mieter, Mietanpassungen), die nur für die Abrechnung gebraucht werden.
  *
  * Zusammenhängende Mehr-Schreib-Operationen (Verbrauchswerte-Upserts,
- * Finalisierung) laufen in echten better-sqlite3-Transaktionen - unter
- * dem früheren D1-Setup war das nicht möglich (dort sequenzielle
- * Einzelqueries ohne Rollback).
+ * Finalisierung) laufen in echten better-sqlite3-Transaktionen (atomar,
+ * mit Rollback bei Fehlern).
  */
 
 const BILLING_PERIOD_COLUMNS = `
@@ -281,10 +280,9 @@ export interface ConsumptionValueInput {
  * Speichert die Verbrauchswerte (Upsert je Einheit) einer Kostenposition.
  *
  * Läuft in EINER better-sqlite3-Transaktion: Entweder werden alle Werte
- * gespeichert oder (bei einem Fehler) keiner - unter dem früheren
- * D1-Setup ohne Transaktionen konnten hier Teildaten zurückbleiben.
- * Wie bisher bleibt `updated_at` eines bestehenden Datensatzes beim
- * Konflikt-Update unverändert (nur der Wert wird ersetzt).
+ * gespeichert oder (bei einem Fehler) keiner. `updated_at` eines
+ * bestehenden Datensatzes bleibt beim Konflikt-Update unverändert (nur
+ * der Wert wird ersetzt).
  */
 export function saveConsumptionValuesForCostItem(costItemId: string, values: ConsumptionValueInput[]): void {
 	const db = getDb();
@@ -455,12 +453,9 @@ export interface FinalizedTenantStatementInput {
  * Zeilen entfernt die ON-DELETE-CASCADE), legt die neuen Statements inkl.
  * Zeilen an und setzt die Periode abschließend auf FINALIZED.
  *
- * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar - im
- * Gegensatz zum früheren D1-Setup (keine Transaktionen), wo ein Fehler
- * mitten in der Schleife einen Teil der Statements ohne Statuswechsel
- * zurücklassen konnte (dort durch "Status zuletzt setzen + vorher
- * löschen" kompensiert; beides bleibt hier erhalten, ist aber nur noch
- * defensiv relevant).
+ * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar. Das
+ * Vorgehen "vorher löschen + Status zuletzt setzen" bleibt darüber hinaus
+ * defensiv erhalten.
  */
 export function finalizeBillingPeriod(billingPeriodId: string, statements: FinalizedTenantStatementInput[]): void {
 	const db = getDb();

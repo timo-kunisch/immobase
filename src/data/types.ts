@@ -1,13 +1,7 @@
 /**
  * Zentrale Row-Typen für den Repository-Layer (src/data/).
  *
- * Diese Typen ersetzen die früheren Drizzle-`$inferSelect`-Typen aus
- * src/db/schema.ts. Die Namen der Enum-Union-Typen (MeterType, Role, ...)
- * wurden bewusst beibehalten, damit UI-Komponenten, die bisher
- * `import type { ... } from "@/db/schema"` nutzten, nur den Importpfad
- * wechseln müssen.
- *
- * Konventionen (unverändert aus dem D1-Schema übernommen):
+ * Konventionen:
  * - Geldbeträge: Decimal-Strings ("-123.45"), siehe src/lib/money.ts.
  * - Datumswerte: ISO-8601-Strings.
  * - Enums: TEXT mit TypeScript-Union-Typen (kein DB-CHECK).

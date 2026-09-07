@@ -31,9 +31,8 @@ import type {
  * - `hoa_cost_items.is_apportionable` und `owners.is_company` sind in SQLite
  *   integer 0/1 - das boolean-Mapping erfolgt ausschließlich hier.
  * - Zusammenhängende Mehr-Schreib-Operationen (Verbrauchswerte-Upserts,
- *   Finalisierung) laufen in echten better-sqlite3-Transaktionen - unter
- *   dem früheren D1-Setup war das nicht möglich (dort sequenzielle
- *   Einzelqueries ohne Rollback).
+ *   Finalisierung) laufen in echten better-sqlite3-Transaktionen (atomar,
+ *   mit Rollback bei Fehlern).
  */
 
 const ANNUAL_STATEMENT_COLUMNS = `
@@ -318,10 +317,9 @@ export interface HoaConsumptionValueInput {
  * Kostenposition.
  *
  * Läuft in EINER better-sqlite3-Transaktion: Entweder werden alle Werte
- * gespeichert oder (bei einem Fehler) keiner - unter dem früheren
- * D1-Setup ohne Transaktionen konnten hier Teildaten zurückbleiben.
- * Wie bisher bleibt `updated_at` eines bestehenden Datensatzes beim
- * Konflikt-Update unverändert (nur der Wert wird ersetzt).
+ * gespeichert oder (bei einem Fehler) keiner. `updated_at` eines
+ * bestehenden Datensatzes bleibt beim Konflikt-Update unverändert (nur
+ * der Wert wird ersetzt).
  */
 export function saveHoaConsumptionValuesForCostItem(costItemId: string, values: HoaConsumptionValueInput[]): void {
 	const db = getDb();
@@ -501,12 +499,9 @@ export interface FinalizedUnitResultInput {
  * Ergebnisse inkl. Zeilen an und setzt die Abrechnung abschließend auf
  * FINALIZED.
  *
- * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar - im
- * Gegensatz zum früheren D1-Setup (keine Transaktionen), wo ein Fehler
- * mitten in der Schleife einen Teil der Ergebnisse ohne Statuswechsel
- * zurücklassen konnte (dort durch "Status zuletzt setzen + vorher
- * löschen" kompensiert; beides bleibt hier erhalten, ist aber nur noch
- * defensiv relevant).
+ * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar. Das
+ * Vorgehen "vorher löschen + Status zuletzt setzen" bleibt darüber hinaus
+ * defensiv erhalten.
  */
 export function finalizeAnnualStatement(annualStatementId: string, results: FinalizedUnitResultInput[]): void {
 	const db = getDb();

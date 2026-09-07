@@ -24,9 +24,7 @@ import type {
  * Fälligstellen der Hausgeld-Sollstellungen) sowie die beiden
  * Mehr-Schreib-Operationen Finalisierung (Einfrieren der
  * Einzelwirtschaftspläne) und Generierung der Hausgeld-Sollstellungen -
- * beide laufen in EINER better-sqlite3-Transaktion und sind damit atomar
- * (unter dem früheren D1-Setup ohne Transaktionen konnten hier Teildaten
- * zurückbleiben).
+ * beide laufen in EINER better-sqlite3-Transaktion und sind damit atomar.
  */
 
 const ECONOMIC_PLAN_COLUMNS = `
@@ -330,10 +328,9 @@ export interface FinalizedUnitShareInput {
  * Zeilen dieses Plans, legt die neuen an und setzt den Plan abschließend
  * auf FINALIZED.
  *
- * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar - unter
- * dem früheren D1-Setup (keine Transaktionen) war hier die Kompensation
- * "Status zuletzt setzen + vorher löschen" nötig; beides bleibt erhalten,
- * ist aber nur noch defensiv relevant.
+ * Läuft in EINER better-sqlite3-Transaktion und ist damit atomar. Das
+ * Vorgehen "vorher löschen + Status zuletzt setzen" bleibt darüber hinaus
+ * defensiv erhalten.
  */
 export function finalizeEconomicPlan(economicPlanId: string, shares: FinalizedUnitShareInput[]): void {
 	const db = getDb();
@@ -403,7 +400,7 @@ export interface DueHousingChargeCandidate {
  * Legt die übergebenen Hausgeld-Sollstellungen an, sofern für dieselbe
  * Einheit im jeweiligen Monat noch keine Sollstellung existiert.
  * Duplikatprüfung und Inserts laufen in einer better-sqlite3-Transaktion
- * (atomar) - unter dem früheren D1-Setup war das nicht möglich.
+ * (atomar).
  */
 export function generateHousingCharges(candidates: DueHousingChargeCandidate[]): { created: number; skipped: number } {
 	const db = getDb();

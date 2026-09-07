@@ -1,10 +1,9 @@
 /**
- * Der Status eines Mietvertrags war im Vorgänger-Prototyp früher ein manuell
- * zu pflegendes Feld. Das führte in der Praxis dazu, dass er nicht
- * konsistent mit Mietbeginn/-ende aktualisiert wurde. Deshalb wird der
- * Status ausschließlich aus startDate/endDate abgeleitet - diese Datei
- * kapselt die dafür nötige Logik, damit überall (Vertrags-, Einheiten-,
- * Finanzen- und Dashboard-Modul) dieselbe Regel gilt.
+ * Der Status eines Mietvertrags wird ausschließlich aus startDate/endDate
+ * abgeleitet - bewusst kein manuell zu pflegendes Feld, weil ein solches
+ * in der Praxis nicht konsistent mit Mietbeginn/-ende aktualisiert wird.
+ * Diese Datei kapselt die dafür nötige Logik, damit überall (Vertrags-,
+ * Einheiten-, Finanzen- und Dashboard-Modul) dieselbe Regel gilt.
  */
 
 export type LeaseStatusValue = "UPCOMING" | "ACTIVE" | "ENDED";
@@ -37,7 +36,7 @@ export const leaseStatusStyles: Record<LeaseStatusValue, string> = {
 
 /**
  * SQL-Fragment (WHERE-Bedingung inkl. Parameter) für "aktuell laufende"
- * Mietverträge (entspricht dem früheren `status: "ACTIVE"`), d. h.
+ * Mietverträge, d. h.
  * Mietbeginn liegt nicht in der Zukunft und Mietende (falls gesetzt) liegt
  * nicht in der Vergangenheit. Die Spalten sind bewusst ohne Tabellen-Alias
  * angegeben - bei JOINs ergänzt der Aufrufer das Alias selbst (z. B.

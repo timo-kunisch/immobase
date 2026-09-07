@@ -11,11 +11,10 @@
  * "buildHistory aus Basis + Adjustments"-Funktion wie bei
  * src/lib/rent-history.ts - die Historie IST bereits die Liste der Zeilen.
  *
- * Hinweis: Die frühere Drizzle-Filterbedingung `activeOwnershipWhere` ist
- * mit dem Wegfall von Drizzle entfallen - die "aktuell laufenden"
- * Eigentumsverhältnisse werden jetzt entweder im Repository-Layer per SQL
- * (start_date <= ? AND (end_date IS NULL OR end_date >= ?)) oder aus einer
- * bereits geladenen Liste per findOwnershipForDate bestimmt.
+ * Die "aktuell laufenden" Eigentumsverhältnisse werden entweder im
+ * Repository-Layer per SQL (start_date <= ? AND (end_date IS NULL OR
+ * end_date >= ?)) oder aus einer bereits geladenen Liste per
+ * findOwnershipForDate bestimmt.
  */
 
 export type OwnershipStatusValue = "UPCOMING" | "ACTIVE" | "ENDED";

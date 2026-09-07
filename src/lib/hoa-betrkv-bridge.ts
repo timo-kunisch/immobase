@@ -32,8 +32,8 @@ import { centsToDecimalString } from "@/lib/money";
 
 /**
  * Default-Vorbelegung für `hoaCostItems.isApportionable` beim Anlegen einer
- * neuen Kostenposition in der Jahresabrechnung, je nach Kostenart - siehe
- * schema.ts-Kommentar zu hoaCostItems.isApportionable. Bewusst nur ein
+ * neuen Kostenposition in der Jahresabrechnung, je nach Kostenart (siehe
+ * Annahme 8 in AGENTS.md Abschnitt 6.1). Bewusst nur ein
  * Vorschlag (vom Nutzer pro Position änderbar), da im Einzelfall auch z. B.
  * eine Rechtsberatung umlagefähig sein könnte (z. B. Rechtsstreit über eine
  * Betriebskostenposition).
@@ -57,7 +57,7 @@ export const hoaCostCategoryDefaultApportionable: Record<HoaCostCategory, boolea
 
 /**
  * Mapping der WEG-Kostenarten auf die entsprechende BetrKV-Kostenart (§ 2
- * BetrKV Nr. 1-17, siehe CostCategory in src/db/schema.ts) für den
+ * BetrKV Nr. 1-17, siehe CostCategory in src/data/types.ts) für den
  * Übertrag in die Nebenkostenabrechnung. Kategorien ohne sinnvolle
  * BetrKV-Entsprechung (Verwaltervergütung, Rücklage, Rechtsberatung,
  * Bankgebühren) werden nicht umlagefähig vorbelegt (siehe oben) und daher

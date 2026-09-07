@@ -1,7 +1,7 @@
 /**
  * Geldbeträge werden in der Datenbank ausschließlich als Decimal-String
- * (z. B. "12.34", "-5.00") in TEXT-Spalten gespeichert (siehe src/db/schema.ts)
- * - SQLite/D1 hat keinen exakten Decimal-Typ, ein REAL/FLOAT würde
+ * (z. B. "12.34", "-5.00") in TEXT-Spalten gespeichert
+ * - SQLite hat keinen exakten Decimal-Typ, ein REAL/FLOAT würde
  * Rundungsfehler riskieren. Diese Datei kapselt die Umrechnung zwischen
  * Decimal-String (DB) und Integer-Cent (Rechnen) an einer zentralen Stelle,
  * damit nirgends im Code direkt mit Float-Beträgen gerechnet wird.

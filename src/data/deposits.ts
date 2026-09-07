@@ -7,7 +7,7 @@ import type { Deposit, DepositStatus, DepositType } from "./types";
  *
  * deposits.lease_id ist UNIQUE: Pro Mietvertrag existiert genau ein
  * Kautionskonto. Das Speichern aus dem Formular ist daher ein Upsert
- * (entspricht dem früheren onConflictDoUpdate auf lease_id).
+ * (ON CONFLICT (lease_id) DO UPDATE).
  */
 
 const DEPOSIT_COLUMNS = `

@@ -23,11 +23,11 @@ type ActionResult = { error?: string; success?: boolean; message?: string };
 /**
  * Gemeinsamer Kostenpositionen-Dialog für Wirtschaftsplan UND
  * Jahresabrechnung (hoaCostItems mit Diskriminator `context`, siehe
- * Annahme 7 in src/db/schema.ts) - die konkrete Server Action
+ * Annahme 7 in AGENTS.md Abschnitt 6.1) - die konkrete Server Action
  * (saveEconomicPlanCostItemAction/saveAnnualStatementCostItemAction) wird
  * als Prop übergeben. Das Feld "Umlagefähig" wird nur bei
  * context = "STATEMENT" angezeigt (siehe showApportionable), da es im
- * Wirtschaftsplan fachlich nicht relevant ist (Annahme 8 in schema.ts).
+ * Wirtschaftsplan fachlich nicht relevant ist (Annahme 8 in AGENTS.md).
  */
 export function HoaCostItemFormDialog({
 	action,

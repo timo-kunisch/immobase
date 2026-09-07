@@ -26,7 +26,7 @@ export function getDatabaseFilePath(): string {
 	return path.join(getDataDir(), "data.db");
 }
 
-/** Wurzelverzeichnis der hochgeladenen/generierten Dateien (ehemals R2). */
+/** Wurzelverzeichnis der hochgeladenen/generierten Dateien. */
 export function getFilesDir(): string {
 	const dir = path.join(getDataDir(), "files");
 	fs.mkdirSync(dir, { recursive: true });

@@ -4,15 +4,16 @@ import { requireUser } from "@/lib/auth/dal";
 import { getMimeType, getUploadedFile } from "@/lib/storage";
 
 /**
- * Liefert eine zuvor über die Dokumente-/Vorlagen-Uploads im R2-Objektspeicher
- * abgelegte Datei aus. Der Bucket selbst ist NICHT öffentlich lesbar - diese
- * Route ist der einzige Weg, an eine Datei zu kommen.
+ * Liefert eine über die Dokumente-/Vorlagen-Uploads abgelegte Datei aus
+ * (Ablage im lokalen Dateisystem, siehe src/lib/storage.ts). Die Dateien
+ * sind NICHT öffentlich lesbar - diese Route ist der einzige Weg, an eine
+ * Datei zu kommen.
  *
  * Schutz zweifach abgesichert (wie alle Requests läuft diese Route auch
  * durch src/proxy.ts, das nur den optimistischen Cookie-Check macht): hier
  * zusätzlich ein autoritativer requireUser()-Check gegen die DB, da das
  * Ausliefern von Dateien sicherheitsrelevant ist und nicht allein auf den
- * Middleware-Schutz vertrauen soll.
+ * Proxy-Check vertrauen soll.
  *
  * URL-Schema: /api/uploads/<subdir>/<dateiname>
  */

@@ -31,8 +31,7 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
 
 	const generatedDocumentList = listGeneratedDocumentsByTemplate(id);
 	// Bewusst nur die für die Vertragsauswahl benötigten Felder selektieren
-	// (kein voller Lease-Datensatz an eine Client Component übergeben) -
-	// analog zum ursprünglichen Prisma-"select statt include"-Muster.
+	// (kein voller Lease-Datensatz an eine Client Component übergeben).
 	const leaseList = listLeaseOptions();
 
 	return (

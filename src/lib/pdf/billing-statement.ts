@@ -1,6 +1,6 @@
 // Siehe src/lib/pdf/document.ts für die Begründung, warum hier bewusst die
-// "standalone"-Variante von pdfkit importiert wird (Cloudflare-Workers-
-// Kompatibilität, keine fs.readFileSync-Nachladung von .afm-Dateien).
+// "standalone"-Variante von pdfkit importiert wird (keine
+// fs.readFileSync-Nachladung von .afm-Dateien zur Laufzeit).
 import PDFDocument from "pdfkit/js/pdfkit.standalone";
 
 import { formatCurrency, formatDate } from "@/lib/format";

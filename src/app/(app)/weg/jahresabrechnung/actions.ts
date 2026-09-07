@@ -303,8 +303,7 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
 	}
 
 	// Atomar in einer Transaktion (src/data/annual-statements.ts) - ein
-	// Fehler hinterlässt im Unterschied zum früheren D1-Setup keine
-	// teilweise geschriebenen Einzelabrechnungen.
+	// Fehler hinterlässt keine teilweise geschriebenen Einzelabrechnungen.
 	try {
 		finalizeAnnualStatement(
 			annualStatementId,

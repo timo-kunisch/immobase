@@ -216,8 +216,7 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 		};
 		try {
 			// Vergabe der nächsten fortlaufenden Nummer (MAX+1) und Insert
-			// laufen im Repository in einer Transaktion (unter D1 nicht
-			// atomar möglich).
+			// laufen im Repository atomar in einer Transaktion.
 			createResolution(data);
 		} catch (error) {
 			console.error("saveResolutionAction (insert) failed", error);

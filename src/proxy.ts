@@ -4,8 +4,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 
 /**
- * Auth-Guard für die gesamte Anwendung (Next.js 16 "proxy"-Konvention,
- * früher "middleware.ts").
+ * Auth-Guard für die gesamte Anwendung (Next.js 16 "proxy"-Konvention).
  *
  * WICHTIG (siehe guides/authentication.md der Next.js-Doku): Der Proxy soll
  * nur einen günstigen, "optimistischen" Check durchführen (hier: Existiert

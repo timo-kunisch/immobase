@@ -40,8 +40,8 @@ import { ContactAdminDialog } from "@/components/layout/contact-admin-dialog";
 import { logoutAction } from "@/lib/auth/actions";
 
 /**
- * Navigationseinträge gegliedert nach fachlichem Bereich (statt zuvor
- * "Verwaltung"/"Betrieb") - macht die additive Struktur der App
+ * Navigationseinträge gegliedert nach fachlichem Bereich - macht die
+ * additive Struktur der App
  * (allgemeine Stammdaten + Mietverwaltung + WEG-Verwaltung, siehe
  * AGENTS.md Abschnitt 1) auch in der Sidebar sichtbar. "Allgemein" enthält
  * bewusst alles, was unabhängig davon relevant ist, ob eine Liegenschaft

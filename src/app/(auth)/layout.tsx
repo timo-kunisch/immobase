@@ -4,7 +4,7 @@ import { Building2 } from "lucide-react";
  * Layout für alle öffentlichen Auth-Seiten (Login, Registrierung,
  * E-Mail-Verifizierung, Passwort vergessen/zurücksetzen). Bewusst ohne
  * Sidebar/Navigation – diese Seiten sind auch für nicht angemeldete
- * Besucher erreichbar (siehe middleware.ts PUBLIC_PATHS).
+ * Besucher erreichbar (siehe PUBLIC_PATHS in src/proxy.ts).
  */
 export default function AuthLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	return (

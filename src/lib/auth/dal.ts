@@ -38,7 +38,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 		try {
 			deleteSessionById(session.id);
 		} catch {
-			// Ignorieren, wie bisher (.catch(() => {}) im Vorgänger).
+			// Ignorieren (Best Effort).
 		}
 		return null;
 	}

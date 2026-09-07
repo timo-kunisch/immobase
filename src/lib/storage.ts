@@ -6,22 +6,21 @@ import { Readable } from "node:stream";
 import { getFilesDir } from "@/data/paths";
 
 /**
- * Dateiablage auf dem lokalen Dateisystem (früher: Cloudflare-R2-Bucket
- * `UPLOADS_BUCKET`). Wurzelverzeichnis ist `<APP_DATA_DIR>/files/` (in der
+ * Dateiablage auf dem lokalen Dateisystem. Wurzelverzeichnis ist
+ * `<APP_DATA_DIR>/files/` (in der
  * Desktop-App `app.getPath("userData")/files`, in der Web-Entwicklung
  * `<Projekt>/data-dev/files`, siehe src/data/paths.ts).
  *
  * Die Dateien sind NICHT öffentlich lesbar; alle Downloads laufen über den
  * geschützten Route Handler src/app/api/uploads/[...path]/route.ts, der die
- * Datei von der Platte liest und an angemeldete Nutzer durchreicht (kein
- * öffentlicher ACL/Presigned-URL-Redirect).
+ * Datei von der Platte liest und an angemeldete Nutzer durchreicht (keine
+ * öffentliche Auslieferung).
  *
  * Diese Datei ist die einzige Stelle im Projekt, die direkt mit dem
  * Dateisystem für Uploads spricht - alle Module (Dokumente, Vorlagen,
  * Abrechnung, WEG) nutzen ausschließlich die hier exportierten Funktionen.
- * Die öffentliche API ist zur früheren R2-Version identisch.
  *
- * Metadaten (Original-Dateiname, MIME-Type - früher R2-Custom-Metadata)
+ * Metadaten (Original-Dateiname, MIME-Type)
  * liegen als Sidecar-Datei `<dateiname>.meta.json` neben der eigentlichen
  * Datei, sodass `files/` auch bei einem reinen Dateisystem-Backup
  * selbsterklärend bleibt.

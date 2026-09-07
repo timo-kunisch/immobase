@@ -9,9 +9,8 @@ import { getLogsDir } from "@/data/paths";
 
 /**
  * E-Mail-Versand für Transaktionsmails (Verifizierung, Passwort-Reset,
- * Kontaktanfragen, Freigabe-Benachrichtigung).
+ * Kontaktanfragen, Freigabe-Benachrichtigung):
  *
- * Früher: Cloudflare Email Service (`SEND_EMAIL`-Binding). Jetzt:
  * - Wenn SMTP konfiguriert ist (App-Einstellungen `smtp.*`, siehe
  *   src/data/app-settings.ts; Fallback: Umgebungsvariablen SMTP_HOST etc.),
  *   wird über nodemailer versendet.

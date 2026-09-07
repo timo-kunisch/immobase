@@ -6,10 +6,9 @@ import { migrateDatabase } from "./migrate";
 /**
  * better-sqlite3-Verbindung (synchron, kein Promise-Wrapper).
  *
- * Im Unterschied zum früheren Cloudflare-D1-Setup DARF hier ein
- * Modul-Level-Singleton verwendet werden: Der Next.js-Server läuft lokal im
- * Electron-Main-Prozess (bzw. in `next dev`), es gibt keine Worker-
- * Isolates und kein Binding, das erst zur Request-Zeit existiert.
+ * Die Verbindung ist ein Modul-Level-Singleton: Der Next.js-Server läuft
+ * lokal im Electron-Main-Prozess (bzw. in `next dev`) - ein prozessweites,
+ * synchrones Handle ist hier der einfachste und sicherste Weg.
  *
  * WICHTIG: Die Verbindung wird LAZY beim ersten `getDb()`-Aufruf geöffnet
  * (nicht beim Modul-Import), damit `next build` die Module laden kann, ohne

@@ -4,10 +4,9 @@ import { now } from "./helpers";
 /**
  * Repository für die einfache Key/Value-Tabelle `app_settings`
  * (technische App-Konfiguration, die nicht ins Repo gehört: SMTP-Zugang,
- * LetterXpress-Credentials, URL-Overrides, ...). Ersetzt die früheren
- * Cloudflare-Umgebungsvariablen/-Secrets als Speicherort - die
- * Umgebungsvariablen selbst bleiben als Fallback für Dev-/Test-Szenarien
- * auswertbar (siehe getSetting).
+ * LetterXpress-Credentials, URL-Overrides, ...). Umgebungsvariablen
+ * bleiben als Fallback für Dev-/Test-Szenarien auswertbar (siehe
+ * getSetting).
  */
 
 interface AppSettingRow {

@@ -262,8 +262,7 @@ export async function saveConsumptionValuesAction(_prevState: ActionState, formD
 	}
 
 	// Das Speichern läuft transaktional im Repository (src/data/billing.ts) -
-	// anders als unter D1 kann hier kein teilweise gespeicherter Stand
-	// zurückbleiben.
+	// es kann kein teilweise gespeicherter Stand zurückbleiben.
 	try {
 		saveConsumptionValuesForCostItem(costItemId, values);
 	} catch (error) {

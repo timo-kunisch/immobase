@@ -13,9 +13,7 @@ const ALL_VALUE = "all";
  * Top-Level-Seiten unter /weg/* (Wirtschaftsplan, Jahresabrechnung,
  * Hausgeld, Rücklage, Versammlungen, Beschluss-Sammlung,
  * Eigentumsverhältnisse, Verteilerschlüssel) - konsistent zum Muster der
- * Mietverwaltung (z. B. /einheiten?propertyId=), statt wie zuvor pro WEG
- * eine eigene Detailseite navigieren zu müssen (siehe AGENTS.md Auftrag
- * "UI konsistenter machen").
+ * Mietverwaltung (z. B. /einheiten?propertyId=).
  */
 export function HoaFilter({ hoas, value, basePath }: { hoas: Hoa[]; value?: string; basePath: string }) {
 	const router = useRouter();

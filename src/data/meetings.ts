@@ -359,10 +359,10 @@ export function countResolutionsForMeeting(meetingId: string): number {
  * Legt einen Beschluss mit der nächsten fortlaufenden Nummer der WEG an.
  *
  * Vergabe der nächsten Nummer (MAX+1) und Insert laufen in EINER
- * better-sqlite3-Transaktion - unter Cloudflare D1 (keine Transaktionen)
- * war das nicht atomar möglich, hier schließt die Transaktion die
- * theoretische Race Condition bei zwei gleichzeitigen Inserts. Der unique
- * index (hoa_id, sequence_number) bleibt zusätzliche Absicherung.
+ * better-sqlite3-Transaktion - so ist die Nummernvergabe atomar und die
+ * theoretische Race Condition bei zwei gleichzeitigen Inserts
+ * ausgeschlossen. Der unique index (hoa_id, sequence_number) bleibt
+ * zusätzliche Absicherung.
  */
 export function createResolution(input: OwnerResolutionInput): OwnerResolution {
 	const db = getDb();

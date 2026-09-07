@@ -16,7 +16,7 @@ import type { Hoa, Property } from "@/data/types";
 
 /**
  * Bewusst nur Liegenschaften anbieten, die noch keiner WEG zugeordnet sind
- * (1:1-Beziehung, siehe hoas.propertyId in src/db/schema.ts) - beim
+ * (1:1-Beziehung, siehe UNIQUE-Index auf hoas.property_id) - beim
  * Bearbeiten wird die aktuelle Liegenschaft der WEG selbst zusätzlich mit
  * angeboten (sonst wäre das Feld beim Bearbeiten leer, falls die
  * Liegenschaft aus der "freien" Liste bereits herausgefiltert wurde).

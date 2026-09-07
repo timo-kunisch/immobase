@@ -42,7 +42,7 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  * - Modi: "replace" (Ist-Zustand wird komplett ersetzt) und "merge"
  *   (Zusammenführen).
  *
- * KONFLIKTSTRATEGIE "merge" (dokumentiert, siehe PORT.md): zeilenbasiert
+ * KONFLIKTSTRATEGIE "merge": zeilenbasiert
  * pro Tabelle per `INSERT OR IGNORE` - existiert eine Zeile mit demselben
  * Primärschlüssel bereits, GEWINNT der lokale Bestand; nur neue Zeilen
  * werden übernommen. Dateien werden nur kopiert, wenn sie lokal noch nicht

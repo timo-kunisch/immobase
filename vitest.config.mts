@@ -6,7 +6,7 @@ const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * Testumgebung für reine Unit-Tests von Server-seitigem Code (kein DOM,
- * keine Cloudflare-Bindings, kein echter Netzwerkzugriff). Externe
+ * kein echter Netzwerkzugriff). Externe
  * Abhängigkeiten (z. B. fetch() gegen die LetterXpress-API) werden in den
  * jeweiligen Testdateien gemockt (siehe src/lib/letterxpress.test.ts).
  */

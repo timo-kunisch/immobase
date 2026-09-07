@@ -2,8 +2,9 @@
 // des Standard-Einstiegspunkts "pdfkit": Diese Variante hat alle
 // Font-Metrik-Dateien (.afm) bereits inline im Bundle statt sie zur
 // Laufzeit per fs.readFileSync relativ zum eigenen Paketverzeichnis
-// nachzuladen - notwendig für den Cloudflare-Workers-Build (workerd hat
-// kein normales Dateisystem), siehe next.config.ts (serverExternalPackages).
+// nachzuladen - robuster im Standalone-/Electron-Packaging, wo das
+// Paketverzeichnis zur Laufzeit nicht zuverlässig auflösbar ist (siehe
+// next.config.ts, serverExternalPackages).
 import PDFDocument from "pdfkit/js/pdfkit.standalone";
 
 /**
