@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { AlertTriangle, Building2, DoorOpen, Euro, PercentCircle, Wrench } from "lucide-react";
+import { AlertTriangle, Building2, DoorOpen, Euro, LifeBuoy, PercentCircle, Wrench } from "lucide-react";
 
 import { SiteHeader } from "@/components/layout/site-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
 import { getDashboardData } from "@/app/(app)/actions/dashboard";
@@ -147,6 +148,30 @@ export default async function DashboardPage() {
 						</CardContent>
 					</Card>
 				) : null}
+
+				{/* Dezenter Hinweis auf das kostenpflichtige Priority-Support-Angebot
+				    (help.immobase.app) - ImmoBase selbst bleibt kostenlos/Open Source.
+				    Externer Link: Die Electron-Shell öffnet target="_blank" im
+				    Standardbrowser (siehe electron/main/index.ts). */}
+				<Card className="border-dashed">
+					<CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+						<div className="flex items-start gap-3">
+							<LifeBuoy className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
+							<div>
+								<p className="text-sm font-medium">Priority-Support direkt vom Entwickler</p>
+								<p className="mt-0.5 text-xs text-muted-foreground">
+									ImmoBase bleibt kostenlos und Open Source. Für Hausverwaltungen und Unternehmen, die garantierte
+									Reaktionszeiten und persönliche Betreuung brauchen, gibt es kostenpflichtige Support-Pakete.
+								</p>
+							</div>
+						</div>
+						<Button variant="outline" size="sm" className="shrink-0" asChild>
+							<a href="https://help.immobase.app" target="_blank" rel="noopener noreferrer">
+								Mehr erfahren
+							</a>
+						</Button>
+					</CardContent>
+				</Card>
 			</div>
 		</div>
 	);
