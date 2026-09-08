@@ -83,10 +83,7 @@ export function countUsers(): number {
 	return row.value;
 }
 
-/**
- * E-Mail-Adressen aller Administratoren (Empfänger der Kontaktanfragen aus
- * dem Sidebar-Dialog, siehe src/lib/contact/actions.ts).
- */
+/** E-Mail-Adressen aller Administratoren. */
 export function listAdminEmails(): string[] {
 	const rows = getDb().prepare("SELECT email FROM users WHERE role = 'ADMIN'").all() as { email: string }[];
 	return rows.map((row) => row.email);

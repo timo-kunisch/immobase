@@ -2,8 +2,8 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { requireUser } from "@/lib/auth/dal";
+import { isAiConfigured } from "@/lib/ai/config";
 import { startDropboxBackupScheduler } from "@/lib/dropbox-backup";
-import { isSmtpConfigured } from "@/lib/email/mailer";
 
 // Autoritativer Auth-Check für den gesamten geschützten Bereich der App
 // (siehe src/proxy.ts für den vorgelagerten, günstigen Cookie-Check).
@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 
 	return (
 		<SidebarProvider>
-			<AppSidebar user={{ email: user.email, role: user.role }} smtpConfigured={isSmtpConfigured()} />
+			<AppSidebar user={{ email: user.email, role: user.role }} aiConfigured={isAiConfigured()} />
 			<SidebarInset>
 				<UpdateBanner />
 				{children}

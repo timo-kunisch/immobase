@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
+import { AiCard } from "@/components/einstellungen/ai-card";
 import { CompanySettingsForm } from "@/components/einstellungen/company-settings-form";
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
@@ -11,6 +12,7 @@ import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/se
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
 import { getDatabaseFilePath } from "@/data/paths";
+import { isAiConfigured } from "@/lib/ai/config";
 import { getDataKeySource } from "@/lib/data-key";
 import { getDropboxUiState } from "@/lib/dropbox-backup";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
@@ -27,6 +29,7 @@ const settingsSections = [
 	{ id: "dropbox-backup", label: "Dropbox-Backup" },
 	{ id: "datenverschluesselung", label: "Lokale Datenverschlüsselung" },
 	{ id: "online-integrationen", label: "Online-Integrationen" },
+	{ id: "ki-assistent", label: "KI-Assistent" },
 	{ id: "mcp-server", label: "MCP-Server (KI-Zugriff)" },
 	{ id: "verbindung", label: "Verbindung & Mehrbenutzer" },
 	{ id: "zuruecksetzen", label: "Anwendung zurücksetzen" },
@@ -93,6 +96,16 @@ export default async function EinstellungenPage() {
 				</section>
 				<section id="online-integrationen" className="scroll-mt-6">
 					<IntegrationSettingsForm settings={integrations} />
+				</section>
+				<section id="ki-assistent" className="scroll-mt-6">
+					<AiCard
+						state={{
+							baseUrl: getSetting("ai.base_url") ?? "",
+							model: getSetting("ai.model") ?? "",
+							apiKeySet: Boolean(getSetting("ai.apikey")),
+							configured: isAiConfigured(),
+						}}
+					/>
 				</section>
 				<section id="mcp-server" className="scroll-mt-6">
 					<McpCard state={{ enabled: isMcpEnabled(), tokenSet: hasMcpToken() }} />

@@ -37,7 +37,7 @@ import {
 	SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { ContactAdminDialog } from "@/components/layout/contact-admin-dialog";
+import { ChatbotDialog } from "@/components/layout/chatbot-dialog";
 import { logoutAction } from "@/lib/auth/actions";
 import { cn } from "@/lib/utils";
 
@@ -85,7 +85,7 @@ const adminNavItems = [
 	{ title: "Einstellungen", href: "/einstellungen", icon: Settings },
 ];
 
-export function AppSidebar({ user, smtpConfigured }: { user: { email: string; role: string }; smtpConfigured: boolean }) {
+export function AppSidebar({ user, aiConfigured }: { user: { email: string; role: string }; aiConfigured: boolean }) {
 	const pathname = usePathname();
 
 	// "/" und "/weg" sind exakte Matches (sonst wäre der Dashboard- bzw.
@@ -244,7 +244,7 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 						<span className="truncate text-xs font-medium">{user.email}</span>
 						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? "Administrator" : "Nutzer"}</span>
 					</div>
-					<ContactAdminDialog smtpConfigured={smtpConfigured} />
+					<ChatbotDialog aiConfigured={aiConfigured} isAdmin={user.role === "ADMIN"} />
 					<form action={logoutAction}>
 						<Button type="submit" variant="ghost" size="icon-sm" title="Abmelden" aria-label="Abmelden">
 							<LogOut className="size-4" />

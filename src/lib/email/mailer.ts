@@ -6,7 +6,7 @@ import { getSettingWithEnvFallback } from "@/data/app-settings";
 
 /**
  * E-Mail-Versand für Transaktionsmails (Verifizierung, Passwort-Reset,
- * Kontaktanfragen, Freigabe-Benachrichtigung):
+ * Freigabe-Benachrichtigung):
  *
  * - Wenn SMTP konfiguriert ist (App-Einstellungen `smtp.*`, siehe
  *   src/data/app-settings.ts; Fallback: Umgebungsvariablen SMTP_HOST etc.),
@@ -15,8 +15,8 @@ import { getSettingWithEnvFallback } from "@/data/app-settings";
  *   Es wird nichts versendet und nichts protokolliert. Der Auth-Flow
  *   behandelt die E-Mail-Verifizierung dann als automatisch erfüllt
  *   (siehe register/login actions); Funktionen, die zwingend auf den
- *   Versand angewiesen sind (Passwort-Reset, Kontaktanfrage), sperren
- *   sich selbst über isSmtpConfigured().
+ *   Versand angewiesen sind (Passwort-Reset), sperren sich selbst über
+ *   isSmtpConfigured().
  *
  * Diese Datei ist die einzige Stelle im Projekt mit Mailversand-Logik -
  * alle Aufrufer nutzen ausschließlich die hier exportierten, fachlichen
@@ -73,7 +73,6 @@ type SendMailOptions = {
 	subject: string;
 	html: string;
 	text: string;
-	replyTo?: string;
 };
 
 async function sendMail(options: SendMailOptions): Promise<void> {
@@ -99,7 +98,6 @@ async function sendMail(options: SendMailOptions): Promise<void> {
 			subject: options.subject,
 			html: options.html,
 			text: options.text,
-			...(options.replyTo ? { replyTo: options.replyTo } : {}),
 		});
 	} catch (error) {
 		// Ein fehlgeschlagener Mailversand darf den aufrufenden Flow (z. B.
@@ -107,16 +105,6 @@ async function sendMail(options: SendMailOptions): Promise<void> {
 		// nicht mit einem 500 abbrechen - nur protokollieren.
 		console.error("[email] Versand fehlgeschlagen:", error);
 	}
-}
-
-/** Escaped Nutzereingaben, bevor sie in HTML-E-Mails eingebettet werden. */
-function escapeHtml(value: string): string {
-	return value
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&#39;");
 }
 
 function layout(title: string, bodyHtml: string): string {
@@ -162,26 +150,6 @@ export async function sendPasswordResetEmail(email: string, token: string): Prom
        können Sie diese E-Mail ignorieren.</p>`
 		),
 		text: `Passwort zurücksetzen: ${url} (1 Stunde gültig)`,
-	});
-}
-
-/**
- * Kontaktanfrage eines angemeldeten Nutzers an den Administrator.
- * `replyTo` wird auf die E-Mail-Adresse des anfragenden Nutzers gesetzt,
- * damit der Admin direkt per "Antworten" reagieren kann.
- */
-export async function sendContactAdminEmail(adminEmail: string, fromUserEmail: string, message: string): Promise<void> {
-	const safeMessage = escapeHtml(message);
-	await sendMail({
-		to: adminEmail,
-		subject: `Kontaktanfrage von ${fromUserEmail}`,
-		html: layout(
-			"Neue Kontaktanfrage",
-			`<p><strong>Von:</strong> ${escapeHtml(fromUserEmail)}</p>
-       <p style="white-space: pre-wrap;">${safeMessage}</p>`
-		),
-		text: `Von: ${fromUserEmail}\n\n${message}`,
-		replyTo: fromUserEmail,
 	});
 }
 

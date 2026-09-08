@@ -91,7 +91,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
   Umgebungsvariablen für Dev/Tests). **Ohne SMTP-Konfiguration sind sämtliche E-Mail-Funktionen
   deaktiviert** (`isSmtpConfigured()`, `src/lib/email/mailer.ts`): `sendMail` wird zum No-Op (kein
-  Versand, kein Fallback-Log), der Passwort-Reset und der Kontakt-Dialog sperren sich mit
+  Versand, kein Fallback-Log), der Passwort-Reset sperrt sich mit
   UI-/Server-Hinweis, die Freigabe-Benachrichtigung im Admin-Bereich wird übersprungen (Admin erhält
   Hinweis im Aktionsergebnis) und die E-Mail-Verifizierung gilt als automatisch erfüllt (siehe
   Abschnitt 3).
@@ -137,6 +137,25 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Server Actions (Entwurfs-Sperren, Beschluss-Nummernvergabe, Eigentümerwechsel-Versionierung,
   Aussperr-Schutz letzter Admin). Das Token hat faktisch Admin-Rechte (prominenter Warnhinweis
   in der UI-Karte `src/components/einstellungen/mcp-card.tsx`).
+- **KI-Assistent (In-App-Chatbot)** (`src/lib/ai/` + `src/app/api/chat/route.ts` +
+  `src/components/layout/chatbot-dialog.tsx`) – **optionale Online-Funktion**: Die Sprechblase im
+  Sidebar-Footer (früher „Administrator kontaktieren", entfernt) öffnet einen Chat gegen einen
+  frei konfigurierbaren **OpenAI-kompatiblen Chat-Completions-Endpunkt** (Einstellungen →
+  KI-Assistent; `ai.base_url` + `ai.model` Klartext, `ai.apikey` FELD-verschlüsselt in
+  `SECRET_SETTING_KEYS`, optional leer für lokale Server wie LM Studio/Ollama; Env-Fallbacks
+  `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY`). Ohne vollständige Konfiguration ist die Sprechblase
+  deaktiviert und die Route gesperrt (`isAiConfigured()`). **Nur Admins** (Route prüft
+  `getCurrentUser()` + Rolle mit JSON-401/403 statt Redirect), weil das Modell über die Werkzeuge
+  der MCP-Registry faktisch Admin-Rechte erhält. `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge als
+  OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
+  (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
+  Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
+  nicht-streamend). **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern) werden clientseitig als
+  Base64 mitgesendet und serverseitig in Text umgewandelt (`src/lib/ai/attachments.ts`:
+  .xlsx/.xlsm via `exceljs` → Semikolon-CSV je Tabellenblatt, .csv/.tsv/.txt/.md/.json/.xml/.log
+  direkt; Obergrenzen 10 MB/Datei, 500 Zeilen/Blatt, 60k Zeichen/Datei; Legacy-.xls wird mit
+  Hinweis abgelehnt). Hinweis: `exceljs` statt `xlsx`, weil das npm-Paket `xlsx` ungepatchte
+  High-Vulnerabilities hat (SheetJS patcht nur noch die eigene CDN-Distribution).
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -258,12 +277,13 @@ src/
     api/uploads/[...path]/  # Geschützter Route Handler für Dateiauslieferung
     api/backup/export|import/  # Backup-Routen (requireAdmin())
     api/mcp/route.ts        # MCP-Endpunkt (Bearer-Token, optional aktivierbar)
+    api/chat/route.ts       # KI-Assistent-Chat (Session, nur Admins)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
     ui/                     # shadcn/ui-Basiskomponenten (via `npx shadcn add`)
     <modul>/                # Modul-spezifische Dialoge/Formulare (Client Components)
-    layout/                 # AppSidebar, SiteHeader, ContactAdminDialog
+    layout/                 # AppSidebar, SiteHeader, ChatbotDialog, UpdateBanner
   data/                     # REPOSITORY-LAYER - EINZIGER Ort mit SQL
     db.ts                   # better-sqlite3 Lazy-Singleton + Pragmas + Shutdown-Versiegelung
     db-vault.ts             # Container-Verschlüsselung der DB at rest (unlock/lock)
@@ -272,7 +292,7 @@ src/
     schema.sql              # generierte Referenz (npm run schema:dump)
     backup.ts               # Export/Import (ZIP, Manifest, SHA-256, db.backup)
     reset.ts                # Vollständiger Anwendungs-Reset (Einstellungen, nur Admins)
-    app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, URL-Overrides)
+    app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, KI-Endpunkt, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
     auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, bootstrap.ts, actions.ts
@@ -289,6 +309,9 @@ src/
     mcp/                    # MCP-Server (KI-Zugriff): auth.ts (Token/Enabled), protocol.ts
                             # (JSON-RPC), registry.ts (Tool-Definition + CRUD-Generator),
                             # tools-rental/-hoa/-system.ts (Werkzeuge), tools.ts (Sammel-Import)
+    ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
+                            # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts
+                            # (Excel-/Text-Extraktion), chat.ts (Tool-Loop über die MCP-Registry)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts
@@ -347,8 +370,8 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **WEG-Verwaltung:** siehe Abschnitt 6.1
 - **Postversand:** `postal_shipments` (polymorph über `sourceType`/`sourceId`)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
-  (technische Key/Value-Konfiguration: SMTP, LetterXpress, URL-Overrides – keine Fachdaten;
-  Geheimnisse wie `smtp.pass`/`letterxpress.apikey` sind feldverschlüsselt, transparent über
+  (technische Key/Value-Konfiguration: SMTP, LetterXpress, KI-Endpunkt, URL-Overrides – keine Fachdaten;
+  Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
   `src/data/app-settings.ts`)
 - **Authentifizierung:** `users`, `sessions`, `verification_tokens`, `password_reset_tokens`
 
@@ -476,7 +499,9 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled, JSON-RPC-Protokoll, Werkzeug-Durchstiche inkl.
-  Fachregeln) sowie
+  Fachregeln), `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
+  Secret-Verschlüsselung, Excel-/Text-Anhang-Extraktion, Tool-Loop gegen gemockten
+  OpenAI-Endpunkt) sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –

@@ -167,6 +167,49 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
 }
 
 // ============================================================
+// KI-Assistent (OpenAI-kompatibler Endpunkt, optional)
+// ============================================================
+
+/**
+ * Speichert die Konfiguration des KI-Assistenten (Basis-URL + Modell eines
+ * OpenAI-kompatiblen Chat-Completions-Endpunkts, optionaler API-Schlüssel)
+ * in app_settings (siehe src/lib/ai/config.ts). Leeres Schlüssel-Feld =
+ * unverändert lassen (Muster wie beim SMTP-Passwort). Leere Basis-URL +
+ * leeres Modell deaktivieren den Assistenten (Sprechblase wird gesperrt,
+ * Chat-Route antwortet mit Hinweis). Nur für Admins.
+ */
+export async function saveAiSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	await requireAdmin();
+
+	const baseUrl = getString(formData, "aiBaseUrl");
+	const model = getString(formData, "aiModel");
+	const apiKey = getString(formData, "aiApiKey");
+
+	if (baseUrl && !/^https?:\/\/.+/.test(baseUrl)) {
+		return { error: "Die Basis-URL muss mit http:// oder https:// beginnen (z. B. https://api.openai.com/v1)." };
+	}
+	if (baseUrl && !model) {
+		return { error: "Bitte geben Sie auch ein Modell an (z. B. gpt-4o-mini)." };
+	}
+	if (!baseUrl && model) {
+		return { error: "Bitte geben Sie auch die Basis-URL an (oder beide Felder leeren, um den KI-Assistenten zu deaktivieren)." };
+	}
+
+	try {
+		setSetting("ai.base_url", baseUrl);
+		setSetting("ai.model", model);
+		if (apiKey) setSetting("ai.apikey", apiKey);
+	} catch (error) {
+		console.error("saveAiSettingsAction failed", error);
+		return { error: "Die KI-Einstellungen konnten nicht gespeichert werden." };
+	}
+
+	revalidatePath("/einstellungen");
+	revalidatePath("/", "layout");
+	return { success: true };
+}
+
+// ============================================================
 // MCP-Server (KI-Zugriff, optional - standardmäßig deaktiviert)
 // ============================================================
 
