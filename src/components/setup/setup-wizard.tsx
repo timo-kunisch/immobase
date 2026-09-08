@@ -60,6 +60,15 @@ const STEP_TITLES = [
 	"Administratorkonto",
 ];
 
+/**
+ * Die Wizard-Karten haben eine farblich abgesetzte Fußleiste (CardFooter mit
+ * bg-muted): Die Card trägt dafür unten keinen eigenen Innenabstand
+ * (has-card-footer:pb-0), daher bekommt der Inhalt selbst den Abstand zur
+ * Leiste. Ohne ihn würde z. B. das Modus-Auswahlfeld der Online-Integrationen
+ * direkt an die Leiste stoßen.
+ */
+const STEP_CONTENT = "pb-(--card-spacing)";
+
 function StepProgress({ step }: { step: number }) {
 	return (
 		<div className="space-y-2">
@@ -84,7 +93,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
 					Die Ersteinrichtung führt Sie in wenigen Schritten durch die Grundeinstellungen der App.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-3 text-sm text-muted-foreground">
+			<CardContent className={`${STEP_CONTENT} space-y-3 text-sm text-muted-foreground`}>
 			<p>ImmoBase läuft vollständig offline – alle Daten bleiben auf diesem Rechner.</p>
 			<p>Die folgenden Schritte richten die App ein:</p>
 			<ul className="list-disc space-y-1 pl-5">
@@ -180,7 +189,7 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 					Mehrbenutzer“ änderbar.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-4">
+			<CardContent className={`${STEP_CONTENT} space-y-4`}>
 				<div className="grid gap-3 sm:grid-cols-3">
 					{MODE_OPTIONS.map((option) => (
 						<button
@@ -258,7 +267,7 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 						jederzeit unter „Einstellungen“ nachpflegbar.
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="space-y-4">
+				<CardContent className={`${STEP_CONTENT} space-y-4`}>
 					<div className="grid gap-2">
 						<Label htmlFor="setup-name">Name / Firma</Label>
 						<Input id="setup-name" name="name" defaultValue={initial.name} placeholder="Max Mustermann Hausverwaltung" />
@@ -342,7 +351,7 @@ function IntegrationsStep({
 						jederzeit unter „Einstellungen“ eingerichtet werden.
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="space-y-6">
+				<CardContent className={`${STEP_CONTENT} space-y-6`}>
 					<fieldset className="space-y-4">
 						<legend className="text-sm font-medium">E-Mail-Versand (SMTP)</legend>
 						<div className="grid grid-cols-3 gap-4">
@@ -492,7 +501,7 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 					(AES-256). Der Schlüssel dazu ist an dieses Gerät gebunden.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-4 text-sm">
+			<CardContent className={`${STEP_CONTENT} space-y-4 text-sm`}>
 				<p className="text-muted-foreground">
 					Mit dem folgenden Wiederherstellungsschlüssel können Sie Ihre Daten entschlüsseln, falls der
 					Geräteschlüssel verloren geht (z. B. nach einer Neuinstallation des Betriebssystems). Verwahren Sie ihn
@@ -561,7 +570,7 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 						Zum Abschluss wird Ihr Benutzerkonto angelegt. Das erste Konto erhält automatisch Administrator-Rechte.
 					</CardDescription>
 				</CardHeader>
-				<CardContent className="grid gap-4">
+				<CardContent className={`${STEP_CONTENT} grid gap-4`}>
 					<div className="grid gap-2">
 						<Label htmlFor="setup-email">E-Mail-Adresse</Label>
 						<Input id="setup-email" name="email" type="email" autoComplete="email" required />
