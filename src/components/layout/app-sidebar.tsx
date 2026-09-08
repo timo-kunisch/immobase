@@ -13,7 +13,6 @@ import {
 	FolderOpen,
 	Gavel,
 	LayoutDashboard,
-	LifeBuoy,
 	LogOut,
 	PiggyBank,
 	Scale,
@@ -240,19 +239,6 @@ export function AppSidebar({ user, aiConfigured }: { user: { email: string; role
 				/>
 			</div>
 			<SidebarFooter>
-				{/* Dezente Verlinkung des kostenpflichtigen Priority-Support-Angebots
-				    (help.immobase.app). Externer Link: Die Electron-Shell öffnet
-				    target="_blank" im Standardbrowser (siehe electron/main/index.ts). */}
-				<a
-					href="https://help.immobase.app"
-					target="_blank"
-					rel="noopener noreferrer"
-					title="Priority-Support direkt vom Entwickler (help.immobase.app)"
-					className="flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-				>
-					<LifeBuoy className="size-4 shrink-0" />
-					<span className="group-data-[collapsible=icon]:hidden">Support &amp; Hilfe</span>
-				</a>
 				<div className="flex items-center gap-2 px-1 py-1">
 					<div className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
 						<span className="truncate text-xs font-medium">{user.email}</span>
