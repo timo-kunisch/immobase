@@ -57,9 +57,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 - **E-Mail** über `nodemailer` (SMTP), konfiguriert in der App unter Einstellungen →
   Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
   Umgebungsvariablen für Dev/Tests). Ohne SMTP: Protokollierung in `<userData>/logs/outbox.log`.
+  **E-Mail-abhängige Funktionen sind ohne Konfiguration deaktiviert** (`isSmtpConfigured()`):
+  Kontakt-Dialog (UI-Hinweis + Server-Check), Freigabe-Benachrichtigung im Admin-Bereich (wird
+  übersprungen, Admin erhält Hinweis im Aktionsergebnis).
 - **Postversand von PDFs** über die externe **LetterXpress API v3** (`src/lib/letterxpress.ts`) –
   **optionale Online-Funktion, nicht Teil des Offline-Kernpfads**: ohne Zugangsdaten sind die
-  Versand-Buttons deaktiviert (`isLetterXpressConfigured()`); Zugangsdaten in `app_settings`.
+  Versand-Buttons deaktiviert (`isLetterXpressConfigured()`) **und** `sendPdfByPostForSource()`
+  (`src/lib/postal-shipments.ts`, zentraler Durchgang aller Versand-Actions) bricht serverseitig
+  früh ab (ohne FAILED-Protokoll-Eintrag); Zugangsdaten in `app_settings`.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). UI: Einstellungen →
   Datensicherung (Desktop: native Dateidialoge via IPC + POST an `/api/backup/*`; Browser-Dev:

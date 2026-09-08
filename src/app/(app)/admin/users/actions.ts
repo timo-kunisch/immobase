@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getUserById, updateUserApproval } from "@/data/users";
 import { requireAdmin } from "@/lib/auth/dal";
 import { destroyAllSessionsForUser } from "@/lib/auth/session";
-import { sendAccountApprovedEmail } from "@/lib/email/mailer";
+import { isSmtpConfigured, sendAccountApprovedEmail } from "@/lib/email/mailer";
 import { ActionState } from "@/lib/action-state";
 
 /**
@@ -34,7 +34,24 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 
 	if (!isApproved) {
 		await destroyAllSessionsForUser(userId);
-	} else if (targetUser.emailVerified) {
+		revalidatePath("/admin/users");
+		return { success: true };
+	}
+
+	// Freigabe erteilt: Benachrichtigungs-E-Mail an den Nutzer. Diese hängt
+	// an der optionalen SMTP-Integration - ohne konfigurierten Server würde
+	// die Mail nur in der Outbox-Logdatei landen (siehe
+	// src/lib/email/mailer.ts); der Versand ist dann deaktiviert und der
+	// Admin erhält einen Hinweis im Ergebnis.
+	if (targetUser.emailVerified) {
+		if (!isSmtpConfigured()) {
+			revalidatePath("/admin/users");
+			return {
+				success: true,
+				message:
+					"Freigabe erteilt. Hinweis: Es ist kein E-Mail-Server konfiguriert (Einstellungen → Online-Integrationen) - der Nutzer wurde nicht per E-Mail benachrichtigt.",
+			};
+		}
 		// Best-effort-Benachrichtigung, Fehler beim Mailversand sollen die
 		// Freigabe nicht rückgängig machen.
 		await sendAccountApprovedEmail(targetUser.email).catch((error) => {

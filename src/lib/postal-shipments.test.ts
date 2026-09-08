@@ -40,17 +40,19 @@ vi.mock("@/lib/letterxpress", async () => {
 	return {
 		...actual,
 		getLetterXpressMode: vi.fn(() => "test"),
+		isLetterXpressConfigured: vi.fn(() => true),
 		sendPdfByPost: vi.fn(),
 	};
 });
 
 import { getUploadedFile } from "@/lib/storage";
-import { getLetterXpressMode, sendPdfByPost, LetterXpressError } from "@/lib/letterxpress";
+import { getLetterXpressMode, isLetterXpressConfigured, sendPdfByPost, LetterXpressError } from "@/lib/letterxpress";
 import { sendPdfByPostForSource } from "@/lib/postal-shipments";
 
 const mockedGetUploadedFile = getUploadedFile as unknown as ReturnType<typeof vi.fn>;
 const mockedSendPdfByPost = sendPdfByPost as unknown as ReturnType<typeof vi.fn>;
 const mockedGetMode = getLetterXpressMode as unknown as ReturnType<typeof vi.fn>;
+const mockedIsConfigured = isLetterXpressConfigured as unknown as ReturnType<typeof vi.fn>;
 
 function fakeUploadedFile(bytes: Uint8Array) {
 	return { body: new Response(bytes as BodyInit).body!, mimeType: "application/pdf" };
@@ -67,9 +69,21 @@ beforeEach(() => {
 	mockedGetUploadedFile.mockReset();
 	mockedSendPdfByPost.mockReset();
 	mockedGetMode.mockReset().mockReturnValue("test");
+	mockedIsConfigured.mockReset().mockReturnValue(true);
 });
 
 describe("sendPdfByPostForSource", () => {
+	it("bricht ohne LetterXpress-Konfiguration ab, ohne die Quelle zu laden oder einen Protokoll-Eintrag zu erzeugen", async () => {
+		mockedIsConfigured.mockReturnValue(false);
+
+		const result = await sendPdfByPostForSource("TENANT_STATEMENT", "s1", "user-1");
+
+		expect(result).toEqual({ error: expect.stringContaining("nicht eingerichtet") });
+		expect(getTenantStatementPdfFile).not.toHaveBeenCalled();
+		expect(mockedSendPdfByPost).not.toHaveBeenCalled();
+		expect(insertedRows).toHaveLength(0);
+	});
+
 	it("gibt einen Fehler zurück, wenn die Quelle kein pdfPath hat (TenantStatement ohne erzeugtes PDF)", async () => {
 		getTenantStatementPdfFile.mockReturnValue(null);
 

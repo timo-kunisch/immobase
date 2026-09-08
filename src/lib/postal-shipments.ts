@@ -10,7 +10,7 @@ import {
 } from "@/data/postal-shipments";
 import type { PostalShipment, PostalShipmentSourceType, PostalShipmentStatus } from "@/data/types";
 import { getUploadedFile } from "@/lib/storage";
-import { getLetterXpressMode, LetterXpressError, sendPdfByPost } from "@/lib/letterxpress";
+import { getLetterXpressMode, isLetterXpressConfigured, LetterXpressError, sendPdfByPost } from "@/lib/letterxpress";
 
 /**
  * Generische Postversand-Orchestrierung (LetterXpress API, siehe
@@ -26,6 +26,13 @@ import { getLetterXpressMode, LetterXpressError, sendPdfByPost } from "@/lib/let
  * Server Actions (in den `actions.ts`-Dateien der Module) rufen
  * ausschließlich `sendPdfByPostForSource()` auf und kümmern sich selbst um
  * `requireUser()`/`revalidatePath()` (Defense-in-Depth-Konvention).
+ *
+ * Der Postversand ist eine optionale Online-Funktion: Solange keine
+ * LetterXpress-Zugangsdaten hinterlegt sind (isLetterXpressConfigured()),
+ * ist er deaktiviert - die UI deaktiviert dann die Versand-Schaltflächen,
+ * und `sendPdfByPostForSource()` bricht als zentrale serverseitige
+ * Absicherung (alle Versand-Actions laufen durch diese Funktion) früh ab,
+ * ohne einen FAILED-Protokoll-Eintrag zu erzeugen.
  */
 
 export const postalShipmentStatusLabels: Record<PostalShipmentStatus, string> = {
@@ -90,6 +97,14 @@ export async function sendPdfByPostForSource(
 	sourceId: string,
 	requestedByUserId: string | null
 ): Promise<PostalShipmentActionState> {
+	// Zentrales Gate für die optionale Online-Integration: Ohne hinterlegte
+	// Zugangsdaten ist der Postversand deaktiviert. Frühabbruch OHNE
+	// Protokoll-Eintrag - ein Versuch kann ohne Konfiguration nie erfolgreich
+	// sein und soll die Sendungsübersicht nicht mit FAILED-Zeilen füllen.
+	if (!isLetterXpressConfigured()) {
+		return { error: "Der Postversand ist nicht eingerichtet. Bitte hinterlegen Sie die LetterXpress-Zugangsdaten unter Einstellungen → Online-Integrationen." };
+	}
+
 	const source = loadSourceFile(sourceType, sourceId);
 	if (!source) {
 		return { error: "Für diese Quelle wurde kein versandfertiges PDF gefunden." };
