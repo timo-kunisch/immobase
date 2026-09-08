@@ -21,7 +21,9 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  *   Dokumente, src/lib/storage.ts),
  * - die lokalen Vor-Import-Sicherungen unter `backups/` (vollständige
  *   Datenkopien, src/data/backup.ts),
- * - das E-Mail-Outbox-Log `logs/outbox.log` (enthält E-Mail-Inhalte),
+ * - das E-Mail-Outbox-Log `logs/outbox.log` (Altlast aus älteren
+ *   Versionen, enthält E-Mail-Inhalte - wird seit der Entfernung des
+ *   Outbox-Fallbacks nicht mehr geschrieben),
  * - verwaiste Import-Temp-Verzeichnisse (`.import-extract-*`,
  *   `.import-trash-*` - Reste abgestürzter Importe).
  *
@@ -63,7 +65,8 @@ export function resetApplicationData(): void {
 		fs.rmSync(getFilesDir(), { recursive: true, force: true });
 		fs.rmSync(path.join(dataDir, "backups"), { recursive: true, force: true });
 
-		// E-Mail-Outbox-Log (enthält E-Mail-Inhalte, src/lib/email/mailer.ts).
+		// E-Mail-Outbox-Log (Altlast aus älteren Versionen, enthält ggf.
+		// noch E-Mail-Inhalte - wird nicht mehr geschrieben).
 		fs.rmSync(path.join(dataDir, "logs", "outbox.log"), { force: true });
 
 		// Verwaiste Import-Temp-Verzeichnisse (nur nach abgestürztem Import

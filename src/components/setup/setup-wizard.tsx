@@ -224,8 +224,7 @@ function IntegrationsStep({
 							SSL/TLS (Port 465)
 						</label>
 						<p className="text-xs text-muted-foreground">
-							Ohne SMTP-Konfiguration werden E-Mails (Verifizierung, Passwort-Reset) in die Datei logs/outbox.log im
-							Datenverzeichnis geschrieben statt versendet.
+							Ohne SMTP-Konfiguration sind alle E-Mail-Funktionen (Verifizierung, Passwort-Reset) deaktiviert.
 						</p>
 					</fieldset>
 

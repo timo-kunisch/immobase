@@ -14,9 +14,9 @@ const MAX_MESSAGE_LENGTH = 5000;
 export async function sendContactMessageAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
 
-	// Ohne konfigurierten SMTP-Server kann die Nachricht den Rechner nicht
-	// verlassen (sie würde nur in der Outbox-Logdatei landen, siehe
-	// src/lib/email/mailer.ts) - der Versand ist dann gesperrt.
+	// Ohne konfigurierten SMTP-Server sind alle E-Mail-Funktionen
+	// deaktiviert (siehe src/lib/email/mailer.ts) - der Versand ist dann
+	// gesperrt.
 	if (!isSmtpConfigured()) {
 		return { error: "Nachrichten können derzeit nicht versendet werden, weil kein E-Mail-Server konfiguriert ist." };
 	}

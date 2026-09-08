@@ -21,10 +21,10 @@ export interface ProvisionResult {
  * - Wenn SMTP konfiguriert ist, wird eine Verifizierungs-E-Mail versendet;
  *   ein Login ist dann erst nach Bestätigung der E-Mail möglich.
  * - OHNE SMTP-Konfiguration (Normalfall der offline laufenden Desktop-App)
- *   kann eine Verifizierungs-Mail niemanden erreichen – sie würde nur in
- *   logs/outbox.log protokolliert. Die E-Mail-Adresse wird daher sofort als
- *   bestätigt markiert, damit der Login nicht an einem nicht zustellbaren
- *   Schritt hängt (Self-Healing für Altfälle zusätzlich im Login selbst).
+ *   sind alle E-Mail-Funktionen deaktiviert – eine Verifizierungs-Mail kann
+ *   niemanden erreichen. Die E-Mail-Adresse wird daher sofort als bestätigt
+ *   markiert, damit der Login nicht an einem nicht zustellbaren Schritt
+ *   hängt (Self-Healing für Altfälle zusätzlich im Login selbst).
  *
  * Aufrufer validieren vorher selbst (E-Mail-Format, Passwort-Regeln,
  * Duplikat-Prüfung) – diese Funktion legt das Konto ungeprüft an.

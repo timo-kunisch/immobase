@@ -37,8 +37,8 @@ function SubmitButton() {
 /**
  * Einstellungen für die optionalen Online-Integrationen (SMTP-E-Mail-Versand,
  * LetterXpress-Postversand). Ohne Konfiguration bleibt die App vollständig
- * offline nutzbar: E-Mails landen dann im Outbox-Log (logs/outbox.log im
- * Datenverzeichnis) und die Postversand-Schaltflächen sind deaktiviert.
+ * offline nutzbar: Alle E-Mail-Funktionen sind dann deaktiviert und die
+ * Postversand-Schaltflächen sind gesperrt.
  *
  * Gespeicherte Geheimnisse (SMTP-Passwort, LetterXpress-API-Key) werden aus
  * Sicherheitsgründen NICHT vorausgefüllt - leeres Feld = unverändert lassen.
@@ -93,8 +93,7 @@ export function IntegrationSettingsForm({ settings }: { settings: IntegrationSet
 							SSL/TLS (Port 465)
 						</label>
 						<p className="text-xs text-muted-foreground">
-							Ohne SMTP-Konfiguration werden E-Mails (Verifizierung, Passwort-Reset) in die Datei logs/outbox.log im
-							Datenverzeichnis geschrieben statt versendet.
+							Ohne SMTP-Konfiguration sind alle E-Mail-Funktionen (Verifizierung, Passwort-Reset) deaktiviert.
 						</p>
 					</fieldset>
 

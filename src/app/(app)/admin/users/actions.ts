@@ -39,10 +39,9 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 	}
 
 	// Freigabe erteilt: Benachrichtigungs-E-Mail an den Nutzer. Diese hängt
-	// an der optionalen SMTP-Integration - ohne konfigurierten Server würde
-	// die Mail nur in der Outbox-Logdatei landen (siehe
-	// src/lib/email/mailer.ts); der Versand ist dann deaktiviert und der
-	// Admin erhält einen Hinweis im Ergebnis.
+	// an der optionalen SMTP-Integration - ohne konfigurierten Server sind
+	// alle E-Mail-Funktionen deaktiviert (siehe src/lib/email/mailer.ts);
+	// der Admin erhält dann einen Hinweis im Ergebnis.
 	if (targetUser.emailVerified) {
 		if (!isSmtpConfigured()) {
 			revalidatePath("/admin/users");

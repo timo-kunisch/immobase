@@ -58,7 +58,7 @@ export async function setupIntegrationSettingsAction(_prevState: ActionState, fo
 	ensureSetupAllowed();
 
 	try {
-		// SMTP (leere Host-Adresse = deaktiviert -> Outbox-Log-Fallback)
+		// SMTP (leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet)
 		setSetting("smtp.host", getString(formData, "smtpHost"));
 		setSetting("smtp.port", getString(formData, "smtpPort"));
 		setSetting("smtp.secure", formData.get("smtpSecure") === "on" ? "true" : "false");

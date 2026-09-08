@@ -12,9 +12,10 @@ import { countUsers } from "@/data/users";
 
 /**
  * Vollständiger Anwendungs-Reset (src/data/reset.ts): löscht Datenbank,
- * Dateiablage, lokale Sicherungen und Outbox-Log, lässt aber Geräte-/
- * Installationsdateien (settings.json, .data-key, main.log) unangetastet
- * und stellt anschließend sofort eine frische, migrierte DB bereit.
+ * Dateiablage, lokale Sicherungen und das Outbox-Log (Altlast älterer
+ * Versionen), lässt aber Geräte-/Installationsdateien (settings.json,
+ * .data-key, main.log) unangetastet und stellt anschließend sofort eine
+ * frische, migrierte DB bereit.
  */
 
 let testDir: string;

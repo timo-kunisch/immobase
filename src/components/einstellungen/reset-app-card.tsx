@@ -16,10 +16,10 @@ import { RESET_CONFIRMATION_PHRASE } from "@/app/(app)/einstellungen/reset-confi
 /**
  * Karte "Anwendung zurücksetzen" (Gefahrenbereich am Ende der
  * Einstellungen). Löscht über resetApplicationAction unwiderruflich die
- * gesamte Datenbank, alle abgelegten Dateien, lokalen Sicherungen und das
- * E-Mail-Protokoll (Details: src/data/reset.ts) und führt zurück zur
- * Ersteinrichtung. Die Seite ist bereits über das Layout auf Admins
- * beschränkt; die Server Action prüft requireAdmin() zusätzlich selbst.
+ * gesamte Datenbank, alle abgelegten Dateien und lokalen Sicherungen
+ * (Details: src/data/reset.ts) und führt zurück zur Ersteinrichtung. Die
+ * Seite ist bereits über das Layout auf Admins beschränkt; die Server
+ * Action prüft requireAdmin() zusätzlich selbst.
  */
 export function ResetAppCard() {
 	const [open, setOpen] = useState(false);
@@ -106,7 +106,7 @@ function ResetAppDialogContent() {
 						<li>alle Benutzerkonten, Freigaben und Sitzungen (alle Nutzer werden abgemeldet)</li>
 						<li>alle Einstellungen inkl. gespeicherter Zugangsdaten (SMTP, LetterXpress, Dropbox)</li>
 						<li>alle abgelegten Dateien (Uploads und erzeugte Dokumente)</li>
-						<li>die lokal gespeicherten Sicherungen (backups/) und das E-Mail-Protokoll (logs/outbox.log)</li>
+						<li>die lokal gespeicherten Sicherungen (backups/)</li>
 					</ul>
 				</div>
 

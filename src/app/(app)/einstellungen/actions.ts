@@ -61,7 +61,7 @@ export async function saveIntegrationSettingsAction(_prevState: ActionState, for
 	await requireAdmin();
 
 	try {
-		// SMTP (leere Host-Adresse = deaktiviert -> Outbox-Log-Fallback)
+		// SMTP (leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet)
 		setSetting("smtp.host", getString(formData, "smtpHost"));
 		setSetting("smtp.port", getString(formData, "smtpPort"));
 		setSetting("smtp.secure", formData.get("smtpSecure") === "on" ? "true" : "false");
@@ -134,8 +134,8 @@ export async function getRecoveryKeyAction(): Promise<{ key?: string; error?: st
 /**
  * Setzt die komplette Anwendung zurück: löscht unwiderruflich die gesamte
  * Datenbank (sämtliche Fachdaten, Benutzerkonten, Sessions und
- * Einstellungen), alle abgelegten Dateien, lokal gespeicherte Sicherungen
- * und das E-Mail-Protokoll (Details: src/data/reset.ts). Nur für Admins.
+ * Einstellungen), alle abgelegten Dateien und lokal gespeicherte
+ * Sicherungen (Details: src/data/reset.ts). Nur für Admins.
  * Schutz vor versehentlicher Auslösung: Tipp-Bestätigung
  * (RESET_CONFIRMATION_PHRASE), client- UND serverseitig geprüft.
  *

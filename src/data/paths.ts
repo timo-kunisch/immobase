@@ -2,8 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Zentrale Pfad-Auflösung für alle App-Daten (SQLite-DB, Upload-Dateien,
- * Logs). Die Desktop-App (Electron-Main-Prozess) setzt vor dem Start des
+ * Zentrale Pfad-Auflösung für alle App-Daten (SQLite-DB, Upload-Dateien). Die Desktop-App (Electron-Main-Prozess) setzt vor dem Start des
  * Next.js-Servers die Umgebungsvariable APP_DATA_DIR auf
  * `app.getPath("userData")`. Für die reine Web-Entwicklung (`next dev` ohne
  * Electron) und für Tests fällt die Auflösung auf `<Projekt>/data-dev`
@@ -42,9 +41,4 @@ export function getDatabaseFilePath(): string {
 /** Wurzelverzeichnis der hochgeladenen/generierten Dateien. */
 export function getFilesDir(): string {
 	return ensurePrivateDir(path.join(getDataDir(), "files"));
-}
-
-/** Verzeichnis für Log-Dateien (Main-Log, E-Mail-Outbox, ...). */
-export function getLogsDir(): string {
-	return ensurePrivateDir(path.join(getDataDir(), "logs"));
 }

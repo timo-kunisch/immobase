@@ -1,11 +1,8 @@
 import "server-only";
-import fs from "node:fs";
-import path from "node:path";
 
 import nodemailer from "nodemailer";
 
 import { getSettingWithEnvFallback } from "@/data/app-settings";
-import { getLogsDir } from "@/data/paths";
 
 /**
  * E-Mail-Versand für Transaktionsmails (Verifizierung, Passwort-Reset,
@@ -14,12 +11,12 @@ import { getLogsDir } from "@/data/paths";
  * - Wenn SMTP konfiguriert ist (App-Einstellungen `smtp.*`, siehe
  *   src/data/app-settings.ts; Fallback: Umgebungsvariablen SMTP_HOST etc.),
  *   wird über nodemailer versendet.
- * - OHNE SMTP-Konfiguration wird die E-Mail NICHT verschickt, sondern in
- *   `<APP_DATA_DIR>/logs/outbox.log` und auf der Konsole protokolliert - so
- *   bleibt der komplette Auth-Flow auch komplett offline (Kernanforderung
- *   der Desktop-App) test- und benutzbar. Der Inhalt enthält alle Links
- *   (z. B. Verifizierungs-/Reset-Links) und kann von dort übernommen
- *   werden.
+ * - OHNE SMTP-Konfiguration sind sämtliche E-Mail-Funktionen deaktiviert:
+ *   Es wird nichts versendet und nichts protokolliert. Der Auth-Flow
+ *   behandelt die E-Mail-Verifizierung dann als automatisch erfüllt
+ *   (siehe register/login actions); Funktionen, die zwingend auf den
+ *   Versand angewiesen sind (Passwort-Reset, Kontaktanfrage), sperren
+ *   sich selbst über isSmtpConfigured().
  *
  * Diese Datei ist die einzige Stelle im Projekt mit Mailversand-Logik -
  * alle Aufrufer nutzen ausschließlich die hier exportierten, fachlichen
@@ -49,11 +46,10 @@ interface SmtpConfig {
 }
 
 /**
- * Gibt an, ob ein SMTP-Versandweg konfiguriert ist. Wenn nicht, können
- * E-Mails den Server-Rechner nicht verlassen (sie landen nur in der
- * Outbox-Logdatei, siehe logToOutbox) - der Auth-Flow behandelt die
- * E-Mail-Verifizierung dann als automatisch erfüllt, weil sie ohne
- * funktionierenden Versand keinen Sicherheitsgewinn bringt, sondern nur
+ * Gibt an, ob ein SMTP-Versandweg konfiguriert ist. Wenn nicht, sind alle
+ * E-Mail-Funktionen deaktiviert (sendMail wird zum No-Op) - der Auth-Flow
+ * behandelt die E-Mail-Verifizierung dann als automatisch erfüllt, weil sie
+ * ohne funktionierenden Versand keinen Sicherheitsgewinn bringt, sondern nur
  * den Login blockiert (siehe register/login actions).
  */
 export function isSmtpConfigured(): boolean {
@@ -80,33 +76,13 @@ type SendMailOptions = {
 	replyTo?: string;
 };
 
-/** Schreibt eine nicht versendete E-Mail in die Outbox-Logdatei (Offline-Fallback). */
-function logToOutbox(options: SendMailOptions & { from: string }, reason: string): void {
-	const line = [
-		"=".repeat(72),
-		`Zeit: ${new Date().toISOString()}`,
-		`Grund: ${reason}`,
-		`Von: ${options.from}`,
-		`An: ${options.to}`,
-		`Betreff: ${options.subject}`,
-		"",
-		options.text,
-		"",
-	].join("\n");
-	try {
-		fs.appendFileSync(path.join(getLogsDir(), "outbox.log"), line + "\n", "utf8");
-	} catch (error) {
-		console.error("[email] Outbox-Log konnte nicht geschrieben werden", error);
-	}
-	console.warn(`[email] Kein SMTP-Versand (${reason}) - E-Mail in logs/outbox.log protokolliert.\n  An: ${options.to}\n  Betreff: ${options.subject}`);
-}
-
 async function sendMail(options: SendMailOptions): Promise<void> {
-	const from = getEmailFrom();
 	const smtp = getSmtpConfig();
 
+	// Ohne SMTP-Konfiguration sind E-Mail-Funktionen deaktiviert: kein
+	// Versand, kein Fallback. Aufrufer, die zwingend auf den Versand
+	// angewiesen sind, prüfen vorher selbst isSmtpConfigured().
 	if (!smtp) {
-		logToOutbox({ ...options, from }, "SMTP nicht konfiguriert");
 		return;
 	}
 
@@ -118,7 +94,7 @@ async function sendMail(options: SendMailOptions): Promise<void> {
 			auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
 		});
 		await transporter.sendMail({
-			from,
+			from: getEmailFrom(),
 			to: options.to,
 			subject: options.subject,
 			html: options.html,
@@ -129,7 +105,7 @@ async function sendMail(options: SendMailOptions): Promise<void> {
 		// Ein fehlgeschlagener Mailversand darf den aufrufenden Flow (z. B.
 		// Registrierung, bei der der Nutzer bereits in der DB angelegt wurde)
 		// nicht mit einem 500 abbrechen - nur protokollieren.
-		logToOutbox({ ...options, from }, `Versand fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+		console.error("[email] Versand fehlgeschlagen:", error);
 	}
 }
 

@@ -89,11 +89,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Verzeichnisse/`data.db`/`settings.json` sind auf 0700/0600 gehärtet.
 - **E-Mail** über `nodemailer` (SMTP), konfiguriert in der App unter Einstellungen →
   Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
-  Umgebungsvariablen für Dev/Tests). Ohne SMTP: Protokollierung in `<userData>/logs/outbox.log`
-  (Klartext-Log – enthält E-Mail-Inhalte, bei Bedarf leeren). **E-Mail-abhängige Funktionen sind
-  ohne Konfiguration deaktiviert** (`isSmtpConfigured()`): Kontakt-Dialog (UI-Hinweis +
-  Server-Check), Freigabe-Benachrichtigung im Admin-Bereich (wird übersprungen, Admin erhält
-  Hinweis im Aktionsergebnis).
+  Umgebungsvariablen für Dev/Tests). **Ohne SMTP-Konfiguration sind sämtliche E-Mail-Funktionen
+  deaktiviert** (`isSmtpConfigured()`, `src/lib/email/mailer.ts`): `sendMail` wird zum No-Op (kein
+  Versand, kein Fallback-Log), der Passwort-Reset und der Kontakt-Dialog sperren sich mit
+  UI-/Server-Hinweis, die Freigabe-Benachrichtigung im Admin-Bereich wird übersprungen (Admin erhält
+  Hinweis im Aktionsergebnis) und die E-Mail-Verifizierung gilt als automatisch erfüllt (siehe
+  Abschnitt 3).
 - **Postversand von PDFs** über die externe **LetterXpress API v3** (`src/lib/letterxpress.ts`) –
   **optionale Online-Funktion, nicht Teil des Offline-Kernpfads**: ohne Zugangsdaten sind die
   Versand-Buttons deaktiviert (`isLetterXpressConfigured()`) **und** `sendPdfByPostForSource()`
@@ -125,8 +126,9 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   (`backups/pre-import-*.zip.enc`, Container-Format; der Import erkennt sie am Magic).
 - **Anwendungs-Reset** (Einstellungen → Anwendung zurücksetzen, nur Admins, Tipp-Bestätigung
   `ZURÜCKSETZEN`): `src/data/reset.ts` löscht die DB in allen Formen (Klartext, WAL,
-  `data.db.enc`, `data.db.pre-migrate-*.enc`), `files/`, `backups/`, `logs/outbox.log` und
-  verwaiste Import-Temp-Verzeichnisse; `settings.json`/`.data-key`/`main.log` bleiben als
+  `data.db.enc`, `data.db.pre-migrate-*.enc`), `files/`, `backups/`, ein evtl. vorhandenes
+  `logs/outbox.log` (Altlast aus Versionen mit E-Mail-Outbox-Fallback) und verwaiste
+  Import-Temp-Verzeichnisse; `settings.json`/`.data-key`/`main.log` bleiben als
   Geräte-/Installationsdateien erhalten. Danach wird die DB sofort frisch migriert angelegt,
   das Session-Cookie serverseitig entfernt und der Client lädt `/setup` vollständig neu.
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
@@ -188,11 +190,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   gilt der klassische Verifizierungslink-Flow über `/login`.
 - **Login-Bedingungen** (beide erforderlich): `emailVerified != null` UND `isApproved == true`.
   Die E-Mail-Verifizierung ist an `isSmtpConfigured()` (`src/lib/email/mailer.ts`) gekoppelt: **Ohne
-  SMTP-Konfiguration** (Normalfall der offline laufenden Desktop-App) kann eine Verifizierungs-Mail
-  niemanden erreichen – Registrierung markiert die Adresse daher sofort als bestätigt und der Login
+  SMTP-Konfiguration** (Normalfall der offline laufenden Desktop-App) sind alle E-Mail-Funktionen
+  deaktiviert – Registrierung markiert die Adresse daher sofort als bestätigt und der Login
   bestätigt sie nach erfolgreicher Passwortprüfung automatisch nach (Self-Healing für Bestands-
-  konten). **Mit SMTP** gilt der klassische Verifizierungslink-Flow. Passwort-Reset-Links landen
-  ohne SMTP weiterhin nur in `logs/outbox.log` (Hinweis im UI der Forgot-Password-Seite).
+  konten). **Mit SMTP** gilt der klassische Verifizierungslink-Flow. Der Passwort-Reset ist ohne
+  SMTP komplett gesperrt (die Forgot-Password-Action bricht mit Hinweis ab, es wird weder ein
+  Token erzeugt noch eine E-Mail versendet).
 - **WICHTIGE Falle bei `"use server"`-Dateien:** nur async Funktionen exportieren (+
   `export type`). Keine Objekt-/Wert-Exporte. Daher liegen `LoginState`/`initialLoginState`
   (`src/lib/auth/login-state.ts`) und `TemplatePreviewState`/`initialPreviewState`
@@ -242,7 +245,7 @@ src/
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
     auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, bootstrap.ts, actions.ts
-    email/mailer.ts         # nodemailer/Outbox-Log
+    email/mailer.ts         # nodemailer (ohne SMTP: alle E-Mail-Funktionen deaktiviert)
     pdf/                    # document.ts (Briefe), billing-statement.ts (Abrechnungen)
     storage.ts              # Dateisystem-Ablage (files/)
     data-key.ts             # Master-Schlüssel (Env aus Electron / Schlüsseldatei-Fallback)

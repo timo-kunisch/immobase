@@ -8,21 +8,22 @@ import { isValidEmail, normalizeEmail } from "@/lib/auth/validation";
 
 const GENERIC_MESSAGE = "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir einen Link zum Zurücksetzen des Passworts versendet.";
 
-// Ohne SMTP kann die Reset-Mail nicht zugestellt werden - sie landet nur in
-// der Outbox-Logdatei auf dem Server-Rechner. Der Hinweis macht diesen
-// Offline-Fallback auffindbar, statt den Nutzer vergeblich auf eine Mail
-// warten zu lassen.
-const OFFLINE_MESSAGE =
-	"Falls ein Konto mit dieser E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts erzeugt. " +
-	"Hinweis: Es ist kein E-Mail-Versand (SMTP) konfiguriert - die Nachricht wurde nicht verschickt, sondern in der Datei " +
-	"logs/outbox.log im App-Datenverzeichnis protokolliert. Den Link können Sie von dort übernehmen.";
-
 /**
  * Absichtlich IMMER dieselbe Erfolgsmeldung, unabhängig davon, ob ein
  * Konto mit dieser E-Mail-Adresse existiert – verhindert, dass sich über
  * dieses Formular erraten lässt, welche E-Mail-Adressen registriert sind.
+ *
+ * Ohne SMTP-Konfiguration ist der Passwort-Reset deaktiviert (die
+ * Reset-E-Mail könnte niemanden erreichen) - es wird dann weder ein Token
+ * erzeugt noch eine E-Mail versendet.
  */
 export async function forgotPasswordAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	if (!isSmtpConfigured()) {
+		return {
+			error: "Das Zurücksetzen des Passworts ist nicht verfügbar, weil kein E-Mail-Server konfiguriert ist. Bitte wenden Sie sich an einen Administrator.",
+		};
+	}
+
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 
 	if (!isValidEmail(email)) {
@@ -35,5 +36,5 @@ export async function forgotPasswordAction(_prevState: ActionState, formData: Fo
 		await sendPasswordResetEmail(email, token);
 	}
 
-	return { success: true, message: isSmtpConfigured() ? GENERIC_MESSAGE : OFFLINE_MESSAGE };
+	return { success: true, message: GENERIC_MESSAGE };
 }
