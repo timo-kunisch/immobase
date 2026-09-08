@@ -50,6 +50,7 @@ const SECRET_TAG_LENGTH = 16;
  * Dropbox: Refresh-/Access-Token des verbundenen Kontos, das zwischenge-
  * speicherte PKCE-Paar des laufenden Verbindungsvorgangs sowie das optionale
  * Passwort für die automatische Cloud-Sicherung (src/lib/dropbox-backup.ts).
+ * MCP: das Zugriffs-Token des optionalen MCP-Servers (src/lib/mcp/auth.ts).
  */
 const SECRET_SETTING_KEYS = new Set([
 	"smtp.pass",
@@ -58,6 +59,7 @@ const SECRET_SETTING_KEYS = new Set([
 	"dropbox.access_token",
 	"dropbox.oauth_pending",
 	"dropbox.backup_password",
+	"mcp.token",
 ]);
 
 /** Ist der Schlüssel ein Geheimnis (feldverschlüsselte Ablage)? */

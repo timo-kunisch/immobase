@@ -5,6 +5,7 @@ import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
 import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
+import { McpCard } from "@/components/einstellungen/mcp-card";
 import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { getCompanySettings } from "@/data/company-settings";
@@ -13,6 +14,7 @@ import { getDatabaseFilePath } from "@/data/paths";
 import { getDataKeySource } from "@/lib/data-key";
 import { getDropboxUiState } from "@/lib/dropbox-backup";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
+import { hasMcpToken, isMcpEnabled } from "@/lib/mcp/auth";
 import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,7 @@ const settingsSections = [
 	{ id: "dropbox-backup", label: "Dropbox-Backup" },
 	{ id: "datenverschluesselung", label: "Lokale Datenverschlüsselung" },
 	{ id: "online-integrationen", label: "Online-Integrationen" },
+	{ id: "mcp-server", label: "MCP-Server (KI-Zugriff)" },
 	{ id: "verbindung", label: "Verbindung & Mehrbenutzer" },
 	{ id: "zuruecksetzen", label: "Anwendung zurücksetzen" },
 ];
@@ -90,6 +93,9 @@ export default async function EinstellungenPage() {
 				</section>
 				<section id="online-integrationen" className="scroll-mt-6">
 					<IntegrationSettingsForm settings={integrations} />
+				</section>
+				<section id="mcp-server" className="scroll-mt-6">
+					<McpCard state={{ enabled: isMcpEnabled(), tokenSet: hasMcpToken() }} />
 				</section>
 				<section id="verbindung" className="scroll-mt-6">
 					<ConnectionCard />

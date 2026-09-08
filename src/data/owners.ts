@@ -44,6 +44,11 @@ export function listOwners(): Owner[] {
 	return rows.map(mapOwner);
 }
 
+export function getOwner(id: string): Owner | null {
+	const row = getDb().prepare(`SELECT ${OWNER_COLUMNS} FROM owners WHERE id = ?`).get(id) as OwnerRow | undefined;
+	return row ? mapOwner(row) : null;
+}
+
 export function createOwner(input: OwnerInput): Owner {
 	const id = newId();
 	const timestamp = now();

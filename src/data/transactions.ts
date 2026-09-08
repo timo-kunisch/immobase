@@ -108,6 +108,11 @@ export function listTransactions(filter: { leaseId?: string } = {}): Transaction
 	return rows.map(mapTransactionRow);
 }
 
+/** Einzelne Zahlung inkl. Vertrags-Relationen (für Detailabfragen). */
+export function getTransaction(id: string): TransactionWithLease | null {
+	return listTransactions().find((transaction) => transaction.id === id) ?? null;
+}
+
 export function createTransaction(input: TransactionInput): Transaction {
 	const id = newId();
 	const timestamp = now();

@@ -40,6 +40,18 @@ export function listUnits(filter?: { propertyId?: string }): UnitWithPropertyNam
 		.all(...params) as UnitWithPropertyName[];
 }
 
+export function getUnit(id: string): Unit | null {
+	const row = getDb()
+		.prepare(
+			`SELECT id, property_id AS propertyId, label, living_space AS livingSpace, rooms,
+				floor, co_ownership_share AS coOwnershipShare,
+				created_at AS createdAt, updated_at AS updatedAt
+			 FROM units WHERE id = ?`
+		)
+		.get(id) as Unit | undefined;
+	return row ?? null;
+}
+
 export function createUnit(input: UnitInput): Unit {
 	const id = newId();
 	const timestamp = now();

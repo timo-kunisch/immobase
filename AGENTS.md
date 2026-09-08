@@ -115,6 +115,28 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   danach Aufbewahrung (älteste `immobase-backup-*`-Dateien bis auf die letzten N löschen). Der
   Dropbox-App-Schlüssel wird in den Einstellungen hinterlegt (Fallback `DROPBOX_APP_KEY`); UI:
   Einstellungen → Dropbox-Backup.
+- **MCP-Server (KI-Zugriff)** (`src/app/api/mcp/route.ts` + `src/lib/mcp/`) – **optionale,
+  standardmäßig deaktivierte Online-Funktion** (Aktivierung nur durch Admins: Einstellungen →
+  MCP-Server (KI-Zugriff)): MCP-Endpunkt (Model Context Protocol, „Streamable HTTP" im
+  zustandslosen Request/Response-Modus, JSON-RPC 2.0; KEIN SSE, keine MCP-Sessions), über den
+  KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~130 Werkzeuge:
+  CRUD aller Entitäten beider Fachbereiche inkl. der fachlichen Operationen wie
+  Abrechnungs-/Wirtschaftsplan-/Jahresabrechnungs-Finalisierung, Fälligstellen von Mieten und
+  Hausgeld, Dokumenten-Up-/Download als Base64, Nutzerfreigaben). Authentifizierung
+  ausschließlich über Bearer-Token (`Authorization`-Header oder `access_token`-Query-Param;
+  **kein** Session-Cookie – `src/proxy.ts` lässt `/api/mcp` daher passieren, die Token-Prüfung im
+  Route Handler ist die autoritative Schranke; im Host-Modus gilt zusätzlich der LAN-Token-Check
+  des Main-Prozesses). Einstellungen `mcp.enabled` (Klartext) + `mcp.token` (FELD-verschlüsselt,
+  in `SECRET_SETTING_KEYS`), Helper `src/lib/mcp/auth.ts` (timingSafeEqual). Protokollschicht
+  `src/lib/mcp/protocol.ts` (initialize/ping/tools/list/tools/call, Batch, Notifications → 202),
+  Werkzeug-Registry `src/lib/mcp/registry.ts` (Feld-Spezifikationen → JSON-Schema +
+  Laufzeit-Validierung/Normalisierung: Dezimal-Komma, ISO-Daten, Enums; CRUD-Generator
+  `registerCrudTools`; fachliche Fehler als `McpToolError` → Tool-Result mit `isError: true`).
+  Werkzeuge aufgeteilt nach `tools-rental.ts`/`tools-hoa.ts`/`tools-system.ts` (Registrierung per
+  Import-Seiteneffekt, Sammel-Import `tools.ts`). Die Werkzeuge spiegeln die Fachregeln der
+  Server Actions (Entwurfs-Sperren, Beschluss-Nummernvergabe, Eigentümerwechsel-Versionierung,
+  Aussperr-Schutz letzter Admin). Das Token hat faktisch Admin-Rechte (prominenter Warnhinweis
+  in der UI-Karte `src/components/einstellungen/mcp-card.tsx`).
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -235,6 +257,7 @@ src/
     (setup)/setup/          # Ersteinrichtungs-Wizard (nur solange countUsers() === 0)
     api/uploads/[...path]/  # Geschützter Route Handler für Dateiauslieferung
     api/backup/export|import/  # Backup-Routen (requireAdmin())
+    api/mcp/route.ts        # MCP-Endpunkt (Bearer-Token, optional aktivierbar)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
@@ -263,6 +286,9 @@ src/
     dropbox.ts              # Dropbox-API-Client (OAuth-PKCE, Chunked-Upload, List/Delete)
     dropbox-backup.ts       # Cloud-Sicherung: Verbindung, Scheduler, Upload, Aufbewahrung
     backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
+    mcp/                    # MCP-Server (KI-Zugriff): auth.ts (Token/Enabled), protocol.ts
+                            # (JSON-RPC), registry.ts (Tool-Definition + CRUD-Generator),
+                            # tools-rental/-hoa/-system.ts (Werkzeuge), tools.ts (Sammel-Import)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts
@@ -441,6 +467,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
+  `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled, JSON-RPC-Protokoll, Werkzeug-Durchstiche inkl.
+  Fachregeln) sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –

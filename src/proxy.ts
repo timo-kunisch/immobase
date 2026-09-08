@@ -62,8 +62,9 @@ export const config = {
 		 * - favicon.ico, robots.txt, sitemap.xml
 		 * - die favicon.io-Icon-Dateien (Tab-/Homescreen-Icons, siehe public/)
 		 *   und das zugehörige site.webmanifest
-		 * - /api/uploads (eigener Auth-Check im Route Handler, siehe dort)
+		 * - /api/mcp (eigene Token-Authentifizierung im Route Handler, siehe
+		 *   dort - MCP-Clients besitzen kein Session-Cookie)
 		 */
-		"/((?!_next/static|_next/image|favicon.ico|favicon-16x16.png|favicon-32x32.png|apple-touch-icon.png|android-chrome-192x192.png|android-chrome-512x512.png|site.webmanifest|robots.txt|sitemap.xml).*)",
+	"/((?!_next/static|_next/image|favicon.ico|favicon-16x16.png|favicon-32x32.png|apple-touch-icon.png|android-chrome-192x192.png|android-chrome-512x512.png|site.webmanifest|robots.txt|sitemap.xml|api/mcp).*)",
 	],
 };

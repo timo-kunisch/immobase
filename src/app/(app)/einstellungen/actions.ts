@@ -12,6 +12,7 @@ import { resetApplicationData } from "@/data/reset";
 import { ActionState } from "@/lib/action-state";
 import { getDataKeyBase64 } from "@/lib/data-key";
 import { encryptPlaintextFilesInTree } from "@/lib/file-crypto";
+import { generateMcpToken, getMcpToken, hasMcpToken, setMcpEnabled } from "@/lib/mcp/auth";
 
 import { RESET_CONFIRMATION_PHRASE } from "./reset-confirmation";
 
@@ -163,4 +164,62 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
 	cookieStore.delete(SESSION_COOKIE_NAME);
 
 	return { success: true, message: "Die Anwendung wurde zurückgesetzt." };
+}
+
+// ============================================================
+// MCP-Server (KI-Zugriff, optional - standardmäßig deaktiviert)
+// ============================================================
+
+/**
+ * Aktiviert/deaktiviert den MCP-Server (/api/mcp). Beim ersten Aktivieren
+ * wird automatisch ein Zugriffs-Token erzeugt; beim Deaktivieren bleibt
+ * das Token gespeichert (Zugriff ist dann trotzdem gesperrt), sodass eine
+ * spätere Reaktivierung ohne Client-Umkonfiguration möglich ist.
+ * Nur für Admins.
+ */
+export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState> {
+	await requireAdmin();
+	try {
+		setMcpEnabled(enabled);
+		if (enabled && !hasMcpToken()) {
+			generateMcpToken();
+		}
+	} catch (error) {
+		console.error("setMcpEnabledAction failed", error);
+		return { error: "Die MCP-Einstellung konnte nicht gespeichert werden." };
+	}
+	revalidatePath("/einstellungen");
+	return { success: true };
+}
+
+/**
+ * Liefert das MCP-Zugriffs-Token im Klartext (zum Anzeigen/Kopieren in
+ * der UI). Sicherheitsrelevant: wird erst nach explizitem Klick abgerufen
+ * (Muster wie getRecoveryKeyAction). Nur für Admins.
+ */
+export async function getMcpTokenAction(): Promise<{ token?: string; error?: string }> {
+	await requireAdmin();
+	try {
+		const token = getMcpToken();
+		if (!token) return { error: "Es ist noch kein MCP-Token vorhanden - MCP-Server zuerst aktivieren." };
+		return { token };
+	} catch (error) {
+		console.error("getMcpTokenAction failed", error);
+		return { error: "Das MCP-Token konnte nicht gelesen werden." };
+	}
+}
+
+/**
+ * Erzeugt ein neues MCP-Zugriffs-Token (Rotations-Funktion). Das bisherige
+ * Token ist ab sofort ungültig - verbundene KI-Clients müssen umkonfiguriert
+ * werden. Nur für Admins.
+ */
+export async function regenerateMcpTokenAction(): Promise<{ token?: string; error?: string }> {
+	await requireAdmin();
+	try {
+		return { token: generateMcpToken() };
+	} catch (error) {
+		console.error("regenerateMcpTokenAction failed", error);
+		return { error: "Das MCP-Token konnte nicht neu erzeugt werden." };
+	}
 }
