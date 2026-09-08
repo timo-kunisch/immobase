@@ -77,6 +77,16 @@ CREATE TABLE billing_periods (
 	FOREIGN KEY (property_id) REFERENCES properties(id) ON UPDATE no action ON DELETE restrict
 );
 
+CREATE TABLE calendar_events (
+	id text PRIMARY KEY NOT NULL,
+	title text NOT NULL,
+	description text,
+	start_date text NOT NULL,
+	end_date text,
+	created_at text NOT NULL,
+	updated_at text NOT NULL
+);
+
 CREATE TABLE company_settings (
 	id text PRIMARY KEY DEFAULT 'singleton' NOT NULL,
 	name text DEFAULT '' NOT NULL,
@@ -278,6 +288,15 @@ CREATE TABLE housing_charges (
 	FOREIGN KEY (unit_id) REFERENCES units(id) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (owner_id) REFERENCES owners(id) ON UPDATE no action ON DELETE restrict,
 	FOREIGN KEY (economic_plan_id) REFERENCES economic_plans(id) ON UPDATE no action ON DELETE set null
+);
+
+CREATE TABLE knowledge_base_articles (
+	id text PRIMARY KEY NOT NULL,
+	title text NOT NULL,
+	category text,
+	content text NOT NULL,
+	created_at text NOT NULL,
+	updated_at text NOT NULL
 );
 
 CREATE TABLE leases (
@@ -605,6 +624,8 @@ CREATE INDEX audit_log_entries_user_id_idx ON audit_log_entries (user_id);
 
 CREATE INDEX billing_periods_property_id_idx ON billing_periods (property_id);
 
+CREATE INDEX calendar_events_start_date_idx ON calendar_events (start_date);
+
 CREATE UNIQUE INDEX consumption_values_cost_item_id_unit_id_key ON consumption_values (cost_item_id, unit_id);
 
 CREATE INDEX consumption_values_unit_id_idx ON consumption_values (unit_id);
@@ -658,6 +679,8 @@ CREATE INDEX housing_charges_economic_plan_id_idx ON housing_charges (economic_p
 CREATE INDEX housing_charges_owner_id_idx ON housing_charges (owner_id);
 
 CREATE INDEX housing_charges_unit_id_idx ON housing_charges (unit_id);
+
+CREATE INDEX knowledge_base_articles_title_idx ON knowledge_base_articles (title);
 
 CREATE INDEX leases_tenant_id_idx ON leases (tenant_id);
 

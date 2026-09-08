@@ -418,3 +418,66 @@ describe("MCP-Werkzeuge: Benutzerverwaltung", () => {
 		await expect(callTool("users_set_approval", { userId: admin.id, isApproved: false })).rejects.toThrow(/letzten freigegebenen Administrator/);
 	});
 });
+
+describe("MCP-Werkzeuge: Kalender und Wissensdatenbank", () => {
+	it("calendar_events: CRUD-Roundtrip inkl. Datums-Guard", async () => {
+		const created = (await callTool("calendar_events_create", { title: "Wartung", startDate: "2026-03-10" })) as { id: string };
+		expect(created.id).toBeTruthy();
+
+		await callTool("calendar_events_update", { id: created.id, title: "Wartung Heizung", startDate: "2026-03-11", endDate: "2026-03-12" });
+		const loaded = (await callTool("calendar_events_get", { id: created.id })) as { title: string; endDate: string };
+		expect(loaded.title).toBe("Wartung Heizung");
+
+		// Enddatum vor Startdatum wird abgelehnt.
+		await expect(callTool("calendar_events_create", { title: "X", startDate: "2026-03-10", endDate: "2026-03-01" })).rejects.toThrow(
+			/Enddatum/
+		);
+
+		await callTool("calendar_events_delete", { id: created.id });
+		expect((await callTool("calendar_events_list", {})) as unknown[]).toHaveLength(0);
+	});
+
+	it("calendar_list: aggregiert manuelle Ereignisse und automatische Termine", async () => {
+		const property = createProperty({ name: "Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const unit = createUnit({ propertyId: property.id, label: "Whg 1", livingSpace: null, rooms: null, floor: null, coOwnershipShare: null });
+		const tenant = createTenant({ firstName: "Max", lastName: "Muster", email: null, phone: null, notes: null });
+		createLease({
+			unitId: unit.id,
+			tenantId: tenant.id,
+			startDate: "2026-03-01",
+			endDate: "2026-12-31",
+			coldRent: "800.00",
+			serviceCharges: "150.00",
+			numberOfOccupants: 1,
+			deposit: null,
+			notes: null,
+		});
+		await callTool("calendar_events_create", { title: "Wartung", startDate: "2026-03-10" });
+
+		// Sortierung nach Tag: Einzug (01.03.) vor dem manuellen Ereignis (10.03.).
+		const march = (await callTool("calendar_list", { from: "2026-03-01", to: "2026-03-31" })) as { kind: string; title: string }[];
+		expect(march.map((item) => item.kind)).toEqual(["LEASE_START", "MANUAL"]);
+
+		// Auszug liegt außerhalb des Zeitraums.
+		const all = (await callTool("calendar_list", {})) as { kind: string }[];
+		expect(all.map((item) => item.kind).sort()).toEqual(["LEASE_END", "LEASE_START", "MANUAL"]);
+
+		await expect(callTool("calendar_list", { from: "2026-04-01", to: "2026-03-01" })).rejects.toThrow(/darf nicht vor/);
+	});
+
+	it("knowledge_articles: CRUD-Roundtrip inkl. Suche", async () => {
+		const created = (await callTool("knowledge_articles_create", {
+			title: "Richtlinie Kaution",
+			category: "Finanzen",
+			content: "Maximal drei Nettokaltmieten.",
+		})) as { id: string };
+		expect(created.id).toBeTruthy();
+
+		await callTool("knowledge_articles_update", { id: created.id, title: "Richtlinie Kaution (neu)", category: "Finanzen", content: "Aktualisiert." });
+		const found = (await callTool("knowledge_articles_list", { search: "Aktualisiert" })) as { title: string }[];
+		expect(found.map((article) => article.title)).toEqual(["Richtlinie Kaution (neu)"]);
+
+		await callTool("knowledge_articles_delete", { id: created.id });
+		expect((await callTool("knowledge_articles_list", {})) as unknown[]).toHaveLength(0);
+	});
+});

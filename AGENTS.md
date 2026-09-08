@@ -119,10 +119,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   standardmäßig deaktivierte Online-Funktion** (Aktivierung nur durch Admins: Einstellungen →
   MCP-Server (KI-Zugriff)): MCP-Endpunkt (Model Context Protocol, „Streamable HTTP" im
   zustandslosen Request/Response-Modus, JSON-RPC 2.0; KEIN SSE, keine MCP-Sessions), über den
-  KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~130 Werkzeuge:
+  KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~140 Werkzeuge:
   CRUD aller Entitäten beider Fachbereiche inkl. der fachlichen Operationen wie
   Abrechnungs-/Wirtschaftsplan-/Jahresabrechnungs-Finalisierung, Fälligstellen von Mieten und
-  Hausgeld, Dokumenten-Up-/Download als Base64, Nutzerfreigaben). Authentifizierung
+  Hausgeld, Dokumenten-Up-/Download als Base64, Nutzerfreigaben, Kalender-Gesamtansicht).
+  Authentifizierung
   ausschließlich über Bearer-Token (`Authorization`-Header oder `access_token`-Query-Param;
   **kein** Session-Cookie – `src/proxy.ts` lässt `/api/mcp` daher passieren, die Token-Prüfung im
   Route Handler ist die autoritative Schranke; im Host-Modus gilt zusätzlich der LAN-Token-Check
@@ -133,7 +134,9 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Laufzeit-Validierung/Normalisierung: Dezimal-Komma, ISO-Daten, Enums; CRUD-Generator
   `registerCrudTools`; fachliche Fehler als `McpToolError` → Tool-Result mit `isError: true`).
   Werkzeuge aufgeteilt nach `tools-rental.ts`/`tools-hoa.ts`/`tools-system.ts` (Registrierung per
-  Import-Seiteneffekt, Sammel-Import `tools.ts`). Die Werkzeuge spiegeln die Fachregeln der
+  Import-Seiteneffekt, Sammel-Import `tools.ts`; `tools-system.ts` enthält neben der
+  Benutzerverwaltung auch die allgemeinen Module Kalender und Wissensdatenbank). Die Werkzeuge
+  spiegeln die Fachregeln der
   Server Actions (Entwurfs-Sperren, Beschluss-Nummernvergabe, Eigentümerwechsel-Versionierung,
   Aussperr-Schutz letzter Admin). Das Token hat faktisch Admin-Rechte (prominenter Warnhinweis
   in der UI-Karte `src/components/einstellungen/mcp-card.tsx`).
@@ -328,6 +331,7 @@ src/
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
                             # chat.ts (Tool-Loop über die MCP-Registry)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
+    calendar.ts             # Kalender-Aggregation (manuelle Ereignisse + automatische Termine, reine Funktionen)
     audit.ts                # logActivity() - Helfer für das Aktivitätsprotokoll (aus Server Actions)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts
@@ -386,6 +390,11 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Dokumentvorlagen:** `document_templates`, `generated_documents`
 - **WEG-Verwaltung:** siehe Abschnitt 6.1
 - **Postversand:** `postal_shipments` (polymorph über `sourceType`/`sourceId`)
+- **Kalender:** `calendar_events` (nur die manuell gepflegten Ereignisse; die automatischen
+  Termine – Einzug/Auszug der Mietverträge, Eigentümerversammlungen – werden zur Laufzeit aus
+  den Fachdaten berechnet, `src/lib/calendar.ts`)
+- **Wissensdatenbank:** `knowledge_base_articles` (einfache Text-Artikel mit optionalem
+  Kategorie-Schlagwort; Suche per LIKE über Titel/Kategorie/Inhalt)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
   (technische Key/Value-Konfiguration: SMTP, LetterXpress, KI-Endpunkt, URL-Overrides – keine Fachdaten;
   Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
@@ -539,7 +548,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Fachregeln), `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
   Secret-Verschlüsselung, Anhang-Aufbereitung für PDF/Office/Bilder/Excel/Text, Tool-Loop gegen
   gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts) sowie
-  `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
+  `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich) und
+  `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –
   kein Sync-Protokoll für parallele Mehrgeräte-Bearbeitung.

@@ -38,6 +38,8 @@ const categoryLabels: Record<AuditCategory, string> = {
 	einheiten: "Einheiten",
 	tickets: "Tickets",
 	dokumente: "Dokumente",
+	kalender: "Kalender",
+	wissen: "Wissensdatenbank",
 	mieter: "Mieter",
 	vertraege: "Verträge",
 	finanzen: "Finanzen",

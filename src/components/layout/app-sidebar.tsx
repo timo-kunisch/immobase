@@ -4,9 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+	BookOpen,
 	Building2,
 	Calculator,
 	CalendarDays,
+	CalendarRange,
 	DoorOpen,
 	FileSignature,
 	FileText,
@@ -58,6 +60,8 @@ const generalNavItems = [
 	{ title: "Einheiten", href: "/einheiten", icon: DoorOpen },
 	{ title: "Tickets", href: "/tickets", icon: Wrench },
 	{ title: "Dokumente", href: "/dokumente", icon: FolderOpen },
+	{ title: "Kalender", href: "/kalender", icon: CalendarRange },
+	{ title: "Wissen", href: "/wissen", icon: BookOpen },
 ];
 
 const rentalNavItems = [

@@ -649,6 +649,36 @@ export interface PasswordResetToken {
 }
 
 // ============================================================
+// Kalender & Wissensdatenbank
+// ============================================================
+
+/**
+ * Manuell gepflegtes Kalender-Ereignis (Modul /kalender). Die automatisch
+ * eingeblendeten Termine (Einzug/Auszug, Versammlungen) werden nicht
+ * gespeichert, sondern aus den Fachdaten berechnet (src/lib/calendar.ts).
+ * startDate/endDate: ISO-8601-Datum "YYYY-MM-DD" (endDate null = eintägig).
+ */
+export interface CalendarEvent {
+	id: string;
+	title: string;
+	description: string | null;
+	startDate: string;
+	endDate: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** Artikel der Wissensdatenbank (Modul /wissen) - einfacher Text mit optionalem Kategorie-Schlagwort. */
+export interface KnowledgeBaseArticle {
+	id: string;
+	title: string;
+	category: string | null;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+// ============================================================
 // Aktivitätsprotokoll (Audit Log)
 // ============================================================
 
@@ -665,6 +695,8 @@ export type AuditCategory =
 	| "einheiten"
 	| "tickets"
 	| "dokumente"
+	| "kalender"
+	| "wissen"
 	| "mieter"
 	| "vertraege"
 	| "finanzen"
