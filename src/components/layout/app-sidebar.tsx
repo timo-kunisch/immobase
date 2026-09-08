@@ -94,7 +94,17 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader>
-				<div className="flex items-center gap-2 px-2 py-1.5">
+				{/* Externer Link: In der Electron-Shell fängt der setWindowOpenHandler
+				    des Main-Prozesses target="_blank" ab und öffnet die Seite im
+				    Standardbrowser (siehe electron/main/index.ts); im Browser-Dev-
+				    Modus öffnet sich einfach ein neuer Tab. */}
+				<a
+					href="https://immobase.app"
+					target="_blank"
+					rel="noopener noreferrer"
+					title="immobase.app im Browser öffnen"
+					className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
+				>
 					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
 						<Building2 className="size-4" />
 					</div>
@@ -102,7 +112,7 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 						<span className="text-sm font-semibold">ImmoBase</span>
 						<span className="text-xs text-muted-foreground">Verwaltungssoftware</span>
 					</div>
-				</div>
+				</a>
 			</SidebarHeader>
 			<SidebarContent>
 				<SidebarGroup>
