@@ -56,6 +56,20 @@ export async function checkForUpdatesQuietly(): Promise<void> {
 	if (!app.isPackaged) return;
 	try {
 		const { autoUpdater } = await import("electron-updater");
+		// Defensiv: electron-updater liefert `autoUpdater` über einen Lazy-Getter
+		// (doLoadAutoUpdater() in out/main.js). Schlägt die Erzeugung der
+		// plattformspezifischen Updater-Instanz fehl (z. B. MacUpdater ohne
+		// gültige Codesignatur - bei --dir-Builds mit untrusted-Identität
+		// regelmäßig der Fall), bleibt der geteilte `_autoUpdater`-Zustand
+		// undefiniert und der erste Zugriff wirft
+		// "Cannot set properties of undefined (setting 'autoDownload')".
+		// Das ist kein Behandlungsfehler der App, sondern ein Hinweis darauf,
+		// dass Auto-Updates in dieser Umgebung nicht möglich sind - also
+		// verständlich protokollieren und überspringen (statt Exception).
+		if (!autoUpdater) {
+			log.warn("Update-Prüfung übersprungen: autoUpdater ist nicht verfügbar (z. B. ungültige/fehlende Codesignatur auf macOS).");
+			return;
+		}
 		autoUpdaterRef = autoUpdater;
 		autoUpdater.autoDownload = true;
 		autoUpdater.autoInstallOnAppQuit = true;
