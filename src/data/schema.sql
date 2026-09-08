@@ -52,6 +52,18 @@ CREATE TABLE app_settings (
 	updated_at text NOT NULL
 );
 
+CREATE TABLE audit_log_entries (
+	id text PRIMARY KEY NOT NULL,
+	user_id text,
+	user_email text NOT NULL,
+	action text NOT NULL,
+	category text NOT NULL,
+	description text NOT NULL,
+	entity_id text,
+	created_at text NOT NULL,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
+);
+
 CREATE TABLE billing_periods (
 	id text PRIMARY KEY NOT NULL,
 	property_id text NOT NULL,
@@ -584,6 +596,12 @@ CREATE INDEX annual_statement_unit_results_statement_id_idx ON annual_statement_
 CREATE INDEX annual_statement_unit_results_unit_id_idx ON annual_statement_unit_results (unit_id);
 
 CREATE INDEX annual_statements_hoa_id_idx ON annual_statements (hoa_id);
+
+CREATE INDEX audit_log_entries_category_idx ON audit_log_entries (category);
+
+CREATE INDEX audit_log_entries_created_at_idx ON audit_log_entries (created_at DESC);
+
+CREATE INDEX audit_log_entries_user_id_idx ON audit_log_entries (user_id);
 
 CREATE INDEX billing_periods_property_id_idx ON billing_periods (property_id);
 

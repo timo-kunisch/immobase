@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import { requireAdmin } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { saveCompanySettings } from "@/data/company-settings";
 import { setSetting } from "@/data/app-settings";
@@ -27,7 +28,7 @@ function getString(formData: FormData, key: string): string {
  * Admins zugänglich - requireAdmin() leitet andernfalls um/wirft.
  */
 export async function saveCompanySettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 
 	const name = getString(formData, "name");
 	const street = getString(formData, "street");
@@ -43,6 +44,7 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
 			city,
 			additional: additional || null,
 		});
+		logActivity(admin, "UPDATE", "einstellungen", "Absenderdaten aktualisiert");
 	} catch (error) {
 		console.error("saveCompanySettingsAction failed", error);
 		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
@@ -59,7 +61,7 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
  * vorhandene Werte nicht anzeigen. Nur für Admins.
  */
 export async function saveIntegrationSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 
 	try {
 		// SMTP (leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet)
@@ -76,6 +78,8 @@ export async function saveIntegrationSettingsAction(_prevState: ActionState, for
 		const lxApiKey = getString(formData, "lxApiKey");
 		if (lxApiKey) setSetting("letterxpress.apikey", lxApiKey);
 		setSetting("letterxpress.mode", getString(formData, "lxMode") === "live" ? "live" : "test");
+
+		logActivity(admin, "UPDATE", "einstellungen", "SMTP- und LetterXpress-Einstellungen aktualisiert");
 	} catch (error) {
 		console.error("saveIntegrationSettingsAction failed", error);
 		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
@@ -98,7 +102,7 @@ export interface EncryptFilesResult {
  * siehe src/instrumentation.ts). Idempotent. Nur für Admins.
  */
 export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	try {
 		const result = await encryptPlaintextFilesInTree(getFilesDir());
 		if (result.failed.length > 0) {
@@ -109,6 +113,7 @@ export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> 
 				failed: result.failed.length,
 			};
 		}
+		logActivity(admin, "UPDATE", "einstellungen", `Nachträgliche Dateiverschlüsselung ausgeführt (${result.encrypted} Datei(en) verschlüsselt)`);
 		revalidatePath("/einstellungen");
 		return { encrypted: result.encrypted, alreadyEncrypted: result.alreadyEncrypted, failed: 0 };
 	} catch (error) {
@@ -154,6 +159,9 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
 	}
 
 	try {
+		// Bewusst KEIN Eintrag ins Aktivitätsprotokoll: Der Reset löscht die
+		// gesamte Datenbank inklusive der Protokoll-Tabelle - ein Eintrag
+		// würde sofort wieder mitgelöscht.
 		resetApplicationData();
 	} catch (error) {
 		console.error("resetApplicationAction failed", error);
@@ -179,7 +187,7 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
  * Chat-Route antwortet mit Hinweis). Nur für Admins.
  */
 export async function saveAiSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 
 	const baseUrl = getString(formData, "aiBaseUrl");
 	const model = getString(formData, "aiModel");
@@ -199,6 +207,7 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
 		setSetting("ai.base_url", baseUrl);
 		setSetting("ai.model", model);
 		if (apiKey) setSetting("ai.apikey", apiKey);
+		logActivity(admin, "UPDATE", "einstellungen", "KI-Einstellungen aktualisiert");
 	} catch (error) {
 		console.error("saveAiSettingsAction failed", error);
 		return { error: "Die KI-Einstellungen konnten nicht gespeichert werden." };
@@ -221,12 +230,13 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
  * Nur für Admins.
  */
 export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	try {
 		setMcpEnabled(enabled);
 		if (enabled && !hasMcpToken()) {
 			generateMcpToken();
 		}
+		logActivity(admin, "UPDATE", "einstellungen", enabled ? "MCP-Server aktiviert" : "MCP-Server deaktiviert");
 	} catch (error) {
 		console.error("setMcpEnabledAction failed", error);
 		return { error: "Die MCP-Einstellung konnte nicht gespeichert werden." };
@@ -258,9 +268,11 @@ export async function getMcpTokenAction(): Promise<{ token?: string; error?: str
  * werden. Nur für Admins.
  */
 export async function regenerateMcpTokenAction(): Promise<{ token?: string; error?: string }> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	try {
-		return { token: generateMcpToken() };
+		const token = generateMcpToken();
+		logActivity(admin, "UPDATE", "einstellungen", "MCP-Zugriffs-Token neu erzeugt");
+		return { token };
 	} catch (error) {
 		console.error("regenerateMcpTokenAction failed", error);
 		return { error: "Das MCP-Token konnte nicht neu erzeugt werden." };

@@ -2,8 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getOwner } from "@/data/owners";
 import { createUnitOwnership, deleteUnitOwnership, getOpenUnitOwnership, setUnitOwnershipEndDate, updateUnitOwnership } from "@/data/unit-ownerships";
+import { getUnit } from "@/data/units";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString } from "@/lib/form-data";
 
@@ -19,7 +22,7 @@ import { getString } from "@/lib/form-data";
  */
 
 export async function saveUnitOwnershipAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const unitId = getString(formData, "unitId");
 	const ownerId = getString(formData, "ownerId");
@@ -45,9 +48,15 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 		notes: notes || null,
 	};
 
+	// Bezeichnungen von Einheit und Eigentümer für den Log-Eintrag auflösen.
+	const unit = getUnit(unitId);
+	const owner = getOwner(ownerId);
+	const ownershipLabel = `${unit ? unit.label : unitId} / ${owner ? `${owner.firstName} ${owner.lastName}` : ownerId}`;
+
 	try {
 		if (id) {
 			updateUnitOwnership(id, data);
+			logActivity(user, "UPDATE", "eigentumsverhaeltnisse", `Eigentumsverhältnis „${ownershipLabel}“ bearbeitet`, id);
 		} else {
 			// Beim Anlegen eines neuen Eigentumsverhältnisses (Eigentümerwechsel):
 			// das bisher noch laufende Eigentumsverhältnis derselben Einheit
@@ -65,7 +74,8 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 				setUnitOwnershipEndDate(previousOpenOwnership.id, endDate.toISOString());
 			}
 
-			createUnitOwnership(data);
+			const ownership = createUnitOwnership(data);
+			logActivity(user, "CREATE", "eigentumsverhaeltnisse", `Eigentumsverhältnis „${ownershipLabel}“ angelegt`, ownership.id);
 		}
 	} catch (error) {
 		console.error("saveUnitOwnershipAction failed", error);
@@ -77,13 +87,16 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 }
 
 export async function deleteUnitOwnershipAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	try {
 		deleteUnitOwnership(id);
 	} catch (error) {
 		console.error("deleteUnitOwnershipAction failed", error);
 		return { error: "Das Eigentumsverhältnis konnte nicht gelöscht werden." };
 	}
+
+	// Es gibt keine getX-Funktion für eine einzelne Zeile - Fallback auf die ID.
+	logActivity(user, "DELETE", "eigentumsverhaeltnisse", `Eigentumsverhältnis „${id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/eigentumsverhaeltnisse`);
 	return { success: true };

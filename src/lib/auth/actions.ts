@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 
 import { getUserByEmail, markEmailVerified } from "@/data/users";
+import { getCurrentUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { destroySession } from "@/lib/auth/session";
 import { createVerificationToken } from "@/lib/auth/tokens";
 import { isSmtpConfigured, sendVerificationEmail } from "@/lib/email/mailer";
@@ -11,7 +13,11 @@ import { ActionState } from "@/lib/action-state";
 
 /** Meldet den aktuellen Nutzer ab (löscht Session in DB + Cookie). */
 export async function logoutAction(): Promise<void> {
+	const user = await getCurrentUser();
 	await destroySession();
+	if (user) {
+		logActivity(user, "LOGOUT", "auth", "Abgemeldet", user.id);
+	}
 	redirect("/login");
 }
 

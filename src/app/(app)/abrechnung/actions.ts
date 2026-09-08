@@ -22,6 +22,7 @@ import {
 import { companySettingsToAddressLines, getCompanySettings } from "@/data/company-settings";
 import type { AllocationKey, CostCategory } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { allocationKeyLabels, calculateBillingResult, costCategoryLabels } from "@/lib/billing";
 import { centsToDecimalString } from "@/lib/money";
@@ -63,6 +64,11 @@ function getDecimalString(formData: FormData, key: string): string | null {
 	return Number.isNaN(parsed) ? null : parsed.toFixed(2);
 }
 
+/** Sprechende Bezeichnung einer Abrechnungsperiode für das Aktivitätsprotokoll. */
+function billingPeriodLabel(period: { periodFrom: string; periodTo: string }): string {
+	return `${formatDate(period.periodFrom)} – ${formatDate(period.periodTo)}`;
+}
+
 /** Lädt eine Abrechnungsperiode und prüft, dass sie noch im Entwurf ist. */
 function requireDraftBillingPeriod(billingPeriodId: string) {
 	const billingPeriod = getBillingPeriod(billingPeriodId);
@@ -82,7 +88,7 @@ function requireDraftBillingPeriod(billingPeriodId: string) {
 // ============================================================
 
 export async function saveBillingPeriodAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const propertyId = getString(formData, "propertyId");
 	const periodFromRaw = getString(formData, "periodFrom");
@@ -117,8 +123,10 @@ export async function saveBillingPeriodAction(_prevState: ActionState, formData:
 	try {
 		if (id) {
 			updateBillingPeriod(id, data);
+			logActivity(user, "UPDATE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(data)}“ bearbeitet`, id);
 		} else {
-			createBillingPeriod(data);
+			const created = createBillingPeriod(data);
+			logActivity(user, "CREATE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(data)}“ angelegt`, created.id);
 		}
 	} catch (error) {
 		console.error("saveBillingPeriodAction failed", error);
@@ -130,7 +138,7 @@ export async function saveBillingPeriodAction(_prevState: ActionState, formData:
 }
 
 export async function deleteBillingPeriodAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const existing = requireDraftBillingPeriod(id);
 	if ("error" in existing) return { error: existing.error };
 
@@ -141,6 +149,8 @@ export async function deleteBillingPeriodAction(id: string): Promise<ActionState
 		return { error: "Die Abrechnungsperiode konnte nicht gelöscht werden." };
 	}
 
+	logActivity(user, "DELETE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(existing.billingPeriod)}“ gelöscht`, id);
+
 	revalidatePath("/abrechnung");
 	return { success: true };
 }
@@ -150,7 +160,7 @@ export async function deleteBillingPeriodAction(id: string): Promise<ActionState
 // ============================================================
 
 export async function saveCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const billingPeriodId = getString(formData, "billingPeriodId");
 	const categoryRaw = getString(formData, "category") as CostCategory;
@@ -194,8 +204,10 @@ export async function saveCostItemAction(_prevState: ActionState, formData: Form
 	try {
 		if (id) {
 			updateCostItem(id, data);
+			logActivity(user, "UPDATE", "abrechnung", `Kostenposition „${label}“ bearbeitet`, id);
 		} else {
-			createCostItem(data);
+			const created = createCostItem(data);
+			logActivity(user, "CREATE", "abrechnung", `Kostenposition „${label}“ angelegt`, created.id);
 		}
 	} catch (error) {
 		console.error("saveCostItemAction failed", error);
@@ -207,7 +219,7 @@ export async function saveCostItemAction(_prevState: ActionState, formData: Form
 }
 
 export async function deleteCostItemAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const costItem = getCostItem(id);
 	if (!costItem) {
 		return { error: "Die Kostenposition wurde nicht gefunden." };
@@ -226,6 +238,8 @@ export async function deleteCostItemAction(id: string): Promise<ActionState> {
 		return { error: "Die Kostenposition konnte nicht gelöscht werden." };
 	}
 
+	logActivity(user, "DELETE", "abrechnung", `Kostenposition „${costItem.label}“ gelöscht`, id);
+
 	revalidatePath("/abrechnung");
 	return { success: true };
 }
@@ -235,7 +249,7 @@ export async function deleteCostItemAction(id: string): Promise<ActionState> {
 // ============================================================
 
 export async function saveConsumptionValuesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const costItemId = getString(formData, "costItemId");
 	if (!costItemId) {
 		return { error: "Ungültige Kostenposition." };
@@ -265,6 +279,7 @@ export async function saveConsumptionValuesAction(_prevState: ActionState, formD
 	// es kann kein teilweise gespeicherter Stand zurückbleiben.
 	try {
 		saveConsumptionValuesForCostItem(costItemId, values);
+		logActivity(user, "UPDATE", "abrechnung", `Verbrauchswerte der Kostenposition „${costItem.label}“ aktualisiert`, costItemId);
 	} catch (error) {
 		console.error("saveConsumptionValuesAction failed", error);
 		return { error: "Die Verbrauchswerte konnten nicht gespeichert werden." };
@@ -290,7 +305,7 @@ export async function saveConsumptionValuesAction(_prevState: ActionState, formD
  * in einer Transaktion im Repository (src/data/billing.ts).
  */
 export async function finalizeBillingPeriodAction(billingPeriodId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const detail = getBillingPeriodDetail(billingPeriodId);
 
 	if (!detail) {
@@ -345,6 +360,7 @@ export async function finalizeBillingPeriodAction(billingPeriodId: string): Prom
 				})),
 			}))
 		);
+		logActivity(user, "UPDATE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(detail.billingPeriod)}“ finalisiert`, billingPeriodId);
 	} catch (error) {
 		console.error("finalizeBillingPeriodAction failed", error);
 		return {
@@ -424,7 +440,7 @@ async function buildAndSaveStatementPdf(data: TenantStatementPdfData): Promise<A
  * Absenderdaten unter /einstellungen) - ersetzt ein zuvor erzeugtes PDF.
  */
 export async function generateBillingStatementPdfAction(tenantStatementId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const data = getTenantStatementForPdf(tenantStatementId);
 	if (!data) {
 		return { error: "Die Abrechnung wurde nicht gefunden." };
@@ -433,6 +449,7 @@ export async function generateBillingStatementPdfAction(tenantStatementId: strin
 	try {
 		const result = await buildAndSaveStatementPdf(data);
 		if ("error" in result) return result;
+		logActivity(user, "CREATE", "abrechnung", `Abrechnungs-PDF für „${data.tenant.firstName} ${data.tenant.lastName}“ erzeugt`, tenantStatementId);
 	} catch (error) {
 		console.error("generateBillingStatementPdfAction failed", error);
 		return { error: "Das PDF konnte nicht erzeugt werden." };
@@ -449,7 +466,7 @@ export async function generateBillingStatementPdfAction(tenantStatementId: strin
  * generateBillingStatementPdfAction).
  */
 export async function generateAllBillingStatementPdfsAction(billingPeriodId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const billingPeriod = getBillingPeriod(billingPeriodId);
 	if (!billingPeriod) {
 		return { error: "Die Abrechnungsperiode wurde nicht gefunden." };
@@ -475,6 +492,11 @@ export async function generateAllBillingStatementPdfsAction(billingPeriodId: str
 			console.error(`generateAllBillingStatementPdfsAction: PDF für TenantStatement ${id} fehlgeschlagen`, error);
 			failedCount += 1;
 		}
+	}
+
+	const generatedCount = statementIds.length - failedCount;
+	if (generatedCount > 0) {
+		logActivity(user, "CREATE", "abrechnung", `Abrechnungs-PDFs für Abrechnungszeitraum „${billingPeriodLabel(billingPeriod)}“ erzeugt (${generatedCount} Stück)`, billingPeriodId);
 	}
 
 	revalidatePath(`/abrechnung/${billingPeriodId}`);
@@ -509,6 +531,10 @@ export async function sendStatementByPostAction(tenantStatementId: string): Prom
 	}
 
 	const result = await sendPdfByPostForSource("TENANT_STATEMENT", tenantStatementId, user.id);
+
+	if ("success" in result) {
+		logActivity(user, "CREATE", "postversand", `Abrechnung für „${data.tenant.firstName} ${data.tenant.lastName}“ per Post versendet`, tenantStatementId);
+	}
 
 	revalidatePath(`/abrechnung/${data.statement.billingPeriodId}`);
 	return result;

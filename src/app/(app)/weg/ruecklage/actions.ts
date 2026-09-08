@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createReserveFundBooking, deleteReserveFundBooking, updateReserveFundBooking } from "@/data/reserve-fund";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import type { ReserveFundBookingType } from "@/data/types";
@@ -11,7 +12,7 @@ import type { ReserveFundBookingType } from "@/data/types";
 const RESERVE_FUND_BOOKING_TYPES: ReserveFundBookingType[] = ["CONTRIBUTION", "WITHDRAWAL"];
 
 export async function saveReserveFundBookingAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const bookingDateRaw = getString(formData, "bookingDate");
@@ -42,8 +43,10 @@ export async function saveReserveFundBookingAction(_prevState: ActionState, form
 	try {
 		if (id) {
 			updateReserveFundBooking(id, data);
+			logActivity(user, "UPDATE", "ruecklage", `Rücklagenbuchung „${description}“ bearbeitet`, id);
 		} else {
-			createReserveFundBooking(data);
+			const booking = createReserveFundBooking(data);
+			logActivity(user, "CREATE", "ruecklage", `Rücklagenbuchung „${description}“ angelegt`, booking.id);
 		}
 	} catch (error) {
 		console.error("saveReserveFundBookingAction failed", error);
@@ -55,13 +58,16 @@ export async function saveReserveFundBookingAction(_prevState: ActionState, form
 }
 
 export async function deleteReserveFundBookingAction(id: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	try {
 		deleteReserveFundBooking(id);
 	} catch (error) {
 		console.error("deleteReserveFundBookingAction failed", error);
 		return { error: "Die Buchung konnte nicht gelöscht werden." };
 	}
+
+	// Es gibt keine getX-Funktion für eine einzelne Buchung - Fallback auf die ID.
+	logActivity(user, "DELETE", "ruecklage", `Rücklagenbuchung „${id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/ruecklage`);
 	return { success: true };

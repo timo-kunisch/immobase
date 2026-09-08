@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getUserById, updateUserApproval } from "@/data/users";
 import { requireAdmin } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { destroyAllSessionsForUser } from "@/lib/auth/session";
 import { isSmtpConfigured, sendAccountApprovedEmail } from "@/lib/email/mailer";
 import { ActionState } from "@/lib/action-state";
@@ -31,6 +32,13 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 	}
 
 	updateUserApproval(userId, isApproved);
+	logActivity(
+		admin,
+		"UPDATE",
+		"admin",
+		isApproved ? `Kontofreigabe für „${targetUser.email}“ erteilt` : `Kontofreigabe für „${targetUser.email}“ entzogen`,
+		userId
+	);
 
 	if (!isApproved) {
 		await destroyAllSessionsForUser(userId);

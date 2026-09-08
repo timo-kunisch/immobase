@@ -25,6 +25,7 @@ import {
 } from "@/data/meetings";
 import type { OwnerMeetingStatus, OwnerMeetingType, ResolutionVotingResult } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getOptionalFloat, getOptionalInt } from "@/lib/form-data";
 import { calculateContestationDeadline } from "@/lib/hoa-meetings";
@@ -42,7 +43,7 @@ const VOTING_RESULTS: ResolutionVotingResult[] = ["ACCEPTED", "REJECTED"];
 // ============================================================
 
 export async function saveOwnerMeetingAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const title = getString(formData, "title");
@@ -72,8 +73,10 @@ export async function saveOwnerMeetingAction(_prevState: ActionState, formData: 
 	try {
 		if (id) {
 			updateOwnerMeeting(id, data);
+			logActivity(user, "UPDATE", "versammlungen", `Eigentümerversammlung „${title}“ bearbeitet`, id);
 		} else {
-			createOwnerMeeting(data);
+			const meeting = createOwnerMeeting(data);
+			logActivity(user, "CREATE", "versammlungen", `Eigentümerversammlung „${title}“ angelegt`, meeting.id);
 		}
 	} catch (error) {
 		console.error("saveOwnerMeetingAction failed", error);
@@ -85,17 +88,21 @@ export async function saveOwnerMeetingAction(_prevState: ActionState, formData: 
 }
 
 export async function deleteOwnerMeetingAction(id: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	if (countResolutionsForMeeting(id) > 0) {
 		return { error: "Diese Versammlung enthält bereits Beschlüsse und kann daher nicht mehr gelöscht werden (Beschluss-Sammlung, § 24 Abs. 6 WEG)." };
 	}
 
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const meeting = getOwnerMeeting(id);
 	try {
 		deleteOwnerMeeting(id);
 	} catch (error) {
 		console.error("deleteOwnerMeetingAction failed", error);
 		return { error: "Die Versammlung konnte nicht gelöscht werden." };
 	}
+
+	logActivity(user, "DELETE", "versammlungen", `Eigentümerversammlung „${meeting ? meeting.title : id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/versammlungen`);
 	return { success: true };
@@ -106,7 +113,7 @@ export async function deleteOwnerMeetingAction(id: string, _hoaId: string): Prom
 // ============================================================
 
 export async function saveAgendaItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const meetingId = getString(formData, "meetingId");
 	const title = getString(formData, "title");
@@ -122,8 +129,10 @@ export async function saveAgendaItemAction(_prevState: ActionState, formData: Fo
 	try {
 		if (id) {
 			updateAgendaItem(id, data);
+			logActivity(user, "UPDATE", "versammlungen", `Tagesordnungspunkt „${title}“ bearbeitet`, id);
 		} else {
-			createAgendaItem(data);
+			const agendaItem = createAgendaItem(data);
+			logActivity(user, "CREATE", "versammlungen", `Tagesordnungspunkt „${title}“ angelegt`, agendaItem.id);
 		}
 	} catch (error) {
 		console.error("saveAgendaItemAction failed", error);
@@ -135,13 +144,17 @@ export async function saveAgendaItemAction(_prevState: ActionState, formData: Fo
 }
 
 export async function deleteAgendaItemAction(id: string, _hoaId: string, meetingId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const agendaItem = listAgendaItemsForMeeting(meetingId).find((item) => item.id === id) ?? null;
 	try {
 		deleteAgendaItem(id);
 	} catch (error) {
 		console.error("deleteAgendaItemAction failed", error);
 		return { error: "Der Tagesordnungspunkt konnte nicht gelöscht werden." };
 	}
+
+	logActivity(user, "DELETE", "versammlungen", `Tagesordnungspunkt „${agendaItem ? agendaItem.title : id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	return { success: true };
@@ -152,7 +165,7 @@ export async function deleteAgendaItemAction(id: string, _hoaId: string, meeting
 // ============================================================
 
 export async function saveResolutionAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const meetingId = getString(formData, "meetingId");
@@ -195,6 +208,7 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 		};
 		try {
 			updateResolution(id, data);
+			logActivity(user, "UPDATE", "beschluesse", `Beschluss „${title}“ bearbeitet`, id);
 		} catch (error) {
 			console.error("saveResolutionAction (update) failed", error);
 			return { error: "Der Beschluss konnte nicht gespeichert werden." };
@@ -217,7 +231,8 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 		try {
 			// Vergabe der nächsten fortlaufenden Nummer (MAX+1) und Insert
 			// laufen im Repository atomar in einer Transaktion.
-			createResolution(data);
+			const resolution = createResolution(data);
+			logActivity(user, "CREATE", "beschluesse", `Beschluss Nr. ${resolution.sequenceNumber} „${title}“ angelegt`, resolution.id);
 		} catch (error) {
 			console.error("saveResolutionAction (insert) failed", error);
 			return { error: "Der Beschluss konnte nicht gespeichert werden." };
@@ -236,7 +251,7 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
  * eine Lücke in der fortlaufenden Nummerierung reißen).
  */
 export async function deleteResolutionAction(id: string, hoaId: string, meetingId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const resolution = getOwnerResolution(id);
 	if (!resolution) {
 		return { error: "Der Beschluss wurde nicht gefunden." };
@@ -254,6 +269,8 @@ export async function deleteResolutionAction(id: string, hoaId: string, meetingI
 		return { error: "Der Beschluss konnte nicht gelöscht werden." };
 	}
 
+	logActivity(user, "DELETE", "beschluesse", `Beschluss Nr. ${resolution.sequenceNumber} „${resolution.title}“ gelöscht`, id);
+
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	revalidatePath(`/weg/beschluesse`);
 	return { success: true };
@@ -264,7 +281,7 @@ export async function deleteResolutionAction(id: string, hoaId: string, meetingI
 // ============================================================
 
 export async function generateInvitationPdfAction(meetingId: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const meeting = getOwnerMeetingWithHoaAndProperty(meetingId);
 	if (!meeting) {
 		return { error: "Die Versammlung wurde nicht gefunden." };
@@ -320,13 +337,15 @@ export async function generateInvitationPdfAction(meetingId: string, _hoaId: str
 		return { error: "Die Einladung konnte nicht gespeichert werden." };
 	}
 
+	logActivity(user, "UPDATE", "versammlungen", `Einladung zur Eigentümerversammlung „${meeting.title}“ erzeugt`, meetingId);
+
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	revalidatePath(`/weg/versammlungen`);
 	return { success: true };
 }
 
 export async function saveMinutesTextAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const meetingId = getString(formData, "meetingId");
 	const minutesText = getString(formData, "minutesText");
 
@@ -334,8 +353,11 @@ export async function saveMinutesTextAction(_prevState: ActionState, formData: F
 		return { error: "Ungültige Versammlung." };
 	}
 
+	// Titel für den Log-Eintrag auflösen.
+	const meeting = getOwnerMeeting(meetingId);
 	try {
 		updateOwnerMeetingMinutesText(meetingId, minutesText || null);
+		logActivity(user, "UPDATE", "versammlungen", `Protokolltext der Eigentümerversammlung „${meeting ? meeting.title : meetingId}“ gespeichert`, meetingId);
 	} catch (error) {
 		console.error("saveMinutesTextAction failed", error);
 		return { error: "Das Protokoll konnte nicht gespeichert werden." };
@@ -346,7 +368,7 @@ export async function saveMinutesTextAction(_prevState: ActionState, formData: F
 }
 
 export async function generateMinutesPdfAction(meetingId: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const meeting = getOwnerMeetingWithHoaAndProperty(meetingId);
 	if (!meeting) {
 		return { error: "Die Versammlung wurde nicht gefunden." };
@@ -397,6 +419,8 @@ export async function generateMinutesPdfAction(meetingId: string, _hoaId: string
 		return { error: "Das Protokoll konnte nicht gespeichert werden." };
 	}
 
+	logActivity(user, "UPDATE", "versammlungen", `Protokoll der Eigentümerversammlung „${meeting.title}“ erzeugt`, meetingId);
+
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	revalidatePath(`/weg/versammlungen`);
 	return { success: true };
@@ -417,6 +441,9 @@ export async function sendInvitationByPostAction(meetingId: string, _hoaId: stri
 	}
 
 	const result = await sendPdfByPostForSource("HOA_MEETING_INVITATION", meetingId, user.id);
+	if ("success" in result) {
+		logActivity(user, "CREATE", "postversand", `Einladung zur Eigentümerversammlung „${meeting.title}“ per Post versendet`, meetingId);
+	}
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	return result;
 }
@@ -432,6 +459,9 @@ export async function sendMinutesByPostAction(meetingId: string, _hoaId: string)
 	}
 
 	const result = await sendPdfByPostForSource("HOA_MEETING_MINUTES", meetingId, user.id);
+	if ("success" in result) {
+		logActivity(user, "CREATE", "postversand", `Protokoll der Eigentümerversammlung „${meeting.title}“ per Post versendet`, meetingId);
+	}
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
 	return result;
 }

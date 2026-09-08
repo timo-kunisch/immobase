@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createUnit, deleteUnit, updateUnit } from "@/data/units";
+import { createUnit, deleteUnit, getUnit, updateUnit } from "@/data/units";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 
 function getString(formData: FormData, key: string): string {
@@ -19,7 +20,7 @@ function getOptionalFloat(formData: FormData, key: string): number | null {
 }
 
 export async function saveUnitAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const propertyId = getString(formData, "propertyId");
 	const label = getString(formData, "label");
@@ -47,8 +48,10 @@ export async function saveUnitAction(_prevState: ActionState, formData: FormData
 	try {
 		if (id) {
 			updateUnit(id, data);
+			logActivity(user, "UPDATE", "einheiten", `Einheit „${label}“ bearbeitet`, id);
 		} else {
-			createUnit(data);
+			const unit = createUnit(data);
+			logActivity(user, "CREATE", "einheiten", `Einheit „${label}“ angelegt`, unit.id);
 		}
 	} catch (error) {
 		console.error("saveUnitAction failed", error);
@@ -62,7 +65,9 @@ export async function saveUnitAction(_prevState: ActionState, formData: FormData
 }
 
 export async function deleteUnitAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const unit = getUnit(id);
 	try {
 		deleteUnit(id);
 	} catch (error) {
@@ -71,6 +76,8 @@ export async function deleteUnitAction(id: string): Promise<ActionState> {
 			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Mietverträge.",
 		};
 	}
+
+	logActivity(user, "DELETE", "einheiten", `Einheit „${unit ? unit.label : id}“ gelöscht`, id);
 
 	revalidatePath("/einheiten");
 	revalidatePath("/liegenschaften");

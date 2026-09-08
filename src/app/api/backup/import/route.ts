@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { importBackup } from "@/data/backup";
 import { requireAdmin } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 
 /**
  * Backup-Import (Ersetzen oder Zusammenführen, siehe src/data/backup.ts).
@@ -14,7 +15,7 @@ import { requireAdmin } from "@/lib/auth/dal";
  * Nur für Admins.
  */
 export async function POST(request: Request) {
-	await requireAdmin();
+	const admin = await requireAdmin();
 
 	let body: unknown;
 	try {
@@ -35,6 +36,15 @@ export async function POST(request: Request) {
 
 	try {
 		const result = await importBackup(path, mode, password !== undefined ? { password } : undefined);
+		// Der Eintrag landet bewusst im importierten Datenbestand (der Import
+		// hat die DB-Verbindung ersetzt) - so ist auch dort nachvollziehbar,
+		// dass dieser Stand aus einer Sicherung wiederhergestellt wurde.
+		logActivity(
+			admin,
+			"CREATE",
+			"system",
+			`Datensicherung importiert (${mode === "merge" ? "zusammengeführt" : "ersetzt"}, ${result.importedFiles} Dateien)`
+		);
 		return NextResponse.json({ ok: true, ...result });
 	} catch (error) {
 		console.error("Backup-Import fehlgeschlagen", error);

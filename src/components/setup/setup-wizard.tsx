@@ -124,7 +124,7 @@ const MODE_OPTIONS: { value: AppMode; title: string; description: string }[] = [
 ];
 
 /**
- * Setup-Schritt „Betriebsmodus" (nur Desktop-App): übernimmt die Wahl per
+ * Setup-Schritt „Betriebsmodus“ (nur Desktop-App): übernimmt die Wahl per
  * IPC an den Main-Prozess (iv:set-mode). Erststart: Der eingebettete Server
  * läuft bereits im lokalen Modus, daher ist "Lokal" vorausgewählt und ein
  * Neustart entfällt (der Main-Prozess wendet die Wahl idempotent an).

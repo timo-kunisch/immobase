@@ -647,3 +647,57 @@ export interface PasswordResetToken {
 	expires: string;
 	createdAt: string;
 }
+
+// ============================================================
+// Aktivitätsprotokoll (Audit Log)
+// ============================================================
+
+/** Art der protokollierten Aktivität. */
+export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGOUT";
+
+/**
+ * Stabiler Modul-Schlüssel eines Log-Eintrags (für die Filterung in der
+ * Admin-UI; die deutschen Anzeige-Labels liegen dort).
+ */
+export type AuditCategory =
+	| "auth"
+	| "liegenschaften"
+	| "einheiten"
+	| "tickets"
+	| "dokumente"
+	| "mieter"
+	| "vertraege"
+	| "finanzen"
+	| "abrechnung"
+	| "vorlagen"
+	| "weg"
+	| "eigentuemer"
+	| "eigentumsverhaeltnisse"
+	| "verteilerschluessel"
+	| "wirtschaftsplan"
+	| "jahresabrechnung"
+	| "hausgeld"
+	| "ruecklage"
+	| "versammlungen"
+	| "beschluesse"
+	| "admin"
+	| "einstellungen"
+	| "postversand"
+	| "system";
+
+/**
+ * Ein Eintrag im Aktivitätsprotokoll. Append-only (kein updatedAt);
+ * `userId` kann nach einer Nutzerlöschung null werden (ON DELETE SET
+ * NULL), `userEmail` bleibt als denormalisierter Snapshot erhalten.
+ */
+export interface AuditLogEntry {
+	id: string;
+	userId: string | null;
+	userEmail: string;
+	action: AuditAction;
+	category: AuditCategory;
+	/** Fertig formulierter deutscher Satz (wird am Aufrufort gebaut). */
+	description: string;
+	entityId: string | null;
+	createdAt: string;
+}

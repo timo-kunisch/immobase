@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createTenant, deleteTenant, updateTenant } from "@/data/tenants";
+import { createTenant, deleteTenant, getTenant, updateTenant } from "@/data/tenants";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 
 function getString(formData: FormData, key: string): string {
@@ -12,7 +13,7 @@ function getString(formData: FormData, key: string): string {
 }
 
 export async function saveTenantAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const firstName = getString(formData, "firstName");
 	const lastName = getString(formData, "lastName");
@@ -35,8 +36,10 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 	try {
 		if (id) {
 			updateTenant(id, data);
+			logActivity(user, "UPDATE", "mieter", `Mieter „${firstName} ${lastName}“ bearbeitet`, id);
 		} else {
-			createTenant(data);
+			const tenant = createTenant(data);
+			logActivity(user, "CREATE", "mieter", `Mieter „${firstName} ${lastName}“ angelegt`, tenant.id);
 		}
 	} catch (error) {
 		console.error("saveTenantAction failed", error);
@@ -49,7 +52,9 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 }
 
 export async function deleteTenantAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const tenant = getTenant(id);
 	try {
 		deleteTenant(id);
 	} catch (error) {
@@ -58,6 +63,8 @@ export async function deleteTenantAction(id: string): Promise<ActionState> {
 			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Mietverträge.",
 		};
 	}
+
+	logActivity(user, "DELETE", "mieter", `Mieter „${tenant ? `${tenant.firstName} ${tenant.lastName}` : id}“ gelöscht`, id);
 
 	revalidatePath("/mieter");
 	revalidatePath("/");

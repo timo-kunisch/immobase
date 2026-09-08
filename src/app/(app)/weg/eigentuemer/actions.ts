@@ -2,15 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createOwner, deleteOwner, updateOwner } from "@/data/owners";
+import { createOwner, deleteOwner, getOwner, updateOwner } from "@/data/owners";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString } from "@/lib/form-data";
 
 /** Stammdaten-CRUD für Eigentümer (owners) - analog zu src/app/(app)/mieter/actions.ts. */
 
 export async function saveOwnerAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const firstName = getString(formData, "firstName");
 	const lastName = getString(formData, "lastName");
@@ -45,8 +46,10 @@ export async function saveOwnerAction(_prevState: ActionState, formData: FormDat
 	try {
 		if (id) {
 			updateOwner(id, data);
+			logActivity(user, "UPDATE", "eigentuemer", `Eigentümer „${firstName} ${lastName}“ bearbeitet`, id);
 		} else {
-			createOwner(data);
+			const owner = createOwner(data);
+			logActivity(user, "CREATE", "eigentuemer", `Eigentümer „${firstName} ${lastName}“ angelegt`, owner.id);
 		}
 	} catch (error) {
 		console.error("saveOwnerAction failed", error);
@@ -58,7 +61,9 @@ export async function saveOwnerAction(_prevState: ActionState, formData: FormDat
 }
 
 export async function deleteOwnerAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const owner = getOwner(id);
 	try {
 		deleteOwner(id);
 	} catch (error) {
@@ -67,6 +72,8 @@ export async function deleteOwnerAction(id: string): Promise<ActionState> {
 			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Eigentumsverhältnisse.",
 		};
 	}
+
+	logActivity(user, "DELETE", "eigentuemer", `Eigentümer „${owner ? `${owner.firstName} ${owner.lastName}` : id}“ gelöscht`, id);
 
 	revalidatePath("/weg/eigentuemer");
 	return { success: true };

@@ -8,11 +8,15 @@ import {
 	deleteLease,
 	deleteRentAdjustment,
 	getLease,
+	getLeaseWithDetails,
 	updateLease,
 	updateRentAdjustment,
+	type LeaseWithDetails,
 } from "@/data/leases";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
+import { formatDate } from "@/lib/format";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -26,8 +30,14 @@ function getDecimalString(formData: FormData, key: string): string | null {
 	return Number.isNaN(parsed) ? null : parsed.toFixed(2);
 }
 
+/** Sprechende Bezeichnung eines Mietvertrags für das Aktivitätsprotokoll (Liegenschaft – Einheit / Mieter). */
+function describeLease(lease: LeaseWithDetails | null, fallback: string): string {
+	if (!lease) return fallback;
+	return `${lease.unit.property.name} – ${lease.unit.label} / ${lease.tenant.firstName} ${lease.tenant.lastName}`;
+}
+
 export async function saveLeaseAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const unitId = getString(formData, "unitId");
 	const tenantId = getString(formData, "tenantId");
@@ -65,8 +75,10 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 	try {
 		if (id) {
 			updateLease(id, data);
+			logActivity(user, "UPDATE", "vertraege", `Mietvertrag „${describeLease(getLeaseWithDetails(id), id)}“ bearbeitet`, id);
 		} else {
-			createLease(data);
+			const lease = createLease(data);
+			logActivity(user, "CREATE", "vertraege", `Mietvertrag „${describeLease(getLeaseWithDetails(lease.id), lease.id)}“ angelegt`, lease.id);
 		}
 	} catch (error) {
 		console.error("saveLeaseAction failed", error);
@@ -80,13 +92,17 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 }
 
 export async function deleteLeaseAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const lease = getLeaseWithDetails(id);
 	try {
 		deleteLease(id);
 	} catch (error) {
 		console.error("deleteLeaseAction failed", error);
 		return { error: "Der Mietvertrag konnte nicht gelöscht werden." };
 	}
+
+	logActivity(user, "DELETE", "vertraege", `Mietvertrag „${describeLease(lease, id)}“ gelöscht`, id);
 
 	revalidatePath("/vertraege");
 	revalidatePath("/einheiten");
@@ -105,7 +121,7 @@ export async function deleteLeaseAction(id: string): Promise<ActionState> {
 // werden. Siehe src/lib/rent-history.ts für die Auswertung.
 
 export async function saveRentAdjustmentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const leaseId = getString(formData, "leaseId");
 	const validFromRaw = getString(formData, "validFrom");
@@ -143,8 +159,10 @@ export async function saveRentAdjustmentAction(_prevState: ActionState, formData
 	try {
 		if (id) {
 			updateRentAdjustment(id, data);
+			logActivity(user, "UPDATE", "vertraege", `Miet-/Nebenkostenänderung „gültig ab ${formatDate(validFrom)}“ bearbeitet`, id);
 		} else {
-			createRentAdjustment(data);
+			const adjustment = createRentAdjustment(data);
+			logActivity(user, "CREATE", "vertraege", `Miet-/Nebenkostenänderung „gültig ab ${formatDate(validFrom)}“ angelegt`, adjustment.id);
 		}
 	} catch (error) {
 		console.error("saveRentAdjustmentAction failed", error);
@@ -160,13 +178,16 @@ export async function saveRentAdjustmentAction(_prevState: ActionState, formData
 }
 
 export async function deleteRentAdjustmentAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	try {
 		deleteRentAdjustment(id);
 	} catch (error) {
 		console.error("deleteRentAdjustmentAction failed", error);
 		return { error: "Die Änderung konnte nicht gelöscht werden." };
 	}
+
+	// Keine getRentAdjustment-Funktion im Repository vorhanden - daher ID-Fallback.
+	logActivity(user, "DELETE", "vertraege", `Miet-/Nebenkostenänderung „${id}“ gelöscht`, id);
 
 	revalidatePath("/vertraege");
 	revalidatePath("/finanzen");

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { getHoaCostItem } from "@/data/annual-statements";
 import {
 	createEconomicPlan,
 	createEconomicPlanCostItem,
@@ -19,6 +20,7 @@ import {
 	type DueHousingChargeCandidate,
 } from "@/data/economic-plans";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import { calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
@@ -55,12 +57,17 @@ function requireDraftEconomicPlan(economicPlanId: string) {
 	return { plan } as const;
 }
 
+/** Kurzbezeichnung des Geschäftsjahrs für Protokoll-Einträge („2026“ bzw. „2026–2027"). */
+function fiscalYearLabel(from: Date, to: Date): string {
+	return from.getFullYear() === to.getFullYear() ? `${from.getFullYear()}` : `${from.getFullYear()}–${to.getFullYear()}`;
+}
+
 // ============================================================
 // Wirtschaftsplan (EconomicPlan)
 // ============================================================
 
 export async function saveEconomicPlanAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const fiscalYearFromRaw = getString(formData, "fiscalYearFrom");
@@ -92,8 +99,10 @@ export async function saveEconomicPlanAction(_prevState: ActionState, formData: 
 	try {
 		if (id) {
 			updateEconomicPlan(id, data);
+			logActivity(user, "UPDATE", "wirtschaftsplan", `Wirtschaftsplan „${fiscalYearLabel(fiscalYearFrom, fiscalYearTo)}“ bearbeitet`, id);
 		} else {
-			createEconomicPlan(data);
+			const plan = createEconomicPlan(data);
+			logActivity(user, "CREATE", "wirtschaftsplan", `Wirtschaftsplan „${fiscalYearLabel(fiscalYearFrom, fiscalYearTo)}“ angelegt`, plan.id);
 		}
 	} catch (error) {
 		console.error("saveEconomicPlanAction failed", error);
@@ -105,7 +114,7 @@ export async function saveEconomicPlanAction(_prevState: ActionState, formData: 
 }
 
 export async function deleteEconomicPlanAction(id: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const existing = requireDraftEconomicPlan(id);
 	if ("error" in existing) return { error: existing.error };
 
@@ -116,6 +125,14 @@ export async function deleteEconomicPlanAction(id: string, _hoaId: string): Prom
 		return { error: "Der Wirtschaftsplan konnte nicht gelöscht werden." };
 	}
 
+	logActivity(
+		user,
+		"DELETE",
+		"wirtschaftsplan",
+		`Wirtschaftsplan „${fiscalYearLabel(new Date(existing.plan.fiscalYearFrom), new Date(existing.plan.fiscalYearTo))}“ gelöscht`,
+		id
+	);
+
 	revalidatePath(`/weg/wirtschaftsplan`);
 	return { success: true };
 }
@@ -125,7 +142,7 @@ export async function deleteEconomicPlanAction(id: string, _hoaId: string): Prom
 // ============================================================
 
 export async function saveEconomicPlanCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const economicPlanId = getString(formData, "economicPlanId");
 	const categoryRaw = getString(formData, "category") as HoaCostCategory;
@@ -167,8 +184,10 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 	try {
 		if (id) {
 			updateEconomicPlanCostItem(id, economicPlanId, data);
+			logActivity(user, "UPDATE", "wirtschaftsplan", `Kostenposition „${label}“ bearbeitet`, id);
 		} else {
-			createEconomicPlanCostItem(economicPlanId, data);
+			const costItem = createEconomicPlanCostItem(economicPlanId, data);
+			logActivity(user, "CREATE", "wirtschaftsplan", `Kostenposition „${label}“ angelegt`, costItem.id);
 		}
 	} catch (error) {
 		console.error("saveEconomicPlanCostItemAction failed", error);
@@ -180,16 +199,20 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 }
 
 export async function deleteEconomicPlanCostItemAction(id: string, _hoaId: string, economicPlanId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const existing = requireDraftEconomicPlan(economicPlanId);
 	if ("error" in existing) return { error: existing.error };
 
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const costItem = getHoaCostItem(id);
 	try {
 		deleteEconomicPlanCostItem(id);
 	} catch (error) {
 		console.error("deleteEconomicPlanCostItemAction failed", error);
 		return { error: "Die Kostenposition konnte nicht gelöscht werden." };
 	}
+
+	logActivity(user, "DELETE", "wirtschaftsplan", `Kostenposition „${costItem ? costItem.label : id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/wirtschaftsplan/${economicPlanId}`);
 	return { success: true };
@@ -200,7 +223,7 @@ export async function deleteEconomicPlanCostItemAction(id: string, _hoaId: strin
 // ============================================================
 
 export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const detail = getEconomicPlanDetail(economicPlanId);
 
 	if (!detail) {
@@ -252,6 +275,14 @@ export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId:
 		return { error: "Der Wirtschaftsplan konnte nicht finalisiert werden." };
 	}
 
+	logActivity(
+		user,
+		"UPDATE",
+		"wirtschaftsplan",
+		`Wirtschaftsplan „${fiscalYearLabel(new Date(detail.plan.fiscalYearFrom), new Date(detail.plan.fiscalYearTo))}“ finalisiert`,
+		economicPlanId
+	);
+
 	revalidatePath(`/weg/wirtschaftsplan/${economicPlanId}`);
 	revalidatePath(`/weg/wirtschaftsplan`);
 	return { success: true };
@@ -274,7 +305,7 @@ export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId:
  * nicht doppelt angelegt (Button darf beliebig oft ausgeführt werden).
  */
 export async function generateHousingChargesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const economicPlanId = getString(formData, "economicPlanId");
 	const dueDayRaw = getString(formData, "dueDay");
 
@@ -362,6 +393,8 @@ export async function generateHousingChargesAction(_prevState: ActionState, form
 						: "Keine Einheiten mit Einzelwirtschaftsplan gefunden.",
 		};
 	}
+
+	logActivity(user, "CREATE", "hausgeld", `Hausgeld fällig gestellt (${created} neue Position${created === 1 ? "" : "en"})`);
 
 	return {
 		success: true,

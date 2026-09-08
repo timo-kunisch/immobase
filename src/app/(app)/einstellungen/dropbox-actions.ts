@@ -15,6 +15,7 @@ import {
 } from "@/lib/dropbox-backup";
 import { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { MIN_BACKUP_PASSWORD_LENGTH } from "@/lib/backup-crypto";
 
 /**
@@ -53,12 +54,13 @@ export async function startDropboxConnectAction(appKey: string): Promise<{ url?:
  * (Token-Tausch + Kontoinfo). Bei Erfolg wird die Konto-E-Mail zurückgegeben.
  */
 export async function completeDropboxConnectAction(code: string): Promise<{ email?: string; error?: string }> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	if (!code || !code.trim()) {
 		return { error: "Bitte den von Dropbox angezeigten Code eingeben." };
 	}
 	try {
 		const result = await completeDropboxConnect(code);
+		logActivity(admin, "CREATE", "einstellungen", `Dropbox-Konto „${result.email}“ verbunden`);
 		revalidatePath("/einstellungen");
 		return { email: result.email };
 	} catch (error) {
@@ -77,9 +79,10 @@ export async function cancelDropboxConnectAction(): Promise<ActionState> {
 
 /** Trennt die Dropbox-Verbindung (löscht Tokens + Kontoinfo, behält die Backup-Konfiguration). */
 export async function disconnectDropboxAction(): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	try {
 		disconnectDropbox();
+		logActivity(admin, "DELETE", "einstellungen", "Dropbox-Verbindung getrennt");
 	} catch (error) {
 		console.error("disconnectDropboxAction failed", error);
 		return { error: "Die Verbindung konnte nicht getrennt werden." };
@@ -95,7 +98,7 @@ export async function disconnectDropboxAction(): Promise<ActionState> {
  * bei den SMTP-/LetterXpress-Geheimnissen).
  */
 export async function saveDropboxBackupSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 
 	const enabled = formData.get("enabled") === "on";
 	const interval = formData.get("interval") === "weekly" ? ("weekly" as const) : ("daily" as const);
@@ -122,6 +125,7 @@ export async function saveDropboxBackupSettingsAction(_prevState: ActionState, f
 
 	try {
 		saveDropboxBackupSettings({ enabled, interval, retention, encrypt, password: password || undefined });
+		logActivity(admin, "UPDATE", "einstellungen", "Dropbox-Backup-Einstellungen aktualisiert");
 	} catch (error) {
 		console.error("saveDropboxBackupSettingsAction failed", error);
 		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
@@ -133,8 +137,11 @@ export async function saveDropboxBackupSettingsAction(_prevState: ActionState, f
 
 /** Löst sofort einen Backup-Durchlauf aus (unabhängig vom Scheduler-Fahrplan). */
 export async function runDropboxBackupNowAction(): Promise<ActionState> {
-	await requireAdmin();
+	const admin = await requireAdmin();
 	const result = await runDropboxBackup("manual");
+	if (result.ok) {
+		logActivity(admin, "CREATE", "system", `Datensicherung „${result.fileName}“ nach Dropbox hochgeladen`);
+	}
 	revalidatePath("/einstellungen");
 	if (!result.ok) {
 		return { error: `Das Dropbox-Backup ist fehlgeschlagen: ${result.error}` };

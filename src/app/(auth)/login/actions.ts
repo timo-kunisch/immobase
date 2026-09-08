@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { getUserByEmail, markEmailVerified } from "@/data/users";
+import { logActivity } from "@/lib/audit";
 import { verifyPasswordTimingSafe } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { isSmtpConfigured } from "@/lib/email/mailer";
@@ -54,6 +55,7 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 	}
 
 	await createSession(user.id);
+	logActivity(user, "LOGIN", "auth", "Angemeldet", user.id);
 
 	const from = String(formData.get("from") ?? "");
 	const safeFrom = from && from.startsWith("/") && !from.startsWith("//") ? from : "/";

@@ -283,6 +283,7 @@ src/
         page.tsx            # Server Component, lädt Daten via Repository-Layer
         actions.ts          # "use server"-Funktionen (CRUD), je requireUser()/requireAdmin()
       weg/                  # WEG-Verwaltung - flache Top-Level-Module (siehe Abschnitt 7.1)
+      admin/logs/           # Aktivitätsprotokoll (Audit Log, nur Admins)
       actions/dashboard.ts  # Dashboard-Orchestrierung (kein "use server" - reines Lesen)
     (auth)/                 # Öffentliche Auth-Seiten, ohne Sidebar
     (setup)/setup/          # Ersteinrichtungs-Wizard (nur solange countUsers() === 0)
@@ -304,6 +305,7 @@ src/
     schema.sql              # generierte Referenz (npm run schema:dump)
     backup.ts               # Export/Import (ZIP, Manifest, SHA-256, db.backup)
     reset.ts                # Vollständiger Anwendungs-Reset (Einstellungen, nur Admins)
+    audit-log.ts            # Aktivitätsprotokoll (append-only, Aufrufe via src/lib/audit.ts)
     app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, KI-Endpunkt, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
@@ -326,6 +328,7 @@ src/
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
                             # chat.ts (Tool-Loop über die MCP-Registry)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
+    audit.ts                # logActivity() - Helfer für das Aktivitätsprotokoll (aus Server Actions)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts
     templates.ts            # Platzhalter-System für Dokumentvorlagen
@@ -388,6 +391,12 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
   Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
   `src/data/app-settings.ts`)
 - **Authentifizierung:** `users`, `sessions`, `verification_tokens`, `password_reset_tokens`
+- **Aktivitätsprotokoll (Audit Log):** `audit_log_entries` (append-only; `user_email` denormalisiert,
+  `user_id` ON DELETE SET NULL). Geschrieben aus Server Actions über `logActivity()`
+  (`src/lib/audit.ts`, best-effort, bricht die Fachoperation nie); Einsicht nur für Admins
+  unter `/admin/logs` (Filter nach Nutzer/Bereich + Pagination). Ausnahmen ohne Log-Eintrag:
+  Anwendungs-Reset (löscht die Log-Tabelle mit), reine Lese-/Vorschau-Aktionen, MCP-Zugriffe
+  (Token ohne Nutzerkontext).
 
 ### 6.1 WEG-Verwaltung (Wohnungseigentümergemeinschaften)
 
@@ -434,7 +443,10 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Server Actions:** Rückgabetyp `ActionState` (`src/lib/action-state.ts`) für die meisten
   Formular-Actions; eigene State-Typen in separaten Dateien ohne `"use server"` (Muster:
   `login-state.ts`, `preview-state.ts`). **Jede** Server Action beginnt mit `await requireUser()`
-  bzw. `await requireAdmin()`.
+  bzw. `await requireAdmin()`. Jede **datenverändernde** Action protokolliert ihren Erfolg
+  zusätzlich über `logActivity(user, aktion, kategorie, beschreibung, entityId?)`
+  (`src/lib/audit.ts`; Beschreibung = fertiger deutscher Satz mit fachlicher Bezeichnung,
+  bei Löschungen die Bezeichnung vorher über das Repository ermitteln).
 - **Datenbankzugriff:** Ausschließlich über Repositories unter `src/data/` (direktes
   better-sqlite3). Repositories sind **synchron** – bestehende `await`-Aufrufe sind harmlos,
   Repo-Funktionen selbst nie `async` machen. SELECTs mit Spalten-Aliassen in camelCase
@@ -451,7 +463,7 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `CountLinkBadge` – Muster aus den Listen-Seiten fortführen.
 - **Pagination:** Nur bei fachlich unbegrenzt wachsenden Listen **ohne** eingehende
   Zeilen-Anker (diese würden sonst ab Seite 2 ins Leere laufen): `/finanzen`
-  (Mieteingänge), `/weg/hausgeld`, `/dokumente`, `/weg/beschluesse`. Muster: `?page=`
+  (Mieteingänge), `/weg/hausgeld`, `/dokumente`, `/weg/beschluesse`, `/admin/logs`. Muster: `?page=`
   (1-basiert) + `resolvePagination()` (`src/lib/pagination.ts`, 50/Seite) + `countX()`/
   `listXPage()` im Repository (SQL mit `LIMIT`/`OFFSET` und deterministischem
   Sortier-Tie-Breaker per ID) + `PaginationBar` (`src/components/ui/pagination-bar.tsx`,

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import { countUsers, getUserByEmail } from "@/data/users";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { provisionUserAccount } from "@/lib/auth/bootstrap";
 import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/validation";
@@ -44,6 +45,14 @@ export async function registerAction(_prevState: ActionState, formData: FormData
 
 	const isFirstUser = countUsers() === 0;
 	const { emailSent } = await provisionUserAccount(email, password, isFirstUser);
+	// Registrierungen sind für Admins relevant (Freigabe-Workflow) - der
+	// Nutzer ist hier noch nicht angemeldet, daher userId = null.
+	logActivity(
+		{ id: null, email },
+		"CREATE",
+		"admin",
+		isFirstUser ? `Benutzerkonto „${email}“ registriert (erster Administrator)` : `Benutzerkonto „${email}“ registriert (wartet auf Freigabe)`
+	);
 
 	redirect(
 		`/login?registered=1${isFirstUser ? "&firstAdmin=1" : ""}${emailSent ? "&emailSent=1" : ""}&email=${encodeURIComponent(email)}`

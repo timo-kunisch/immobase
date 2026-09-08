@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createProperty, deleteProperty, updateProperty } from "@/data/properties";
+import { createProperty, deleteProperty, getProperty, updateProperty } from "@/data/properties";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 
 function getString(formData: FormData, key: string): string {
@@ -16,7 +17,7 @@ function getString(formData: FormData, key: string): string {
  * je nachdem ob ein verstecktes Feld "id" im Formular vorhanden ist.
  */
 export async function savePropertyAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const name = getString(formData, "name");
 	const street = getString(formData, "street");
@@ -41,8 +42,10 @@ export async function savePropertyAction(_prevState: ActionState, formData: Form
 	try {
 		if (id) {
 			updateProperty(id, data);
+			logActivity(user, "UPDATE", "liegenschaften", `Liegenschaft „${name}“ bearbeitet`, id);
 		} else {
-			createProperty(data);
+			const property = createProperty(data);
+			logActivity(user, "CREATE", "liegenschaften", `Liegenschaft „${name}“ angelegt`, property.id);
 		}
 	} catch (error) {
 		console.error("savePropertyAction failed", error);
@@ -55,7 +58,9 @@ export async function savePropertyAction(_prevState: ActionState, formData: Form
 }
 
 export async function deletePropertyAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const property = getProperty(id);
 	try {
 		deleteProperty(id);
 	} catch (error) {
@@ -64,6 +69,8 @@ export async function deletePropertyAction(id: string): Promise<ActionState> {
 			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Einheiten.",
 		};
 	}
+
+	logActivity(user, "DELETE", "liegenschaften", `Liegenschaft „${property ? property.name : id}“ gelöscht`, id);
 
 	revalidatePath("/liegenschaften");
 	revalidatePath("/");

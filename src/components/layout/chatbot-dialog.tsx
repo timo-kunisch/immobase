@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
  *
  * Der Gesprächsverlauf liegt im State dieser (immer gemounteten) Komponente -
  * Radix unmountet den Dialog-INHALT beim Schließen; so bleibt das Gespräch
- * über das Schließen hinaus erhalten („Neues Gespräch" setzt es zurück). Der
+ * über das Schließen hinaus erhalten („Neues Gespräch“ setzt es zurück). Der
  * Server ist zustandslos: Der Verlauf wird bei jeder Anfrage vollständig
  * mitgesendet.
  */

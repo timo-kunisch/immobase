@@ -16,6 +16,7 @@ import {
 	LogOut,
 	PiggyBank,
 	Scale,
+	ScrollText,
 	Settings,
 	ShieldCheck,
 	Users,
@@ -82,6 +83,7 @@ const wegNavItems = [
 
 const adminNavItems = [
 	{ title: "Nutzerverwaltung", href: "/admin/users", icon: ShieldCheck },
+	{ title: "Aktivitätsprotokoll", href: "/admin/logs", icon: ScrollText },
 	{ title: "Einstellungen", href: "/einstellungen", icon: Settings },
 ];
 

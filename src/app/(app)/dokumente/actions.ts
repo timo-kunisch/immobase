@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createDocument, deleteDocument, getDocument } from "@/data/documents";
 import type { DocumentType } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { deleteUploadedFile, saveUploadedFile } from "@/lib/storage";
 import { sendPdfByPostForSource, type PostalShipmentActionState } from "@/lib/postal-shipments";
@@ -26,7 +27,7 @@ function getOptionalId(formData: FormData, key: string): string | null {
 }
 
 export async function uploadDocumentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const file = formData.get("file");
 	const typeRaw = getString(formData, "type") as DocumentType;
 	const propertyId = getOptionalId(formData, "propertyId");
@@ -50,7 +51,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 	try {
 		const saved = await saveUploadedFile(file, "documents");
 
-		createDocument({
+		const document = createDocument({
 			propertyId,
 			unitId,
 			tenantId,
@@ -60,6 +61,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 			mimeType: saved.mimeType,
 			fileSize: saved.fileSize,
 		});
+		logActivity(user, "CREATE", "dokumente", `Dokument „${saved.fileName}“ hochgeladen`, document.id);
 	} catch (error) {
 		console.error("uploadDocumentAction failed", error);
 		return { error: "Die Datei konnte nicht hochgeladen werden." };
@@ -70,7 +72,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 }
 
 export async function deleteDocumentAction(id: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	try {
 		const document = getDocument(id);
 		if (!document) {
@@ -79,6 +81,7 @@ export async function deleteDocumentAction(id: string): Promise<ActionState> {
 
 		deleteDocument(id);
 		await deleteUploadedFile(document.filePath);
+		logActivity(user, "DELETE", "dokumente", `Dokument „${document.fileName}“ gelöscht`, id);
 	} catch (error) {
 		console.error("deleteDocumentAction failed", error);
 		return { error: "Das Dokument konnte nicht gelöscht werden." };
@@ -109,6 +112,12 @@ export async function sendDocumentByPostAction(documentId: string): Promise<Post
 	}
 
 	const result = await sendPdfByPostForSource("DOCUMENT", documentId, user.id);
+
+	// Nur bei tatsächlich erfolgtem Versand protokollieren (bei einem Fehler
+	// liegt kein Versand vor - ggf. nur ein FAILED-Eintrag im Sendungsprotokoll).
+	if ("success" in result) {
+		logActivity(user, "CREATE", "postversand", `Dokument „${document.fileName}“ per Post versendet`, documentId);
+	}
 
 	revalidatePath("/dokumente");
 	return result;

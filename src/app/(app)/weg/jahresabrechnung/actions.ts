@@ -21,6 +21,7 @@ import {
 import { createCostItem, getBillingPeriod } from "@/data/billing";
 import type { HoaAllocationKey, HoaCostCategory } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
+import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import { calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
@@ -56,12 +57,17 @@ function requireDraftAnnualStatement(annualStatementId: string) {
 	return { statement } as const;
 }
 
+/** Kurzbezeichnung des Abrechnungszeitraums für Protokoll-Einträge („2026“ bzw. „2026–2027"). */
+function periodLabel(from: Date, to: Date): string {
+	return from.getFullYear() === to.getFullYear() ? `${from.getFullYear()}` : `${from.getFullYear()}–${to.getFullYear()}`;
+}
+
 // ============================================================
 // Jahresabrechnung (AnnualStatement)
 // ============================================================
 
 export async function saveAnnualStatementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const periodFromRaw = getString(formData, "periodFrom");
@@ -93,8 +99,10 @@ export async function saveAnnualStatementAction(_prevState: ActionState, formDat
 	try {
 		if (id) {
 			updateAnnualStatement(id, data);
+			logActivity(user, "UPDATE", "jahresabrechnung", `Jahresabrechnung „${periodLabel(periodFrom, periodTo)}“ bearbeitet`, id);
 		} else {
-			createAnnualStatement(data);
+			const statement = createAnnualStatement(data);
+			logActivity(user, "CREATE", "jahresabrechnung", `Jahresabrechnung „${periodLabel(periodFrom, periodTo)}“ angelegt`, statement.id);
 		}
 	} catch (error) {
 		console.error("saveAnnualStatementAction failed", error);
@@ -106,7 +114,7 @@ export async function saveAnnualStatementAction(_prevState: ActionState, formDat
 }
 
 export async function deleteAnnualStatementAction(id: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const existing = requireDraftAnnualStatement(id);
 	if ("error" in existing) return { error: existing.error };
 
@@ -117,6 +125,14 @@ export async function deleteAnnualStatementAction(id: string, _hoaId: string): P
 		return { error: "Die Jahresabrechnung konnte nicht gelöscht werden." };
 	}
 
+	logActivity(
+		user,
+		"DELETE",
+		"jahresabrechnung",
+		`Jahresabrechnung „${periodLabel(new Date(existing.statement.periodFrom), new Date(existing.statement.periodTo))}“ gelöscht`,
+		id
+	);
+
 	revalidatePath(`/weg/jahresabrechnung`);
 	return { success: true };
 }
@@ -126,7 +142,7 @@ export async function deleteAnnualStatementAction(id: string, _hoaId: string): P
 // ============================================================
 
 export async function saveAnnualStatementCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const id = getString(formData, "id");
 	const annualStatementId = getString(formData, "annualStatementId");
 	const categoryRaw = getString(formData, "category") as HoaCostCategory;
@@ -173,8 +189,10 @@ export async function saveAnnualStatementCostItemAction(_prevState: ActionState,
 	try {
 		if (id) {
 			updateHoaCostItem(id, data);
+			logActivity(user, "UPDATE", "jahresabrechnung", `Kostenposition „${label}“ bearbeitet`, id);
 		} else {
-			createHoaCostItem(data);
+			const costItem = createHoaCostItem(data);
+			logActivity(user, "CREATE", "jahresabrechnung", `Kostenposition „${label}“ angelegt`, costItem.id);
 		}
 	} catch (error) {
 		console.error("saveAnnualStatementCostItemAction failed", error);
@@ -186,16 +204,20 @@ export async function saveAnnualStatementCostItemAction(_prevState: ActionState,
 }
 
 export async function deleteAnnualStatementCostItemAction(id: string, _hoaId: string, annualStatementId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const existing = requireDraftAnnualStatement(annualStatementId);
 	if ("error" in existing) return { error: existing.error };
 
+	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
+	const costItem = getHoaCostItem(id);
 	try {
 		deleteHoaCostItem(id);
 	} catch (error) {
 		console.error("deleteAnnualStatementCostItemAction failed", error);
 		return { error: "Die Kostenposition konnte nicht gelöscht werden." };
 	}
+
+	logActivity(user, "DELETE", "jahresabrechnung", `Kostenposition „${costItem ? costItem.label : id}“ gelöscht`, id);
 
 	revalidatePath(`/weg/jahresabrechnung/${annualStatementId}`);
 	return { success: true };
@@ -206,7 +228,7 @@ export async function deleteAnnualStatementCostItemAction(id: string, _hoaId: st
 // ============================================================
 
 export async function saveHoaConsumptionValuesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const costItemId = getString(formData, "costItemId");
 	if (!costItemId) {
 		return { error: "Ungültige Kostenposition." };
@@ -237,6 +259,7 @@ export async function saveHoaConsumptionValuesAction(_prevState: ActionState, fo
 				return { unitId, value };
 			})
 		);
+		logActivity(user, "UPDATE", "jahresabrechnung", `Verbrauchswerte der Kostenposition „${costItem.label}“ aktualisiert`, costItemId);
 	} catch (error) {
 		console.error("saveHoaConsumptionValuesAction failed", error);
 		return { error: "Die Verbrauchswerte konnten nicht gespeichert werden." };
@@ -251,7 +274,7 @@ export async function saveHoaConsumptionValuesAction(_prevState: ActionState, fo
 // ============================================================
 
 export async function finalizeAnnualStatementAction(annualStatementId: string, _hoaId: string): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const detail = getAnnualStatementDetail(annualStatementId);
 
 	if (!detail) {
@@ -327,6 +350,14 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
 		return { error: "Die Jahresabrechnung konnte nicht finalisiert werden." };
 	}
 
+	logActivity(
+		user,
+		"UPDATE",
+		"jahresabrechnung",
+		`Jahresabrechnung „${periodLabel(new Date(detail.statement.periodFrom), new Date(detail.statement.periodTo))}“ finalisiert`,
+		annualStatementId
+	);
+
 	revalidatePath(`/weg/jahresabrechnung/${annualStatementId}`);
 	revalidatePath(`/weg/jahresabrechnung`);
 	return { success: true };
@@ -346,7 +377,7 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
  * Liegenschaft der gewählten Abrechnungsperiode.
  */
 export async function bridgeToBetrKvAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	await requireUser();
+	const user = await requireUser();
 	const unitResultId = getString(formData, "unitResultId");
 	const billingPeriodId = getString(formData, "billingPeriodId");
 
@@ -400,6 +431,14 @@ export async function bridgeToBetrKvAction(_prevState: ActionState, formData: Fo
 		console.error("bridgeToBetrKvAction failed", error);
 		return { error: "Der Übertrag in die Nebenkostenabrechnung ist fehlgeschlagen." };
 	}
+
+	logActivity(
+		user,
+		"CREATE",
+		"jahresabrechnung",
+		`WEG-Einzelabrechnung in die Nebenkostenabrechnung übertragen (${bridgedItems.length} Kostenposition${bridgedItems.length === 1 ? "" : "en"})`,
+		unitResultId
+	);
 
 	revalidatePath(`/abrechnung/${billingPeriodId}`);
 	revalidatePath(`/weg/jahresabrechnung`);
