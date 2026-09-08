@@ -1,11 +1,13 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
 	Building2,
 	Calculator,
 	CalendarDays,
+	ChevronDown,
 	DoorOpen,
 	FileSignature,
 	FileText,
@@ -38,6 +40,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { ContactAdminDialog } from "@/components/layout/contact-admin-dialog";
 import { logoutAction } from "@/lib/auth/actions";
+import { cn } from "@/lib/utils";
 
 /**
  * Navigationseinträge gegliedert nach fachlichem Bereich - macht die
@@ -91,6 +94,41 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 	// die eigene, gleichrangige Sidebar-Einträge sind, z. B. /weg/hausgeld).
 	const isItemActive = (href: string) => (href === "/" || href === "/weg" ? pathname === href : pathname.startsWith(href));
 
+	// Scroll-Hinweise: Die Menüliste ist scrollbar (SidebarContent hat
+	// "overflow-auto" bei ausgeblendeter Scrollbar). Damit erkennbar ist,
+	// dass es weitere Einträge gibt, werden - abhängig von der
+	// Scrollposition - ein Ausblend-Verlauf am oberen/unteren Rand und ein
+	// "Weitere Menüpunkte"-Button eingeblendet, der eine Stück
+	// nach unten scrollt.
+	const scrollRef = useRef<HTMLDivElement | null>(null);
+	const [canScrollUp, setCanScrollUp] = useState(false);
+	const [canScrollDown, setCanScrollDown] = useState(false);
+
+	const updateScrollState = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		const threshold = 4;
+		setCanScrollUp(el.scrollTop > threshold);
+		setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - threshold);
+	}, []);
+
+	useEffect(() => {
+		updateScrollState();
+		const el = scrollRef.current;
+		if (!el) return;
+		// Fenstergrößenänderungen (und damit Höhenänderungen der Sidebar)
+		// verändern, ob bzw. wie weit gescrollt werden kann.
+		const observer = new ResizeObserver(updateScrollState);
+		observer.observe(el);
+		return () => observer.disconnect();
+	}, [updateScrollState]);
+
+	const scrollFurtherDown = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		el.scrollBy({ top: el.clientHeight * 0.6, behavior: "smooth" });
+	}, []);
+
 	return (
 		<Sidebar collapsible="icon">
 			<SidebarHeader>
@@ -114,64 +152,16 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 					</div>
 				</a>
 			</SidebarHeader>
-			<SidebarContent>
-				<SidebarGroup>
-					<SidebarGroupLabel>Allgemein</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{generalNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
-										<Link href={item.href}>
-											<item.icon />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-				<SidebarGroup>
-					<SidebarGroupLabel>Mietverwaltung</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{rentalNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
-										<Link href={item.href}>
-											<item.icon />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-				<SidebarGroup>
-					<SidebarGroupLabel>WEG-Verwaltung</SidebarGroupLabel>
-					<SidebarGroupContent>
-						<SidebarMenu>
-							{wegNavItems.map((item) => (
-								<SidebarMenuItem key={item.href}>
-									<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
-										<Link href={item.href}>
-											<item.icon />
-											<span>{item.title}</span>
-										</Link>
-									</SidebarMenuButton>
-								</SidebarMenuItem>
-							))}
-						</SidebarMenu>
-					</SidebarGroupContent>
-				</SidebarGroup>
-				{user.role === "ADMIN" ? (
+			{/* Der Wrapper macht die Scroll-Overlays positionsverankert
+			    (relative) und erhält den Flex-Platz, den sonst SidebarContent
+			    direkt einnähme (flex-1 min-h-0). */}
+			<div className="relative flex min-h-0 flex-1 flex-col">
+				<SidebarContent ref={scrollRef} onScroll={updateScrollState}>
 					<SidebarGroup>
-						<SidebarGroupLabel>Administration</SidebarGroupLabel>
+						<SidebarGroupLabel>Allgemein</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<SidebarMenu>
-								{adminNavItems.map((item) => (
+								{generalNavItems.map((item) => (
 									<SidebarMenuItem key={item.href}>
 										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
 											<Link href={item.href}>
@@ -184,8 +174,90 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 							</SidebarMenu>
 						</SidebarGroupContent>
 					</SidebarGroup>
-				) : null}
-			</SidebarContent>
+					<SidebarGroup>
+						<SidebarGroupLabel>Mietverwaltung</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<SidebarMenu>
+								{rentalNavItems.map((item) => (
+									<SidebarMenuItem key={item.href}>
+										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+											<Link href={item.href}>
+												<item.icon />
+												<span>{item.title}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								))}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+					<SidebarGroup>
+						<SidebarGroupLabel>WEG-Verwaltung</SidebarGroupLabel>
+						<SidebarGroupContent>
+							<SidebarMenu>
+								{wegNavItems.map((item) => (
+									<SidebarMenuItem key={item.href}>
+										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+											<Link href={item.href}>
+												<item.icon />
+												<span>{item.title}</span>
+											</Link>
+										</SidebarMenuButton>
+									</SidebarMenuItem>
+								))}
+							</SidebarMenu>
+						</SidebarGroupContent>
+					</SidebarGroup>
+					{user.role === "ADMIN" ? (
+						<SidebarGroup>
+							<SidebarGroupLabel>Administration</SidebarGroupLabel>
+							<SidebarGroupContent>
+								<SidebarMenu>
+									{adminNavItems.map((item) => (
+										<SidebarMenuItem key={item.href}>
+											<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+												<Link href={item.href}>
+													<item.icon />
+													<span>{item.title}</span>
+												</Link>
+											</SidebarMenuButton>
+										</SidebarMenuItem>
+									))}
+								</SidebarMenu>
+							</SidebarGroupContent>
+						</SidebarGroup>
+					) : null}
+				</SidebarContent>
+				{/* Scroll-Hinweise (nur sichtbar, wenn in die jeweilige Richtung
+				    weitergescrollt werden kann). Im eingeklappten Icon-Modus ist
+				    der Inhalt nicht scrollbar, dort werden sie ausgeblendet. */}
+				<div
+					aria-hidden="true"
+					className={cn(
+						"pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-sidebar to-transparent transition-opacity group-data-[collapsible=icon]:hidden",
+						canScrollUp ? "opacity-100" : "opacity-0",
+					)}
+				/>
+				<div
+					aria-hidden="true"
+					className={cn(
+						"pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-sidebar from-30% to-transparent transition-opacity group-data-[collapsible=icon]:hidden",
+						canScrollDown ? "opacity-100" : "opacity-0",
+					)}
+				/>
+				<button
+					type="button"
+					onClick={scrollFurtherDown}
+					tabIndex={canScrollDown ? 0 : -1}
+					className={cn(
+						"absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1 text-xs text-sidebar-accent-foreground shadow-sm transition-opacity hover:bg-sidebar-accent/80 group-data-[collapsible=icon]:hidden",
+						canScrollDown ? "opacity-100" : "pointer-events-none opacity-0",
+					)}
+				>
+					Weitere Menüpunkte
+					<ChevronDown className="size-3.5" />
+				</button>
+			</div>
 			<SidebarFooter>
 				<div className="flex items-center gap-2 px-1 py-1">
 					<div className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
