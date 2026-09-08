@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, SkipForward } from "lucide-react";
+import { useActionState, useEffect, useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Copy, KeyRound, Loader2, SkipForward } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +12,12 @@ import { initialActionState, type ActionState } from "@/lib/action-state";
 import type { CompanySettings } from "@/data/types";
 import type { IntegrationSettings } from "@/components/einstellungen/integration-settings-form";
 
-import { setupAccountAction, setupCompanySettingsAction, setupIntegrationSettingsAction } from "@/app/(setup)/setup/actions";
+import {
+	getSetupRecoveryKeyAction,
+	setupAccountAction,
+	setupCompanySettingsAction,
+	setupIntegrationSettingsAction,
+} from "@/app/(setup)/setup/actions";
 
 /**
  * Setup-Wizard für die Ersteinrichtung (Route /setup, nur erreichbar solange
@@ -21,7 +26,9 @@ import { setupAccountAction, setupCompanySettingsAction, setupIntegrationSetting
  *   1. Willkommen (Einführung)
  *   2. Absenderdaten für erzeugte PDFs (überspringbar)
  *   3. Online-Integrationen SMTP/LetterXpress (überspringbar)
- *   4. Administratorkonto anlegen (erforderlich, letzter Schritt)
+ *   4. Wiederherstellungsschlüssel der lokalen Datenverschlüsselung sichern
+ *      (nicht überspringbar, aber ohne Eingabe – Bestätigung per Checkbox)
+ *   5. Administratorkonto anlegen (erforderlich, letzter Schritt)
  *
  * Das Konto wird bewusst als LETZTER Schritt angelegt: Die Setup-Actions
  * sind nur zulässig, solange noch kein Benutzer existiert (siehe
@@ -33,7 +40,7 @@ import { setupAccountAction, setupCompanySettingsAction, setupIntegrationSetting
  * eingegebene Werte beim Zurückblättern erhalten bleiben.
  */
 
-const STEP_TITLES = ["Willkommen", "Absenderdaten", "Online-Integrationen", "Administratorkonto"];
+const STEP_TITLES = ["Willkommen", "Absenderdaten", "Online-Integrationen", "Wiederherstellungsschlüssel", "Administratorkonto"];
 
 function StepProgress({ step }: { step: number }) {
 	return (
@@ -65,6 +72,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
 				<ul className="list-disc space-y-1 pl-5">
 					<li>Absenderdaten für erzeugte PDFs (optional)</li>
 					<li>Online-Integrationen für E-Mail- und Postversand (optional)</li>
+					<li>Wiederherstellungsschlüssel der lokalen Datenverschlüsselung sichern (erforderlich)</li>
 					<li>Ihr Administratorkonto (erforderlich)</li>
 				</ul>
 				<p>Optionale Schritte können übersprungen und jederzeit unter „Einstellungen“ nachgeholt werden.</p>
@@ -283,6 +291,114 @@ function IntegrationsStep({
 	);
 }
 
+function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: () => void; onBack: () => void }) {
+	const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
+	const [error, setError] = useState<string | null>(null);
+	const [copied, setCopied] = useState(false);
+	const [confirmed, setConfirmed] = useState(false);
+
+	// Der Schlüssel wird erst abgerufen, wenn der Schritt sichtbar wird (alle
+	// Schritte bleiben gemountet) – analog zum expliziten Abruf in den
+	// Einstellungen, nicht schon beim Laden der Seite.
+	useEffect(() => {
+		if (!active || recoveryKey !== null) return;
+		let cancelled = false;
+		getSetupRecoveryKeyAction()
+			.then((result) => {
+				if (cancelled) return;
+				if (result.error || !result.key) {
+					setError(result.error ?? "Der Wiederherstellungsschlüssel konnte nicht gelesen werden.");
+				} else {
+					setRecoveryKey(result.key);
+				}
+			})
+			.catch(() => {
+				if (!cancelled) setError("Der Wiederherstellungsschlüssel konnte nicht gelesen werden.");
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [active, recoveryKey]);
+
+	async function handleCopy(): Promise<void> {
+		if (!recoveryKey) return;
+		try {
+			await navigator.clipboard.writeText(recoveryKey);
+			setCopied(true);
+			setTimeout(() => setCopied(false), 2000);
+		} catch {
+			// Clipboard-API nicht verfügbar (z. B. kein sicherer Kontext) – der
+			// Schlüssel ist markierbar und kann manuell kopiert werden.
+		}
+	}
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2">
+					<KeyRound className="size-5" />
+					Wiederherstellungsschlüssel sichern
+				</CardTitle>
+				<CardDescription>
+					ImmoBase verschlüsselt Ihre Datenbank, abgelegte Dateien und gespeicherte Zugangsdaten auf diesem Gerät
+					(AES-256). Der Schlüssel dazu ist an dieses Gerät gebunden.
+				</CardDescription>
+			</CardHeader>
+			<CardContent className="space-y-4 text-sm">
+				<p className="text-muted-foreground">
+					Mit dem folgenden Wiederherstellungsschlüssel können Sie Ihre Daten entschlüsseln, falls der
+					Geräteschlüssel verloren geht (z. B. nach einer Neuinstallation des Betriebssystems). Verwahren Sie ihn
+					wie ein Passwort an einem sicheren Ort – ohne ihn sind die verschlüsselten Daten in diesem Fall
+					unwiederbringlich verloren. Wer den Schlüssel besitzt, kann sämtliche Daten entschlüsseln: zeigen Sie
+					ihn niemandem.
+				</p>
+
+				{error ? <p className="text-sm text-destructive">{error}</p> : null}
+				{recoveryKey === null && !error ? (
+					<p className="flex items-center gap-2 text-muted-foreground">
+						<Loader2 className="size-4 animate-spin" />
+						Schlüssel wird geladen …
+					</p>
+				) : null}
+				{recoveryKey !== null ? (
+					<div className="space-y-2">
+						<code className="block break-all rounded-md border bg-muted p-3 text-xs select-all">{recoveryKey}</code>
+						<Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+							{copied ? <Check /> : <Copy />}
+							{copied ? "Kopiert" : "In die Zwischenablage kopieren"}
+						</Button>
+					</div>
+				) : null}
+
+				<label className="flex items-start gap-2 text-sm">
+					<input
+						type="checkbox"
+						className="mt-0.5"
+						checked={confirmed}
+						onChange={(event) => setConfirmed(event.target.checked)}
+					/>
+					Ich habe den Wiederherstellungsschlüssel sicher außerhalb dieses Geräts verwahrt (z. B. notiert oder in
+					einem Passwort-Manager).
+				</label>
+
+				<p className="text-xs text-muted-foreground">
+					Der Schlüssel ist später jederzeit unter „Einstellungen“ → „Lokale Datenverschlüsselung“ erneut einsehbar.
+				</p>
+			</CardContent>
+			<CardFooter className="justify-between">
+				<Button type="button" variant="ghost" onClick={onBack}>
+					<ChevronLeft />
+					Zurück
+				</Button>
+				<Button type="button" onClick={onDone} disabled={recoveryKey === null || !confirmed}>
+					Weiter
+					<ChevronRight />
+				</Button>
+			</CardFooter>
+		</Card>
+	);
+}
+
 function AccountStep({ onBack }: { onBack: () => void }) {
 	// Bei Erfolg leitet die Action selbst weiter ("/" bei direkter Anmeldung
 	// bzw. "/login?...&emailSent=1" bei konfiguriertem SMTP).
@@ -353,7 +469,10 @@ export function SetupWizard({ company, integrations }: { company: CompanySetting
 				<IntegrationsStep initial={integrations} onDone={() => setStep(3)} onBack={() => setStep(1)} />
 			</div>
 			<div className={step === 3 ? undefined : "hidden"}>
-				<AccountStep onBack={() => setStep(2)} />
+				<RecoveryKeyStep active={step === 3} onDone={() => setStep(4)} onBack={() => setStep(2)} />
+			</div>
+			<div className={step === 4 ? undefined : "hidden"}>
+				<AccountStep onBack={() => setStep(3)} />
 			</div>
 		</div>
 	);

@@ -9,6 +9,7 @@ import { ActionState } from "@/lib/action-state";
 import { provisionUserAccount } from "@/lib/auth/bootstrap";
 import { createSession } from "@/lib/auth/session";
 import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/validation";
+import { getDataKeyBase64 } from "@/lib/data-key";
 
 /**
  * Guard für alle Setup-Actions (Defense-in-Depth): Die Ersteinrichtung ist
@@ -78,6 +79,25 @@ export async function setupIntegrationSettingsAction(_prevState: ActionState, fo
 	}
 
 	return { success: true };
+}
+
+/**
+ * Setup-Schritt „Wiederherstellungsschlüssel“: liefert den Master-Schlüssel
+ * der lokalen Datenverschlüsselung als Base64-Text, damit der Nutzer ihn
+ * während der Ersteinrichtung sicher verwahren kann. Entspricht
+ * getRecoveryKeyAction() in /einstellungen, aber mit Setup-Guard statt
+ * Admin-Guard (es existiert ja noch kein Konto). Der Schlüssel wird beim
+ * Abruf bei Bedarf neu erzeugt (siehe src/lib/data-key.ts) – es gibt zu
+ * diesem Zeitpunkt noch keine Daten, die er gefährden könnte.
+ */
+export async function getSetupRecoveryKeyAction(): Promise<{ key?: string; error?: string }> {
+	ensureSetupAllowed();
+	try {
+		return { key: getDataKeyBase64() };
+	} catch (error) {
+		console.error("getSetupRecoveryKeyAction failed", error);
+		return { error: "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." };
+	}
 }
 
 /**

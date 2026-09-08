@@ -72,7 +72,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   ohne Electron (Browser-Dev/Tests): Schlüsseldatei `<dataDir>/.data-key` (0600). Die Marker-Datei
   `.data-key.managed` verhindert, dass ein Server ohne übergebenen Schlüssel still einen neuen
   erzeugt. Wiederherstellungsschlüssel (base64) in der Admin-UI einsehbar (Einstellungen →
-  Lokale Datenverschlüsselung).
+  Lokale Datenverschlüsselung) und im Setup-Wizard als Pflicht-Schritt zur Sicherung.
 - **Datenbank-Verschlüsselung at rest** (Container, `src/data/db-vault.ts`): Im Ruhezustand liegt
   die SQLite-DB als `data.db.enc` (gleiches AES-256-GCM-Container-Format wie Dateien) vor.
   `getDb()` entschlüsselt synchron vor dem Öffnen (atomar Temp+rename; Fehler = harter Abbruch,
@@ -184,8 +184,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   **erste** Nutzer wird automatisch `ADMIN` + `isApproved=true`. Alle weiteren: `USER` +
   `isApproved=false`, bis ein Admin sie unter `/admin/users` freischaltet. Der Normalpfad für das
   erste Konto ist der **Setup-Wizard** `/setup` (Willkommen → Absenderdaten → Online-Integrationen →
-  Administratorkonto; die beiden mittleren Schritte sind überspringbar, das Konto wird bewusst als
-  letzter Schritt angelegt, damit der `countUsers() === 0`-Guard für alle Setup-Actions gilt). Ohne
+  Wiederherstellungsschlüssel → Administratorkonto; die beiden Schritte nach dem Willkommens-Schritt
+  sind überspringbar, der Schlüssel-Schritt verlangt eine Lesebestätigung per Checkbox, das Konto wird
+  bewusst als letzter Schritt angelegt, damit der `countUsers() === 0`-Guard für alle Setup-Actions
+  gilt). Ohne
   SMTP meldet die letzte Setup-Action den Nutzer direkt an (Session + Redirect auf `/`); mit SMTP
   gilt der klassische Verifizierungslink-Flow über `/login`.
 - **Login-Bedingungen** (beide erforderlich): `emailVerified != null` UND `isApproved == true`.
