@@ -1,14 +1,23 @@
 import { AlertTriangle, Wallet } from "lucide-react";
 
-import { listHousingChargesForUnits, listHoasSortedByName, listOwnersSortedByLastName, listUnitsForProperties } from "@/data/housing-charges";
+import {
+	countHousingChargesForUnits,
+	listHousingChargesForUnitsPage,
+	listHoasSortedByName,
+	listOpenHousingChargeArrearAmounts,
+	listOwnersSortedByLastName,
+	listUnitsForProperties,
+} from "@/data/housing-charges";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { HousingChargeFormDialog } from "@/components/weg/housing-charge-form-dialog";
 import { MarkHousingChargePaidButton } from "@/components/weg/mark-housing-charge-paid-button";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { resolvePagination } from "@/lib/pagination";
 
 import { deleteHousingChargeAction } from "./actions";
 
@@ -28,8 +37,8 @@ const statusStyles: Record<string, string> = {
 	CANCELLED: "bg-muted text-muted-foreground",
 };
 
-export default async function HausgeldPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
-	const { hoaId } = await searchParams;
+export default async function HausgeldPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+	const { hoaId, page: pageParam } = await searchParams;
 
 	const hoaList = listHoasSortedByName();
 
@@ -49,13 +58,15 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 
 	const units = listUnitsForProperties(relevantHoas.map((h) => h.propertyId));
 	const ownerList = listOwnersSortedByLastName();
+	const unitIds = units.map((u) => u.id);
 
-	const chargeList = listHousingChargesForUnits(units.map((u) => u.id));
+	// Paginierte Sollstellungs-Liste (wächst unbegrenzt, eine Seite = 50 Einträge).
+	const chargePagination = resolvePagination(pageParam, countHousingChargesForUnits(unitIds));
+	const chargeList = listHousingChargesForUnitsPage(unitIds, chargePagination);
 
+	// Rückstände über ALLE Sollstellungen (unabhängig von der angezeigten Seite).
 	const now = new Date();
-	const arrears = chargeList
-		.filter((charge) => (charge.status === "OPEN" || charge.status === "OVERDUE") && new Date(charge.dueDate) <= now)
-		.reduce((sum, charge) => sum + Number(charge.amount), 0);
+	const arrears = listOpenHousingChargeArrearAmounts(unitIds, now).reduce((sum, amount) => sum + Number(amount), 0);
 
 	return (
 		<div className="flex flex-1 flex-col">
@@ -126,6 +137,8 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 						)}
 					</CardContent>
 				</Card>
+
+				<PaginationBar basePath="/weg/hausgeld" pagination={chargePagination} params={{ hoaId }} />
 			</div>
 		</div>
 	);

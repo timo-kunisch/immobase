@@ -6,6 +6,7 @@ import { getProperty, listProperties } from "@/data/properties";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { DocumentUploadDialog } from "@/components/dokumente/document-upload-dialog";
@@ -14,6 +15,7 @@ import { SendByPostButton } from "@/components/postal-shipments/send-by-post-but
 import { formatDate } from "@/lib/format";
 import { formatFileSize } from "@/lib/format";
 import { documentSourceTypeLabels, loadUnifiedDocuments } from "@/lib/documents-overview";
+import { resolvePagination } from "@/lib/pagination";
 
 import { deleteAnyDocumentAction, sendAnyDocumentByPostAction } from "./actions";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
@@ -41,13 +43,20 @@ export default async function DokumentePage({
 		propertyId?: string;
 		unitId?: string;
 		tenantId?: string;
+		page?: string;
 	}>;
 }) {
-	const { q, propertyId, unitId, tenantId } = await searchParams;
+	const { q, propertyId, unitId, tenantId, page: pageParam } = await searchParams;
 	const postalConfigured = isLetterXpressConfigured();
 	const query = q?.trim();
 
 	const documentRows = await loadUnifiedDocuments({ propertyId, unitId, tenantId, search: query });
+
+	// Paginierung der gemergten Übersicht (die drei Quellen werden in
+	// src/lib/documents-overview.ts im Speicher zusammengeführt - der Slice
+	// erfolgt daher hier statt auf SQL-Ebene, eine Seite = 50 Einträge).
+	const documentPagination = resolvePagination(pageParam, documentRows.length);
+	const pagedDocumentRows = documentRows.slice(documentPagination.offset, documentPagination.offset + documentPagination.limit);
 	// Picker-Listen alphabetisch (bisher: SQL ORDER BY name/label/lastName ASC).
 	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 	const unitList = listUnitsByLabel();
@@ -98,8 +107,8 @@ export default async function DokumentePage({
 										<TableHead className="w-[100px] text-right">Aktionen</TableHead>
 									</TableRow>
 								</TableHeader>
-								<TableBody>
-									{documentRows.map((document) => (
+							<TableBody>
+								{pagedDocumentRows.map((document) => (
 										<TableRow key={`${document.sourceType}-${document.id}`}>
 											<TableCell className="font-medium">
 												<a href={`/api/uploads/${document.filePath}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:underline">
@@ -160,6 +169,8 @@ export default async function DokumentePage({
 						)}
 					</CardContent>
 				</Card>
+
+				<PaginationBar basePath="/dokumente" pagination={documentPagination} params={{ q: query, propertyId, unitId, tenantId }} />
 			</div>
 		</div>
 	);

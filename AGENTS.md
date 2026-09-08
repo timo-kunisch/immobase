@@ -278,6 +278,7 @@ electron/
 src/
   app/
     (app)/                  # Geschützter Bereich, mit Sidebar (requireUser() im Layout)
+      loading.tsx           # Ladezustand aller App-Seiten (PageSkeleton, Suspense unter dem Layout)
       <modul>/
         page.tsx            # Server Component, lädt Daten via Repository-Layer
         actions.ts          # "use server"-Funktionen (CRUD), je requireUser()/requireAdmin()
@@ -330,6 +331,7 @@ src/
     templates.ts            # Platzhalter-System für Dokumentvorlagen
     desktop-bridge.ts       # Typen für window.iv (Electron-Brücke)
     format.ts, action-state.ts, form-data.ts, id.ts, utils.ts
+    pagination.ts           # Seitengröße, resolvePagination (page-Param clampen), buildPageNumbers
   proxy.ts                  # Auth-Guard (optimistischer Cookie-Check)
   instrumentation.ts        # Server-Start-Hook: Bestandsmigration der Datenverschlüsselung
 scripts/dump-schema.mjs     # Regeneriert src/data/schema.sql aus den Migrationen
@@ -447,6 +449,17 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Cross-Modul-Verlinkung:** Query-Param-Filter (`?propertyId=`/`?unitId=`/`?hoaId=`) +
   Anchor-Links (`id="<typ>-<id>"`, Hervorhebung via `tr:target` in `globals.css`) +
   `CountLinkBadge` – Muster aus den Listen-Seiten fortführen.
+- **Pagination:** Nur bei fachlich unbegrenzt wachsenden Listen **ohne** eingehende
+  Zeilen-Anker (diese würden sonst ab Seite 2 ins Leere laufen): `/finanzen`
+  (Mieteingänge), `/weg/hausgeld`, `/dokumente`, `/weg/beschluesse`. Muster: `?page=`
+  (1-basiert) + `resolvePagination()` (`src/lib/pagination.ts`, 50/Seite) + `countX()`/
+  `listXPage()` im Repository (SQL mit `LIMIT`/`OFFSET` und deterministischem
+  Sortier-Tie-Breaker per ID) + `PaginationBar` (`src/components/ui/pagination-bar.tsx`,
+  Link-basierte Server-Komponente, Filter-Params werden mitgeschleift). Seitenübergreifende
+  Summen (Rückstands-Karten) über eigene Aggregat-Funktionen
+  (`listOpenTransactionArrearAmounts`/`listOpenHousingChargeArrearAmounts`). Stammdaten-
+  Listen (Mieter, Einheiten, Verträge, …) und das Rücklagen-Kontobuch (laufender Saldo)
+  bleiben bewusst unpaginiert.
 
 ## 8. Electron-spezifische Regeln
 

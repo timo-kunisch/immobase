@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { Gavel } from "lucide-react";
 
-import { listHoas, listOwnerResolutions } from "@/data/meetings";
+import { countOwnerResolutions, listHoas, listOwnerResolutionsPage } from "@/data/meetings";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatDate } from "@/lib/format";
+import { resolvePagination } from "@/lib/pagination";
 import { isContestationDeadlinePassed, resolutionVotingResultLabels, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +24,8 @@ export const dynamic = "force-dynamic";
  * Seite mit optionalem hoaId-Filter (siehe HoaFilter), analog zu den
  * übrigen WEG-Funktionen.
  */
-export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
-	const { hoaId } = await searchParams;
+export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+	const { hoaId, page: pageParam } = await searchParams;
 
 	const hoaList = listHoas();
 
@@ -40,7 +42,10 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 
 	const selectedHoa = hoaId ? hoaList.find((h) => h.id === hoaId) : undefined;
 
-	const resolutionList = listOwnerResolutions(selectedHoa ? { hoaId: selectedHoa.id } : undefined);
+	const resolutionFilter = selectedHoa ? { hoaId: selectedHoa.id } : undefined;
+	// Paginierte Beschluss-Sammlung (wächst über die Jahre, eine Seite = 50 Einträge).
+	const resolutionPagination = resolvePagination(pageParam, countOwnerResolutions(resolutionFilter));
+	const resolutionList = listOwnerResolutionsPage(resolutionFilter, resolutionPagination);
 
 	const now = new Date();
 
@@ -117,6 +122,8 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 						)}
 					</CardContent>
 				</Card>
+
+				<PaginationBar basePath="/weg/beschluesse" pagination={resolutionPagination} params={{ hoaId }} />
 			</div>
 		</div>
 	);

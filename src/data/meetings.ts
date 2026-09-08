@@ -303,6 +303,24 @@ export interface OwnerResolutionWithMeetingAndHoa extends OwnerResolution {
 }
 
 /**
+ * SELECT-/JOIN-Fragment der Beschluss-Sammlung (Beschluss + Versammlungs-
+ * Titel + WEG-Name) - gemeinsam genutzt von listOwnerResolutions und
+ * listOwnerResolutionsPage. Sortierung absteigend nach fortlaufender
+ * Nummer (pro WEG eindeutig, damit deterministisch paginierbar).
+ */
+const RESOLUTION_COLLECTION_SELECT = `
+	SELECT r.id, r.hoa_id AS hoaId, r.meeting_id AS meetingId, r.agenda_item_id AS agendaItemId,
+		r.sequence_number AS sequenceNumber, r.title, r.content, r.voting_result AS votingResult,
+		r.votes_for AS votesFor, r.votes_against AS votesAgainst, r.votes_abstained AS votesAbstained,
+		r.resolved_at AS resolvedAt, r.contested_until AS contestedUntil, r.notes,
+		r.created_at AS createdAt, r.updated_at AS updatedAt,
+		m.title AS meetingTitle, h.name AS hoaName
+	FROM owner_resolutions r
+	JOIN owner_meetings m ON m.id = r.meeting_id
+	JOIN hoas h ON h.id = r.hoa_id
+`;
+
+/**
  * Vollständige Beschluss-Sammlung einer WEG (oder aller WEGs), absteigend
  * nach fortlaufender Nummer sortiert.
  */
@@ -310,20 +328,31 @@ export function listOwnerResolutions(filter?: { hoaId?: string }): OwnerResoluti
 	const where = filter?.hoaId ? "WHERE r.hoa_id = ?" : "";
 	const params = filter?.hoaId ? [filter.hoaId] : [];
 	return getDb()
-		.prepare(
-			`SELECT r.id, r.hoa_id AS hoaId, r.meeting_id AS meetingId, r.agenda_item_id AS agendaItemId,
-				r.sequence_number AS sequenceNumber, r.title, r.content, r.voting_result AS votingResult,
-				r.votes_for AS votesFor, r.votes_against AS votesAgainst, r.votes_abstained AS votesAbstained,
-				r.resolved_at AS resolvedAt, r.contested_until AS contestedUntil, r.notes,
-				r.created_at AS createdAt, r.updated_at AS updatedAt,
-				m.title AS meetingTitle, h.name AS hoaName
-			 FROM owner_resolutions r
-			 JOIN owner_meetings m ON m.id = r.meeting_id
-			 JOIN hoas h ON h.id = r.hoa_id
-			 ${where}
-			 ORDER BY r.sequence_number DESC`
-		)
+		.prepare(`${RESOLUTION_COLLECTION_SELECT} ${where} ORDER BY r.sequence_number DESC`)
 		.all(...params) as OwnerResolutionWithMeetingAndHoa[];
+}
+
+/** Zählt Beschlüsse der Sammlung (gleicher Filter wie listOwnerResolutions) - Grundlage der Seitennummerierung. */
+export function countOwnerResolutions(filter?: { hoaId?: string }): number {
+	const where = filter?.hoaId ? "WHERE r.hoa_id = ?" : "";
+	const params = filter?.hoaId ? [filter.hoaId] : [];
+	const row = getDb().prepare(`SELECT COUNT(*) AS value FROM owner_resolutions r ${where}`).get(...params) as { value: number };
+	return row.value;
+}
+
+/**
+ * Seitenweise Variante von listOwnerResolutions (LIMIT/OFFSET) für die
+ * paginierte Beschluss-Sammlung (/weg/beschluesse). Achtung: Über WEGs
+ * hinweg ist sequence_number nur pro WEG eindeutig - die ID dient daher
+ * als Tie-Breaker. `limit`/`offset` kommen aus resolvePagination
+ * (src/lib/pagination.ts).
+ */
+export function listOwnerResolutionsPage(filter: { hoaId?: string } | undefined, page: { limit: number; offset: number }): OwnerResolutionWithMeetingAndHoa[] {
+	const where = filter?.hoaId ? "WHERE r.hoa_id = ?" : "";
+	const params = filter?.hoaId ? [filter.hoaId] : [];
+	return getDb()
+		.prepare(`${RESOLUTION_COLLECTION_SELECT} ${where} ORDER BY r.sequence_number DESC, r.id DESC LIMIT ? OFFSET ?`)
+		.all(...params, page.limit, page.offset) as OwnerResolutionWithMeetingAndHoa[];
 }
 
 export function listResolutionsForMeeting(meetingId: string): OwnerResolution[] {

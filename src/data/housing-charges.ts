@@ -172,34 +172,81 @@ function mapHousingChargeRow(row: HousingChargeJoinRow): HousingChargeWithRelati
 	};
 }
 
+/**
+ * SELECT-/JOIN-Fragment des Hausgeld-Stammjoins (Einheit + Eigentümer +
+ * WEG der Liegenschaft) - gemeinsam genutzt von listHousingChargesForUnits
+ * und listHousingChargesForUnitsPage. Sortierung: neueste Fälligkeit
+ * zuerst, ID als Tie-Breaker für eine stabile Pagination (LIMIT/OFFSET).
+ */
+const HOUSING_CHARGE_SELECT = `
+	SELECT c.id, c.unit_id AS unitId, c.owner_id AS ownerId, c.economic_plan_id AS economicPlanId,
+		c.amount, c.due_date AS dueDate, c.paid_date AS paidDate, c.purpose, c.status,
+		c.created_at AS createdAt, c.updated_at AS updatedAt,
+		u.label AS unitLabel, u.property_id AS unitPropertyId, u.living_space AS unitLivingSpace,
+		u.rooms AS unitRooms, u.floor AS unitFloor, u.co_ownership_share AS unitCoOwnershipShare,
+		u.created_at AS unitCreatedAt, u.updated_at AS unitUpdatedAt,
+		o.first_name AS ownerFirstName, o.last_name AS ownerLastName, o.is_company AS ownerIsCompany,
+		o.company_name AS ownerCompanyName, o.street AS ownerStreet, o.zip_code AS ownerZipCode,
+		o.city AS ownerCity, o.country AS ownerCountry, o.email AS ownerEmail, o.phone AS ownerPhone,
+		o.notes AS ownerNotes, o.created_at AS ownerCreatedAt, o.updated_at AS ownerUpdatedAt,
+		h.id AS hoaId, h.property_id AS hoaPropertyId, h.name AS hoaName, h.total_shares AS hoaTotalShares,
+		h.bank_iban AS hoaBankIban, h.bank_bic AS hoaBankBic, h.notes AS hoaNotes,
+		h.created_at AS hoaCreatedAt, h.updated_at AS hoaUpdatedAt
+	FROM housing_charges c
+	JOIN units u ON u.id = c.unit_id
+	JOIN owners o ON o.id = c.owner_id
+	LEFT JOIN hoas h ON h.property_id = u.property_id
+`;
+
+const HOUSING_CHARGE_ORDER = "ORDER BY c.due_date DESC, c.id DESC";
+
 /** Listet Hausgeld-Sollstellungen der übergebenen Einheiten (neueste Fälligkeit zuerst) inkl. Einheit/Eigentümer/WEG. */
 export function listHousingChargesForUnits(unitIds: string[]): HousingChargeWithRelations[] {
 	if (unitIds.length === 0) return [];
 	const placeholders = unitIds.map(() => "?").join(", ");
 	const rows = getDb()
-		.prepare(
-			`SELECT c.id, c.unit_id AS unitId, c.owner_id AS ownerId, c.economic_plan_id AS economicPlanId,
-				c.amount, c.due_date AS dueDate, c.paid_date AS paidDate, c.purpose, c.status,
-				c.created_at AS createdAt, c.updated_at AS updatedAt,
-				u.label AS unitLabel, u.property_id AS unitPropertyId, u.living_space AS unitLivingSpace,
-				u.rooms AS unitRooms, u.floor AS unitFloor, u.co_ownership_share AS unitCoOwnershipShare,
-				u.created_at AS unitCreatedAt, u.updated_at AS unitUpdatedAt,
-				o.first_name AS ownerFirstName, o.last_name AS ownerLastName, o.is_company AS ownerIsCompany,
-				o.company_name AS ownerCompanyName, o.street AS ownerStreet, o.zip_code AS ownerZipCode,
-				o.city AS ownerCity, o.country AS ownerCountry, o.email AS ownerEmail, o.phone AS ownerPhone,
-				o.notes AS ownerNotes, o.created_at AS ownerCreatedAt, o.updated_at AS ownerUpdatedAt,
-				h.id AS hoaId, h.property_id AS hoaPropertyId, h.name AS hoaName, h.total_shares AS hoaTotalShares,
-				h.bank_iban AS hoaBankIban, h.bank_bic AS hoaBankBic, h.notes AS hoaNotes,
-				h.created_at AS hoaCreatedAt, h.updated_at AS hoaUpdatedAt
-			 FROM housing_charges c
-			 JOIN units u ON u.id = c.unit_id
-			 JOIN owners o ON o.id = c.owner_id
-			 LEFT JOIN hoas h ON h.property_id = u.property_id
-			 WHERE c.unit_id IN (${placeholders})
-			 ORDER BY c.due_date DESC`
-		)
+		.prepare(`${HOUSING_CHARGE_SELECT} WHERE c.unit_id IN (${placeholders}) ${HOUSING_CHARGE_ORDER}`)
 		.all(...unitIds) as HousingChargeJoinRow[];
 	return rows.map(mapHousingChargeRow);
+}
+
+/** Zählt Hausgeld-Sollstellungen der übergebenen Einheiten - Grundlage der Seitennummerierung. */
+export function countHousingChargesForUnits(unitIds: string[]): number {
+	if (unitIds.length === 0) return 0;
+	const placeholders = unitIds.map(() => "?").join(", ");
+	const row = getDb()
+		.prepare(`SELECT COUNT(*) AS value FROM housing_charges c WHERE c.unit_id IN (${placeholders})`)
+		.get(...unitIds) as { value: number };
+	return row.value;
+}
+
+/**
+ * Seitenweise Variante von listHousingChargesForUnits (LIMIT/OFFSET) für
+ * die paginierte Hausgeld-Liste (/weg/hausgeld). `limit`/`offset` kommen
+ * aus resolvePagination (src/lib/pagination.ts).
+ */
+export function listHousingChargesForUnitsPage(unitIds: string[], page: { limit: number; offset: number }): HousingChargeWithRelations[] {
+	if (unitIds.length === 0) return [];
+	const placeholders = unitIds.map(() => "?").join(", ");
+	const rows = getDb()
+		.prepare(`${HOUSING_CHARGE_SELECT} WHERE c.unit_id IN (${placeholders}) ${HOUSING_CHARGE_ORDER} LIMIT ? OFFSET ?`)
+		.all(...unitIds, page.limit, page.offset) as HousingChargeJoinRow[];
+	return rows.map(mapHousingChargeRow);
+}
+
+/**
+ * Beträge (Decimal-Strings) aller fälligen/überfälligen Sollstellungen der
+ * übergebenen Einheiten (Status OPEN/OVERDUE, Fälligkeit <= `date`) für
+ * die Rückstands-Karte auf /weg/hausgeld (unabhängig von der aktuell
+ * angezeigten Seite). Die Summe wird im Aufrufer gebildet.
+ */
+export function listOpenHousingChargeArrearAmounts(unitIds: string[], date: Date): string[] {
+	if (unitIds.length === 0) return [];
+	const placeholders = unitIds.map(() => "?").join(", ");
+	const rows = getDb()
+		.prepare(`SELECT amount FROM housing_charges WHERE status IN ('OPEN', 'OVERDUE') AND due_date <= ? AND unit_id IN (${placeholders})`)
+		.all(date.toISOString(), ...unitIds) as { amount: string }[];
+	return rows.map((row) => row.amount);
 }
 
 export function createHousingCharge(input: HousingChargeInput): HousingCharge {

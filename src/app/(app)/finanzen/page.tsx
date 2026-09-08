@@ -2,9 +2,10 @@ import Link from "next/link";
 import { AlertTriangle, PiggyBank, Wallet } from "lucide-react";
 
 import { getLeaseWithDetails, listLeasesWithDetails } from "@/data/leases";
-import { listTransactions } from "@/data/transactions";
+import { countTransactions, listOpenTransactionArrearAmounts, listTransactionsPage } from "@/data/transactions";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent } from "@/components/ui/card";
+import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
@@ -13,6 +14,7 @@ import { TransactionFormDialog } from "@/components/finanzen/transaction-form-di
 import { GenerateDueTransactionsDialog } from "@/components/finanzen/generate-due-transactions-dialog";
 import { MarkPaidButton } from "@/components/finanzen/mark-paid-button";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { resolvePagination } from "@/lib/pagination";
 
 import { deleteTransactionAction } from "./actions";
 
@@ -46,19 +48,21 @@ const transactionStatusStyles: Record<string, string> = {
 	CANCELLED: "bg-muted text-muted-foreground",
 };
 
-export default async function FinanzenPage({ searchParams }: { searchParams: Promise<{ leaseId?: string }> }) {
-	const { leaseId } = await searchParams;
+export default async function FinanzenPage({ searchParams }: { searchParams: Promise<{ leaseId?: string; page?: string }> }) {
+	const { leaseId, page: pageParam } = await searchParams;
 
 	const leaseList = listLeasesWithDetails({ leaseId });
-	const transactionList = listTransactions({ leaseId });
 	const filteredLease = leaseId ? getLeaseWithDetails(leaseId) : null;
+
+	// Paginierte Mieteingangs-Liste (wächst unbegrenzt, eine Seite = 50 Einträge).
+	const transactionPagination = resolvePagination(pageParam, countTransactions({ leaseId }));
+	const transactionList = listTransactionsPage({ leaseId }, transactionPagination);
 
 	const filterLabel = filteredLease ? `${filteredLease.tenant.firstName} ${filteredLease.tenant.lastName} · ${filteredLease.unit.property.name} – ${filteredLease.unit.label}` : null;
 
+	// Rückstände über ALLE Zahlungen (unabhängig von der angezeigten Seite).
 	const now = new Date();
-	const arrears = transactionList
-		.filter((transaction) => (transaction.status === "OPEN" || transaction.status === "OVERDUE") && new Date(transaction.dueDate) <= now)
-		.reduce((sum, transaction) => sum + Number(transaction.amount), 0);
+	const arrears = listOpenTransactionArrearAmounts(now, { leaseId }).reduce((sum, amount) => sum + Number(amount), 0);
 
 	return (
 		<div className="flex flex-1 flex-col">
@@ -152,6 +156,8 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 								)}
 							</CardContent>
 						</Card>
+
+						<PaginationBar basePath="/finanzen" pagination={transactionPagination} params={{ leaseId }} />
 					</TabsContent>
 
 					<TabsContent value="kautionen" className="space-y-4">

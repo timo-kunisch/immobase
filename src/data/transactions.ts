@@ -29,6 +29,27 @@ const TRANSACTION_JOIN_COLUMNS = `
 	${TENANT_COLUMNS}
 `;
 
+/**
+ * FROM/JOIN-Fragment des Transaktions-Stammjoins (Vertrag + Einheit +
+ * Liegenschaft + Mieter) - gemeinsam genutzt von listTransactions und
+ * listTransactionsPage.
+ */
+const TRANSACTION_JOIN_FROM = `
+	FROM transactions tr
+	JOIN leases l ON l.id = tr.lease_id
+	JOIN units u ON u.id = l.unit_id
+	JOIN properties p ON p.id = u.property_id
+	JOIN tenants t ON t.id = l.tenant_id
+`;
+
+/**
+ * Sortierung der Listenansicht: neueste Fälligkeit zuerst; die ID als
+ * Tie-Breaker macht die Reihenfolge bei gleichen Fälligkeitsdaten
+ * (Regelfall: Monatserste) deterministisch - Voraussetzung für eine
+ * stabile Pagination (LIMIT/OFFSET).
+ */
+const TRANSACTION_ORDER = "ORDER BY tr.due_date DESC, tr.id DESC";
+
 interface TransactionJoinRow extends Transaction, UnitPropertyJoinRow, TenantJoinRow {
 	leaseUnitId: string;
 	leaseTenantId: string;
@@ -95,17 +116,52 @@ export function listTransactions(filter: { leaseId?: string } = {}): Transaction
 	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
 	const params = filter.leaseId ? [filter.leaseId] : [];
 	const rows = getDb()
-		.prepare(
-			`SELECT ${TRANSACTION_JOIN_COLUMNS} FROM transactions tr
-			 JOIN leases l ON l.id = tr.lease_id
-			 JOIN units u ON u.id = l.unit_id
-			 JOIN properties p ON p.id = u.property_id
-			 JOIN tenants t ON t.id = l.tenant_id
-			 ${where}
-			 ORDER BY tr.due_date DESC`
-		)
+		.prepare(`SELECT ${TRANSACTION_JOIN_COLUMNS} ${TRANSACTION_JOIN_FROM} ${where} ${TRANSACTION_ORDER}`)
 		.all(...params) as TransactionJoinRow[];
 	return rows.map(mapTransactionRow);
+}
+
+/** Zählt Zahlungen (gleicher Filter wie listTransactions) - Grundlage der Seitennummerierung. */
+export function countTransactions(filter: { leaseId?: string } = {}): number {
+	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
+	const params = filter.leaseId ? [filter.leaseId] : [];
+	const row = getDb().prepare(`SELECT COUNT(*) AS value FROM transactions tr ${where}`).get(...params) as { value: number };
+	return row.value;
+}
+
+/**
+ * Seitenweise Variante von listTransactions (LIMIT/OFFSET) für die
+ * paginierte Mieteingangs-Liste (/finanzen). `limit`/`offset` kommen aus
+ * resolvePagination (src/lib/pagination.ts), die Sortierung ist dank
+ * Tie-Breaker deterministisch.
+ */
+export function listTransactionsPage(filter: { leaseId?: string } = {}, page: { limit: number; offset: number }): TransactionWithLease[] {
+	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
+	const params = filter.leaseId ? [filter.leaseId] : [];
+	const rows = getDb()
+		.prepare(`SELECT ${TRANSACTION_JOIN_COLUMNS} ${TRANSACTION_JOIN_FROM} ${where} ${TRANSACTION_ORDER} LIMIT ? OFFSET ?`)
+		.all(...params, page.limit, page.offset) as TransactionJoinRow[];
+	return rows.map(mapTransactionRow);
+}
+
+/**
+ * Beträge (Decimal-Strings) aller fälligen/überfälligen Zahlungen
+ * (Status OPEN/OVERDUE, Fälligkeit <= `date`), optional auf einen Vertrag
+ * eingegrenzt - analog zu listRentArrearAmounts in dashboard.ts, hier mit
+ * Lease-Filter für die Rückstands-Karte auf /finanzen (unabhängig von der
+ * aktuell angezeigten Seite). Die Summe wird im Aufrufer gebildet.
+ */
+export function listOpenTransactionArrearAmounts(date: Date, filter: { leaseId?: string } = {}): string[] {
+	const conditions = ["status IN ('OPEN', 'OVERDUE')", "due_date <= ?"];
+	const params: string[] = [date.toISOString()];
+	if (filter.leaseId) {
+		conditions.push("lease_id = ?");
+		params.push(filter.leaseId);
+	}
+	const rows = getDb()
+		.prepare(`SELECT amount FROM transactions WHERE ${conditions.join(" AND ")}`)
+		.all(...params) as { amount: string }[];
+	return rows.map((row) => row.amount);
 }
 
 /** Einzelne Zahlung inkl. Vertrags-Relationen (für Detailabfragen). */
