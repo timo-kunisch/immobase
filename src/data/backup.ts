@@ -56,7 +56,7 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  * - prüft schemaVersion (älter -> wird nach dem Einspielen automatisch
  *   migriert; NEUER -> klar abgelehnt),
  * - legt vorher ein Backup des Ist-Zustands an
- *   (`<dataDir>/backups/pre-import-<Zeitstempel>.zip`),
+ *   (`<dataDir>/backups/pre-import-<Zeitstempel>.zip.enc`),
  * - arbeitet atomar: Entpacken in ein temp-Verzeichnis INNERHALB des
  *   Datenverzeichnisses (gleiches Dateisystem!) -> Validierung -> Umbenennen
  *   der Verzeichnisse -> bei Fehler vollständiger Rollback,
@@ -68,8 +68,10 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  * sondern einen AES-256-GCM-Container (`.imbak`, Format siehe
  * src/lib/backup-crypto.ts); der Import erkennt solche Container am Magic
  * und entschlüsselt sie vorab in ein temp-ZIP. Die automatische
- * Vor-Import-Sicherung (`backups/pre-import-*.zip`) bleibt bewusst
- * UNVERSCHLÜSSELT (lokale Sicherheitskopie im eigenen Datenverzeichnis).
+ * Vor-Import-Sicherung wird mit dem lokalen Datenschlüssel verschlüsselt
+ * abgelegt (`backups/pre-import-*.zip.enc`, Container-Format von
+ * src/lib/file-crypto.ts - NICHT mit dem passwortgeschützten
+ * .imbak-Format verwechseln; der Import erkennt sie am Magic).
  *
  * KONFLIKTSTRATEGIE "merge": zeilenbasiert
  * pro Tabelle per `INSERT OR IGNORE` - existiert eine Zeile mit demselben

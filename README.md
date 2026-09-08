@@ -34,7 +34,10 @@ es einen optionalen Host-/Client-Modus im eigenen Netzwerk.
 
 **Datenschutz & Kontrolle**
 - Alle Daten in einer lokalen SQLite-Datenbank – funktioniert komplett offline
-- Backups als eine ZIP (mit Prüfsummen), Wiederherstellung mit einem Klick
+- Verschlüsselung aller Daten im Ruhezustand (AES-256-GCM, gerätegebundener
+  Schlüssel im OS-Schlüsselbund)
+- Backups als eine ZIP (mit Prüfsummen), optional passwortverschlüsselt,
+  Wiederherstellung mit einem Klick
 - Mehrbenutzer optional: Host-/Client-Modus im LAN (Token-geschützt, mDNS)
 - Kein Tracking, keine Telemetrie, keine externen Dienste im Kernpfad
 
@@ -48,35 +51,6 @@ Fertige Pakete gibt es unter
   `ImmoBase.app` in den Programme-Ordner ziehen, keine Installation nötig
 - **Linux:** AppImage (`…-linux-x64.AppImage`) – einmal ausführbar machen
   (`chmod +x`) und direkt starten, keine Installation nötig
-
-> Hinweis: Die Pakete sind aktuell nicht signiert. macOS zeigt einmalig
-> eine Gatekeeper-Warnung – App per Rechtsklick → „Öffnen" starten.
-> Windows zeigt ggf. einen SmartScreen-Hinweis („Weitere Informationen" →
-> „Trotzdem ausführen"). Siehe Abschnitt „Code-Signing" weiter unten.
-
-## Code-Signing (macOS)
-
-Der Release-Workflow ist für Signatur + Notarisierung vorbereitet: Sobald
-die folgenden fünf Repository-Secrets gesetzt sind (GitHub →
-*Settings → Secrets and variables → Actions*), werden die macOS-Pakete
-automatisch signiert und notarisiert; ohne sie bleibt alles unsigniert und
-der Build läuft trotzdem durch:
-
-| Secret | Inhalt |
-| --- | --- |
-| `CSC_LINK` | „Developer ID Application"-Zertifikat inkl. privatem Schlüssel, als `.p12` exportiert und base64-kodiert (`base64 -i cert.p12 \| pbcopy`) |
-| `CSC_KEY_PASSWORD` | Passwort des `.p12`-Exports |
-| `APPLE_ID` | E-Mail der Apple-ID (Entwicklerkonto) |
-| `APPLE_APP_SPECIFIC_PASSWORD` | App-spezifisches Passwort von [appleid.apple.com](https://appleid.apple.com) |
-| `APPLE_TEAM_ID` | 10-stellige Team-ID aus der Apple-Developer-Mitgliedschaft |
-
-Voraussetzung ist ein bezahltes Apple-Developer-Program-Konto; das
-Zertifikat wird unter
-[developer.apple.com](https://developer.apple.com/account/resources/certificates)
-(Typ **Developer ID Application**, CSR aus der Schlüsselbundverwaltung)
-oder direkt in Xcode (*Settings → Accounts → Manage Certificates*)
-erzeugt. Windows bleibt vorerst unsigniert; ein eigenes
-Windows-Zertifikat (OV/EV) wäre ein separater Schritt.
 
 ## Technik
 
@@ -125,8 +99,9 @@ Alle Daten liegen unter `app.getPath("userData")`:
 - macOS: `~/Library/Application Support/ImmoBase/`
 - Linux: `~/.config/ImmoBase/`
 
-Darunter: `data.db` (SQLite), `files/` (Uploads/generierte PDFs), `logs/`,
-`backups/` (automatische Sicherungen vor Importen), `settings.json`.
+Darunter: `data.db` (SQLite, im Ruhezustand verschlüsselt als `data.db.enc`),
+`files/` (Uploads/generierte PDFs, verschlüsselt), `logs/`, `backups/`
+(automatische, verschlüsselte Sicherungen vor Importen), `settings.json`.
 
 ## Mehrbenutzer-Betrieb
 
@@ -154,12 +129,6 @@ werden Manifest und Prüfsummen, vorher wird automatisch eine Sicherung des
 Ist-Zustands angelegt, die Arbeit läuft atomar. Modi: **Ersetzen** oder
 **Zusammenführen** (nur fehlende Einträge ergänzen, lokaler Bestand
 gewinnt).
-
-## Mitmachen
-
-Beiträge sind willkommen – siehe [CONTRIBUTING.md](CONTRIBUTING.md).
-Architektur- und Arbeitsregeln für Mensch und Maschine stehen in
-[AGENTS.md](AGENTS.md).
 
 ## Lizenz
 

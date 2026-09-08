@@ -106,7 +106,8 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Container am Magic und verlangt dann zwingend das Passwort). UI: Einstellungen →
   Datensicherung (Desktop: native Dateidialoge via IPC + POST an `/api/backup/*`; Browser-Dev:
   Download-Fallback via GET `/api/backup/export`, dort nur unverschlüsselt). Die automatische
-  Vor-Import-Sicherung (`backups/pre-import-*.zip`) bleibt bewusst unverschlüsselt.
+  Vor-Import-Sicherung wird mit dem lokalen Datenschlüssel verschlüsselt abgelegt
+  (`backups/pre-import-*.zip.enc`, Container-Format; der Import erkennt sie am Magic).
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
   - `main/index.ts` – Lifecycle, `requestSingleInstanceLock()`, Netzlaufwerk-Abbruch-Check,
     Modus-Orchestrierung (local/host/client), IPC, Fenster-Sicherheit (`contextIsolation: true`,

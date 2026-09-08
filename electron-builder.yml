@@ -5,8 +5,8 @@
 # electron-updater dort nur NSIS-Pakete aktualisieren kann (macOS: nur ZIP,
 # Linux: nur AppImage).
 #
-# Code-Signing / Notarisierung (Schritt-für-Schritt-Anleitung: README,
-# Abschnitt "Code-Signing"):
+# Code-Signing / Notarisierung (Schritt-für-Schritt-Anleitung:
+# .github/code-signing.md):
 # - macOS: Signatur mit "Developer ID Application"-Zertifikat aus CSC_LINK +
 #   CSC_KEY_PASSWORD; Notarisierung (notarytool) läuft automatisch, sobald
 #   APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID gesetzt sind
