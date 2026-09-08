@@ -7,7 +7,6 @@ import {
 	Building2,
 	Calculator,
 	CalendarDays,
-	ChevronDown,
 	DoorOpen,
 	FileSignature,
 	FileText,
@@ -96,10 +95,9 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 
 	// Scroll-Hinweise: Die Menüliste ist scrollbar (SidebarContent hat
 	// "overflow-auto" bei ausgeblendeter Scrollbar). Damit erkennbar ist,
-	// dass es weitere Einträge gibt, werden - abhängig von der
-	// Scrollposition - ein Ausblend-Verlauf am oberen/unteren Rand und ein
-	// "Weitere Menüpunkte"-Button eingeblendet, der eine Stück
-	// nach unten scrollt.
+	// dass es weitere Einträge gibt, wird - abhängig von der
+	// Scrollposition - ein Ausblend-Verlauf am oberen/unteren Rand
+	// eingeblendet.
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const [canScrollUp, setCanScrollUp] = useState(false);
 	const [canScrollDown, setCanScrollDown] = useState(false);
@@ -122,12 +120,6 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 		observer.observe(el);
 		return () => observer.disconnect();
 	}, [updateScrollState]);
-
-	const scrollFurtherDown = useCallback(() => {
-		const el = scrollRef.current;
-		if (!el) return;
-		el.scrollBy({ top: el.clientHeight * 0.6, behavior: "smooth" });
-	}, []);
 
 	return (
 		<Sidebar collapsible="icon">
@@ -245,18 +237,6 @@ export function AppSidebar({ user, smtpConfigured }: { user: { email: string; ro
 						canScrollDown ? "opacity-100" : "opacity-0",
 					)}
 				/>
-				<button
-					type="button"
-					onClick={scrollFurtherDown}
-					tabIndex={canScrollDown ? 0 : -1}
-					className={cn(
-						"absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-sidebar-border bg-sidebar-accent px-3 py-1 text-xs text-sidebar-accent-foreground shadow-sm transition-opacity hover:bg-sidebar-accent/80 group-data-[collapsible=icon]:hidden",
-						canScrollDown ? "opacity-100" : "pointer-events-none opacity-0",
-					)}
-				>
-					Weitere Menüpunkte
-					<ChevronDown className="size-3.5" />
-				</button>
 			</div>
 			<SidebarFooter>
 				<div className="flex items-center gap-2 px-1 py-1">
