@@ -3,8 +3,11 @@ import { CompanySettingsForm } from "@/components/einstellungen/company-settings
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
+import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { getCompanySettings } from "@/data/company-settings";
-import { getSetting } from "@/data/app-settings";
+import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
+import { getDataKeySource } from "@/lib/data-key";
+import { getTreeEncryptionStatus } from "@/lib/file-crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +27,18 @@ export default async function EinstellungenPage() {
 		lxMode: (getSetting("letterxpress.mode") === "live" ? "live" : "test") as "test" | "live",
 	};
 
+	// Status der lokalen Datenverschlüsselung at rest (Dateien + Geheimnisse).
+	const fileStatus = getTreeEncryptionStatus();
+	const secretStatus = getSecretSettingsStatus();
+	const securityStatus: SecurityStatus = {
+		keySource: getDataKeySource(),
+		filesTotal: fileStatus.total,
+		filesEncrypted: fileStatus.encrypted,
+		filesPlaintext: fileStatus.plaintext,
+		secretsSet: secretStatus.secretsSet,
+		secretsEncrypted: secretStatus.secretsEncrypted,
+	};
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
@@ -34,6 +49,7 @@ export default async function EinstellungenPage() {
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<CompanySettingsForm settings={settings} />
 				<DataExportCard />
+				<SecurityCard status={securityStatus} />
 				<IntegrationSettingsForm settings={integrations} />
 				<ConnectionCard />
 			</div>

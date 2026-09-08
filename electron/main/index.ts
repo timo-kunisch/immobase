@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { app, BrowserWindow, dialog, ipcMain, session, shell } from "electron";
 
+import { getOrCreateDataKey } from "./data-key";
 import { destroyDiscovery, publishHostService, startDiscovery, type DiscoveredHost } from "./discovery";
 import { initMainLog, log } from "./log";
 import { checkDataDirNotOnNetworkDrive } from "./network-check";
@@ -163,6 +164,13 @@ async function startLocalServer(mode: "local" | "host"): Promise<void> {
 		hostToken = generateHostToken();
 		settings.update({ hostToken });
 	}
+
+	// Master-Schlüssel für die Datenverschlüsselung at rest aus dem
+	// OS-Schlüsselbund auflösen (bzw. beim ersten Start erzeugen) und dem
+	// eingebetteten Next-Server übergeben. Schlägt die Auflösung fehl (z. B.
+	// Datenverzeichnis von einem anderen Gerät übernommen), wird der Start
+	// mit einer klaren Fehlermeldung abgebrochen (siehe boot()).
+	process.env.IMMOBASE_DATA_KEY = getOrCreateDataKey(settings, app.getPath("userData"));
 
 	const current = settings.get();
 	runningServer = await startEmbeddedServer({

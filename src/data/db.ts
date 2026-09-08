@@ -1,3 +1,5 @@
+import fs from "node:fs";
+
 import BetterSqlite3 from "better-sqlite3";
 
 import { getDatabaseFilePath } from "./paths";
@@ -26,6 +28,13 @@ export function getDb(): BetterSqlite3.Database {
 
 	const dbFilePath = getDatabaseFilePath();
 	const db = new BetterSqlite3(dbFilePath);
+	try {
+		// Zugriffsrechte restriktiv (nur eigener OS-Benutzer) - die DB enthält
+		// sämtliche Fachdaten. Best effort (Windows kennt keine POSIX-Rechte).
+		fs.chmodSync(dbFilePath, 0o600);
+	} catch {
+		// Ignorieren.
+	}
 	db.pragma("journal_mode = WAL");
 	db.pragma("foreign_keys = ON");
 	db.pragma("busy_timeout = 5000");

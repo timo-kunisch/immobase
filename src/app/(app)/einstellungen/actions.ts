@@ -5,7 +5,10 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/dal";
 import { saveCompanySettings } from "@/data/company-settings";
 import { setSetting } from "@/data/app-settings";
+import { getFilesDir } from "@/data/paths";
 import { ActionState } from "@/lib/action-state";
+import { getDataKeyBase64 } from "@/lib/data-key";
+import { encryptPlaintextFilesInTree } from "@/lib/file-crypto";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -74,4 +77,51 @@ export async function saveIntegrationSettingsAction(_prevState: ActionState, for
 
 	revalidatePath("/einstellungen");
 	return { success: true };
+}
+
+export interface EncryptFilesResult {
+	encrypted?: number;
+	alreadyEncrypted?: number;
+	failed?: number;
+	error?: string;
+}
+
+/**
+ * Verschlüsselt alle noch im Klartext vorliegenden Bestandsdateien in
+ * files/ (manueller Nachlauf zur automatischen Migration beim Server-Start,
+ * siehe src/instrumentation.ts). Idempotent. Nur für Admins.
+ */
+export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> {
+	await requireAdmin();
+	try {
+		const result = await encryptPlaintextFilesInTree(getFilesDir());
+		if (result.failed.length > 0) {
+			return {
+				error: `${result.failed.length} Datei(en) konnten nicht verschlüsselt werden (Details im Server-Log).`,
+				encrypted: result.encrypted,
+				alreadyEncrypted: result.alreadyEncrypted,
+				failed: result.failed.length,
+			};
+		}
+		revalidatePath("/einstellungen");
+		return { encrypted: result.encrypted, alreadyEncrypted: result.alreadyEncrypted, failed: 0 };
+	} catch (error) {
+		console.error("encryptExistingFilesAction failed", error);
+		return { error: "Die Dateiverschlüsselung konnte nicht ausgeführt werden." };
+	}
+}
+
+/**
+ * Liefert den Master-Schlüssel der lokalen Datenverschlüsselung als
+ * Base64-Text (Wiederherstellungsschlüssel). Sicherheitsrelevant: wird erst
+ * nach explizitem Klick in der UI abgerufen. Nur für Admins.
+ */
+export async function getRecoveryKeyAction(): Promise<{ key?: string; error?: string }> {
+	await requireAdmin();
+	try {
+		return { key: getDataKeyBase64() };
+	} catch (error) {
+		console.error("getRecoveryKeyAction failed", error);
+		return { error: "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." };
+	}
 }

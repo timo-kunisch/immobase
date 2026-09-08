@@ -9,7 +9,9 @@ import BetterSqlite3 from "better-sqlite3";
 import yauzl from "yauzl";
 
 import { decryptBackupToTempZip, encryptStreamToFile, isEncryptedBackupFile } from "@/lib/backup-crypto";
+import { createPlaintextReadStream, encryptPlaintextFilesInTree, hashPlaintextFile, isEncryptedFile } from "@/lib/file-crypto";
 
+import { decryptSecretsInDatabase, ensureSecretsEncrypted } from "./app-settings";
 import { closeDb, getDb } from "./db";
 import { LATEST_SCHEMA_VERSION, migrateDatabase } from "./migrate";
 import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
@@ -25,6 +27,16 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  *   AUSSCHLIESSLICH über die SQLite-Backup-API (`db.backup()`), niemals
  *   per fs.copyFile (WAL-Konsistenz).
  * - `files/...`      – die Upload-/Generat-Dateien inkl. Sidecar-Metadaten.
+ *
+ * Zusammenspiel mit der Verschlüsselung at rest (src/lib/file-crypto.ts,
+ * src/data/app-settings.ts): Das Backup-ZIP ist bewusst PORTIERBAR und
+ * enthält durchgehend KLARTEXT - Dateien werden beim Export gestreamt
+ * entschlüsselt (Manifest-Prüfsummen/-Größen beziehen sich auf den Klartext)
+ * und Geheimnisse aus app_settings werden in der DB-Snapshot-Kopie
+ * entschlüsselt. Schutz der Sicherungsdatei liegt damit wie bisher in der
+ * Verantwortung des Nutzers bzw. der passwortverschlüsselten
+ * `.imbak`-Variante. Beim Import werden Dateien und Geheimnisse mit dem
+ * lokalen Master-Schlüssel des Zielgeräts wieder verschlüsselt.
  *
  * Streaming: Der Export nutzt `archiver` (Streams, kein Vollpuffer) und
  * funktioniert damit auch mit mehreren GB großen `files/`-Verzeichnissen.
@@ -117,6 +129,16 @@ async function sha256File(filePath: string): Promise<string> {
 async function createDatabaseSnapshot(): Promise<{ snapshotPath: string; cleanup: () => void }> {
 	const snapshotPath = path.join(os.tmpdir(), `iv-db-snapshot-${crypto.randomUUID()}.db`);
 	await getDb().backup(snapshotPath);
+	// Geheimnisse (SMTP-Passwort, LetterXpress-API-Key) sind at rest
+	// feldverschlüsselt - für den Export werden sie in der Snapshot-KOPIE
+	// entschlüsselt, damit das Backup geräteübergreifend portierbar bleibt
+	// (beim Import werden sie mit dem dortigen Schlüssel neu verschlüsselt).
+	const snapshotDb = new BetterSqlite3(snapshotPath);
+	try {
+		decryptSecretsInDatabase(snapshotDb);
+	} finally {
+		snapshotDb.close();
+	}
 	return {
 		snapshotPath,
 		cleanup: () => {
@@ -157,6 +179,23 @@ function collectFilesEntries(): FileEntry[] {
 	return entries;
 }
 
+/**
+ * Hängt einen Eintrag an das ZIP: Datenbank und Sidecar-Metadaten roh,
+ * verschlüsselte Ablagedateien gestreamt ENTSCHLÜSSELT (das Backup enthält
+ * bewusst Klartext, siehe Dateikopf). Die Entscheidung wird beim Packen
+ * erneut am Magic getroffen (nicht aus dem Manifest-Hash-Lauf
+ * zwischengespeichert): Beide Pfade liefern immer Klartext, sodass auch eine
+ * zeitgleich laufende Bestandsmigration keine inkonsistenten Archive
+ * erzeugen kann.
+ */
+function appendEntryToArchive(archive: archiver.Archiver, entry: { absolutePath: string; zipPath: string }): void {
+	if (entry.zipPath.startsWith("files/") && !entry.zipPath.endsWith(".meta.json") && isEncryptedFile(entry.absolutePath)) {
+		archive.append(createPlaintextReadStream(entry.absolutePath), { name: entry.zipPath });
+		return;
+	}
+	archive.file(entry.absolutePath, { name: entry.zipPath });
+}
+
 async function writeZipArchive(
 	targetPath: string,
 	manifest: BackupManifest,
@@ -168,7 +207,7 @@ async function writeZipArchive(
 	// manifest.json zuerst eintragen, damit es beim Entpacken zuerst auftaucht.
 	archive.append(JSON.stringify(manifest, null, 2), { name: MANIFEST_NAME });
 	for (const entry of entries) {
-		archive.file(entry.absolutePath, { name: entry.zipPath });
+		appendEntryToArchive(archive, entry);
 	}
 
 	if (password) {
@@ -212,7 +251,15 @@ async function buildBackupEntries(): Promise<{
 
 		const manifestFiles: BackupManifest["files"] = [];
 		for (const entry of allEntries) {
-			manifestFiles.push({ path: entry.zipPath, sha256: await sha256File(entry.absolutePath), size: entry.size });
+			if (entry.zipPath.startsWith("files/") && !entry.zipPath.endsWith(".meta.json")) {
+				// Ablagedateien: Prüfsumme + Größe über dem KLARTEXT (das ZIP
+				// enthält entschlüsselte Daten, siehe appendEntryToArchive).
+				const { sha256, size } = await hashPlaintextFile(entry.absolutePath);
+				entry.size = size;
+				manifestFiles.push({ path: entry.zipPath, sha256, size });
+			} else {
+				manifestFiles.push({ path: entry.zipPath, sha256: await sha256File(entry.absolutePath), size: entry.size });
+			}
 		}
 
 		const manifest: BackupManifest = {
@@ -259,7 +306,7 @@ export async function createBackupZipStream(): Promise<{ stream: NodeJS.Readable
 	archive.on("error", cleanup);
 	archive.append(JSON.stringify(manifest, null, 2), { name: MANIFEST_NAME });
 	for (const entry of entries) {
-		archive.file(entry.absolutePath, { name: entry.zipPath });
+		appendEntryToArchive(archive, entry);
 	}
 	void archive.finalize();
 	const stamp = new Date().toISOString().slice(0, 10);
@@ -460,6 +507,19 @@ async function importReplace(extractDir: string): Promise<void> {
 		//    wird komplett zurückgerollt.
 		getDb();
 
+		// 3b. Eingelesene Klartext-Bestände in die lokale Verschlüsselung
+		//     at rest überführen (Backups sind portierbar/Klartext, siehe
+		//     Dateikopf): Geheimnisse in app_settings + alle Dateien.
+		//     Schlägt ein Teil fehl, wird der Import komplett zurückgerollt.
+		ensureSecretsEncrypted();
+		const encryption = await encryptPlaintextFilesInTree(filesDir);
+		if (encryption.failed.length > 0) {
+			throw new Error(
+				`Verschlüsselung von ${encryption.failed.length} importierte(n) Datei(en) fehlgeschlagen: ` +
+					encryption.failed.map((f) => `${f.path} (${f.error})`).join("; ")
+			);
+		}
+
 		// 4. Erfolg: alten Zustand endgültig verwerfen.
 		fs.rmSync(trashDir, { recursive: true, force: true });
 	} catch (error) {
@@ -577,6 +637,16 @@ async function importMerge(extractDir: string, manifest: BackupManifest): Promis
 		walk(sourceFilesDir);
 	}
 	mergedRows["__files__"] = copiedFiles;
+
+	// Eingelesene Klartext-Bestände in die lokale Verschlüsselung at rest
+	// überführen (Backups sind portierbar/Klartext, siehe Dateikopf). Der
+	// Merge hat kein Rollback - ein Verschlüsselungsfehler wird daher nur
+	// protokolliert (Reste holt die idempotente Start-Migration nach).
+	ensureSecretsEncrypted();
+	const encryption = await encryptPlaintextFilesInTree(getFilesDir());
+	if (encryption.failed.length > 0) {
+		console.error("Verschlüsselung einzelner importierter Dateien fehlgeschlagen", encryption.failed);
+	}
 
 	return mergedRows;
 }

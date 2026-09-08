@@ -23,6 +23,13 @@ export interface AppSettings {
 	clientHostUrl: string | null;
 	/** Zugangs-Token des Hosts (nur Modus client). */
 	clientToken: string | null;
+	/**
+	 * Master-Schlüssel für die Datenverschlüsselung at rest, mit dem
+	 * OS-Schlüsselbund verschlüsselt ("safe:<base64>", Electron safeStorage)
+	 * bzw. als Fallback ohne verfügbaren Schlüsselbund nur base64-kodiert
+	 * ("plain:<base64>", siehe electron/main/data-key.ts).
+	 */
+	encryptedDataKey: string | null;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -32,6 +39,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 	lastHostPort: null,
 	clientHostUrl: null,
 	clientToken: null,
+	encryptedDataKey: null,
 };
 
 export class SettingsStore {
@@ -56,6 +64,13 @@ export class SettingsStore {
 	private save(): void {
 		fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
 		fs.writeFileSync(this.filePath, JSON.stringify(this.settings, null, 2), "utf8");
+		try {
+			// Enthält Zugangs-Tokens + verschlüsselten Datenschlüssel - Datei
+			// restriktiv halten (nur eigener OS-Benutzer).
+			fs.chmodSync(this.filePath, 0o600);
+		} catch {
+			// Best effort (Windows kennt keine POSIX-Rechte).
+		}
 	}
 
 	get(): AppSettings {

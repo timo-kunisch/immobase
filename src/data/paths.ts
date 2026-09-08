@@ -13,12 +13,25 @@ import path from "node:path";
  * WICHTIG: Diese Funktion liest die Env-Variable bei jedem Aufruf neu aus,
  * damit Tests (vitest) sie per `process.env.APP_DATA_DIR = ...` +
  * `closeDb()` zwischen den Testfällen umschalten können.
+ *
+ * Zugriffsrechte: Alle Datenverzeichnisse werden restriktiv (0700 - nur der
+ * eigene OS-Benutzer) angelegt bzw. best effort darauf gehärtet; auf
+ * Dateisystemen ohne POSIX-Rechte (Windows) ist das ein No-Op.
  */
+function ensurePrivateDir(dir: string): string {
+	fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+	try {
+		fs.chmodSync(dir, 0o700);
+	} catch {
+		// Best effort (z. B. Windows-Dateisysteme kennen keine POSIX-Rechte).
+	}
+	return dir;
+}
+
 export function getDataDir(): string {
 	const fromEnv = process.env.APP_DATA_DIR?.trim();
 	const dir = fromEnv && fromEnv.length > 0 ? fromEnv : path.join(process.cwd(), "data-dev");
-	fs.mkdirSync(dir, { recursive: true });
-	return dir;
+	return ensurePrivateDir(dir);
 }
 
 /** Pfad zur SQLite-Datenbankdatei. */
@@ -28,14 +41,10 @@ export function getDatabaseFilePath(): string {
 
 /** Wurzelverzeichnis der hochgeladenen/generierten Dateien. */
 export function getFilesDir(): string {
-	const dir = path.join(getDataDir(), "files");
-	fs.mkdirSync(dir, { recursive: true });
-	return dir;
+	return ensurePrivateDir(path.join(getDataDir(), "files"));
 }
 
 /** Verzeichnis für Log-Dateien (Main-Log, E-Mail-Outbox, ...). */
 export function getLogsDir(): string {
-	const dir = path.join(getDataDir(), "logs");
-	fs.mkdirSync(dir, { recursive: true });
-	return dir;
+	return ensurePrivateDir(path.join(getDataDir(), "logs"));
 }

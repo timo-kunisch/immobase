@@ -4,6 +4,7 @@ import path from "node:path";
 import { Readable } from "node:stream";
 
 import { getFilesDir } from "@/data/paths";
+import { createPlaintextReadStream, writeEncryptedFile } from "./file-crypto";
 
 /**
  * Dateiablage auf dem lokalen Dateisystem. Wurzelverzeichnis ist
@@ -16,6 +17,13 @@ import { getFilesDir } from "@/data/paths";
  * Datei von der Platte liest und an angemeldete Nutzer durchreicht (keine
  * öffentliche Auslieferung).
  *
+ * Verschlüsselung at rest: Alle NEU abgelegten Dateien werden AES-256-GCM-
+ * verschlüsselt gespeichert (Container-Format siehe src/lib/file-crypto.ts,
+ * Schlüssel siehe src/lib/data-key.ts). Der Lesepfad (getUploadedFile)
+ * entschlüsselt transparent am Container-Magic und kann dadurch auch ältere
+ * Klartext-Bestände lesen; die Bestandsmigration
+ * (encryptPlaintextFilesInTree) holt diese nach.
+ *
  * Diese Datei ist die einzige Stelle im Projekt, die direkt mit dem
  * Dateisystem für Uploads spricht - alle Module (Dokumente, Vorlagen,
  * Abrechnung, WEG) nutzen ausschließlich die hier exportierten Funktionen.
@@ -23,7 +31,8 @@ import { getFilesDir } from "@/data/paths";
  * Metadaten (Original-Dateiname, MIME-Type)
  * liegen als Sidecar-Datei `<dateiname>.meta.json` neben der eigentlichen
  * Datei, sodass `files/` auch bei einem reinen Dateisystem-Backup
- * selbsterklärend bleibt.
+ * selbsterklärend bleibt. Die Sidecars sind bewusst NICHT verschlüsselt
+ * (enthalten nur Dateiname + MIME-Type, keinen Inhalt).
  */
 
 const MIME_TYPES: Record<string, string> = {
@@ -160,8 +169,9 @@ export async function saveUploadedFile(
 	// dem ursprünglichen Dateinamen erfolgt.
 	const absolute = resolveAbsolutePath(key);
 	if (!absolute) throw new Error(`Ungültiger Ablagepfad: ${key}`);
-	fs.mkdirSync(path.dirname(absolute), { recursive: true });
-	fs.writeFileSync(absolute, Buffer.from(buffer));
+	// Verschlüsselte Ablage at rest (siehe Dateikopf); fileSize bewusst die
+	// KLARTEXT-Größe (für Anzeige/DB), nicht die Container-Größe.
+	writeEncryptedFile(absolute, Buffer.from(buffer));
 	writeMeta(absolute, { originalFileName, mimeType });
 
 	return {
@@ -192,8 +202,8 @@ export async function saveGeneratedFile(
 	// UUID verwenden kann.
 	const absolute = resolveAbsolutePath(key);
 	if (!absolute) throw new Error(`Ungültiger Ablagepfad: ${key}`);
-	fs.mkdirSync(path.dirname(absolute), { recursive: true });
-	fs.writeFileSync(absolute, buffer);
+	// Verschlüsselte Ablage at rest (siehe Dateikopf).
+	writeEncryptedFile(absolute, buffer);
 	writeMeta(absolute, { originalFileName: fileName, mimeType: getMimeType(fileName) });
 
 	return { relativePath: key, fileSize: buffer.byteLength };
@@ -244,7 +254,10 @@ export async function getUploadedFile(relativePath: string): Promise<{
 		const fileName = meta?.originalFileName || (relativePath.split("/").pop() ?? "download");
 		const mimeType = meta?.mimeType || getMimeType(fileName);
 		// Gestreamtes Lesen statt Komplett-Pufferung (große PDFs/Archive).
-		const body = Readable.toWeb(fs.createReadStream(absolute)) as ReadableStream;
+		// Verschlüsselte Dateien (Erkennung am Container-Magic) werden dabei
+		// transparent entschlüsselt; Klartext-Bestandsdateien laufen einfach
+		// durch. Ein Integritäts-/Schlüsselfehler bricht den Stream hart ab.
+		const body = Readable.toWeb(createPlaintextReadStream(absolute)) as ReadableStream;
 		return { body, mimeType, fileName };
 	} catch (error) {
 		console.error("getUploadedFile failed", error);

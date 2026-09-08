@@ -54,6 +54,28 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   (einzige Datei mit direktem Dateisystem-Zugriff für Uploads). Original-Dateiname/MIME-Type in
   Sidecar-Dateien (`<name>.meta.json`). Auslieferung nur über den geschützten Route Handler
   `src/app/api/uploads/[...path]/route.ts` (autoritativ `requireUser()`-geprüft).
+- **Datenverschlüsselung at rest** (AES-256-GCM, gerätegebundener Master-Schlüssel):
+  `src/lib/file-crypto.ts` (Container-Format: Magic `IMMOBASE-FILE-ENC:v1` + Nonce + Ciphertext +
+  Auth-Tag am Dateiende, streaming) verschlüsselt alle NEU abgelegten Dateien in `files/`; der
+  Lesepfad erkennt das Magic und entschlüsselt transparent (ältere Klartext-Bestände bleiben
+  lesbar). Bestandsmigration idempotent + pro Datei atomar via `encryptPlaintextFilesInTree()`:
+  automatisch beim Server-Start (`src/instrumentation.ts`), nach jedem Backup-Import und manuell
+  in den Einstellungen. Geheimnisse in `app_settings` (`smtp.pass`, `letterxpress.apikey`) sind
+  FELD-verschlüsselt (`"enc:v1:"`-Präfix, transparent in `src/data/app-settings.ts`; nicht
+  entschlüsselbarer Wert = `undefined`, fail-closed). **Backups bleiben portierbar**: Der Export
+  entschlüsselt Dateien gestreamt ins ZIP (Manifest-Prüfsummen über dem Klartext) und Secrets in
+  der DB-Snapshot-Kopie; der Import verschlüsselt mit dem lokalen Schlüssel wieder.
+- **Master-Schlüssel** (`src/lib/data-key.ts`, 32 Bytes): Die Desktop-App
+  (`electron/main/data-key.ts`) legt ihn mit dem OS-Schlüsselbund verschlüsselt in `settings.json`
+  ab (`safe:`-Präfix, Electron safeStorage; `plain:`-Fallback ohne Schlüsselbund, z. B. Linux ohne
+  Secret Service) und übergibt ihn an den eingebetteten Server via `IMMOBASE_DATA_KEY`. Fallback
+  ohne Electron (Browser-Dev/Tests): Schlüsseldatei `<dataDir>/.data-key` (0600). Die Marker-Datei
+  `.data-key.managed` verhindert, dass ein Server ohne übergebenen Schlüssel still einen neuen
+  erzeugt. Wiederherstellungsschlüssel (base64) in der Admin-UI einsehbar (Einstellungen →
+  Lokale Datenverschlüsselung). **Die SQLite-DB selbst bleibt Klartext-SQLite** (better-sqlite3
+  hat keine SQLCipher-Unterstützung; ein natives SQLCipher-Fork-Modul würde Build/Rebuild/
+  Packaging gefährden - bewusste Entscheidung, Festplattenverschlüsselung wird empfohlen);
+  Verzeichnisse/`data.db`/`settings.json` sind auf 0700/0600 gehärtet.
 - **E-Mail** über `nodemailer` (SMTP), konfiguriert in der App unter Einstellungen →
   Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
   Umgebungsvariablen für Dev/Tests). Ohne SMTP: Protokollierung in `<userData>/logs/outbox.log`.
@@ -148,7 +170,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 
 ```
 electron/
-  main/                     # Main-Prozess (index/server/settings/network-check/discovery/updater/log)
+  main/                     # Main-Prozess (index/server/settings/network-check/discovery/updater/log/data-key)
   preload/index.ts          # contextBridge-API (window.iv)
   shell/connect.html        # Setup-/Verbindungsseite (plain HTML/JS, kein Build)
   tsconfig.json             # strict TS für die Shell (npx tsc -p electron/tsconfig.json)
@@ -183,6 +205,8 @@ src/
     email/mailer.ts         # nodemailer/Outbox-Log
     pdf/                    # document.ts (Briefe), billing-statement.ts (Abrechnungen)
     storage.ts              # Dateisystem-Ablage (files/)
+    data-key.ts             # Master-Schlüssel (Env aus Electron / Schlüsseldatei-Fallback)
+    file-crypto.ts          # AES-256-GCM-Dateiverschlüsselung at rest + Bestandsmigration
     letterxpress.ts         # LetterXpress-API (optionaler Postversand)
     postal-shipments.ts     # Postversand-Orchestrierung (Quelle -> PDF -> LetterXpress -> DB)
     backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
@@ -193,6 +217,7 @@ src/
     desktop-bridge.ts       # Typen für window.iv (Electron-Brücke)
     format.ts, action-state.ts, form-data.ts, id.ts, utils.ts
   proxy.ts                  # Auth-Guard (optimistischer Cookie-Check)
+  instrumentation.ts        # Server-Start-Hook: Bestandsmigration der Datenverschlüsselung
 scripts/dump-schema.mjs     # Regeneriert src/data/schema.sql aus den Migrationen
 electron.vite.config.ts     # electron-vite (nur main+preload)
 electron-builder.yml        # Packaging (NSIS/ZIP/AppImage, extraResources, publish)
@@ -243,7 +268,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **WEG-Verwaltung:** siehe Abschnitt 6.1
 - **Postversand:** `postal_shipments` (polymorph über `sourceType`/`sourceId`)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
-  (technische Key/Value-Konfiguration: SMTP, LetterXpress, URL-Overrides – keine Fachdaten)
+  (technische Key/Value-Konfiguration: SMTP, LetterXpress, URL-Overrides – keine Fachdaten;
+  Geheimnisse wie `smtp.pass`/`letterxpress.apikey` sind feldverschlüsselt, transparent über
+  `src/data/app-settings.ts`)
 - **Authentifizierung:** `users`, `sessions`, `verification_tokens`, `password_reset_tokens`
 
 ### 6.1 WEG-Verwaltung (Wohnungseigentümergemeinschaften)
@@ -340,6 +367,17 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 
 ## 9. Bekannte, bewusst offene Punkte
 
+- **Die SQLite-DB selbst ist nicht als Ganzes verschlüsselt** (Klartext-SQLite, siehe Abschnitt
+  2): better-sqlite3 unterstützt kein SQLCipher, und ein natives SQLCipher-Fork-Modul würde
+  Build/Rebuild/Packaging auf allen Plattformen gefährden. Abgedeckt sind stattdessen: Dateien in
+  `files/`, Geheimnisse in `app_settings` (beide AES-256-GCM), restriktive Dateirechte. Für vollen
+  At-Rest-Schutz der DB wird die Festplattenverschlüsselung des Systems (FileVault/BitLocker)
+  empfohlen.
+- **Host-Modus (LAN) ohne TLS**: Das Zugangs-Token schützt die Authentisierung, nicht die
+  Vertraulichkeit der Übertragung im LAN. In nicht vertrauenswürdigen Netzen nur über
+  verschlüsselte Strecke (z. B. VPN) betreiben.
+- **Linux ohne Secret Service**: Dort liegt der Master-Schlüssel nur base64-kodiert in
+  `settings.json` (`plain:`-Fallback, Datei 0600) – Schutz dann nur über Dateirechte.
 - **Keine eigene UI** für Zählerstände (`meters`/`meter_readings`) und Übergabeprotokolle
   (`protocols`) – Tabellen sind vollständig angelegt, aber es gibt noch keine Seiten/Actions dafür.
 - Kein Rollen-Wechsel (`USER` ↔ `ADMIN`) in der Admin-UI, nur der Freigabe-Toggle (`isApproved`).

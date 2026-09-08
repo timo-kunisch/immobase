@@ -1,16 +1,20 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import archiver from "archiver";
 import yauzl from "yauzl";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { getSetting, setSetting } from "@/data/app-settings";
 import { exportBackup, importBackup } from "@/data/backup";
 import { closeDb, getDb } from "@/data/db";
 import { LATEST_SCHEMA_VERSION } from "@/data/migrate";
 import { createProperty, getProperty, listProperties } from "@/data/properties";
 import { isEncryptedBackupFile } from "@/lib/backup-crypto";
+import { isEncryptedFile, readPlaintextFile } from "@/lib/file-crypto";
+import { saveGeneratedFile } from "@/lib/storage";
 
 /**
  * Export/Import-Roundtrip-Tests inkl. Prüfsummen-Validierung, Modi
@@ -82,6 +86,34 @@ async function readZipListing(zipFilePath: string): Promise<ZipListing> {
 		zipfile.readEntry();
 	});
 	return { names, manifest: manifest! };
+}
+
+/** Liest den Inhalt eines einzelnen ZIP-Eintrags (für Inhaltsprüfungen). */
+async function readZipEntryContent(zipFilePath: string, entryName: string): Promise<Buffer> {
+	const zipfile = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+		yauzl.open(zipFilePath, { lazyEntries: true, autoClose: true }, (err, zf) => (err || !zf ? reject(err) : resolve(zf)));
+	});
+	return new Promise<Buffer>((resolve, reject) => {
+		zipfile.on("error", reject);
+		zipfile.on("end", () => reject(new Error(`Eintrag "${entryName}" nicht im ZIP gefunden.`)));
+		zipfile.on("entry", (entry: yauzl.Entry) => {
+			if (entry.fileName !== entryName) {
+				zipfile.readEntry();
+				return;
+			}
+			zipfile.openReadStream(entry, (err, stream) => {
+				if (err || !stream) {
+					reject(err);
+					return;
+				}
+				const chunks: Buffer[] = [];
+				stream.on("data", (c: Buffer) => chunks.push(c));
+				stream.on("end", () => resolve(Buffer.concat(chunks)));
+				stream.on("error", reject);
+			});
+		});
+		zipfile.readEntry();
+	});
 }
 
 /** Manipuliert eine Datei im ZIP: entpackt, ändert, packt neu (für Prüfsummen-Fehlerfall). */
@@ -165,8 +197,12 @@ describe("Backup-Import (Ersetzen)", () => {
 		const restored = getProperty(created.id);
 		expect(restored?.name).toBe("Musterhaus");
 
-		// Dateien wiederhergestellt (inkl. Sidecar-Metadaten)
-		expect(fs.readFileSync(path.join(restoreDir, "files", "documents", "doc1.pdf"), "utf8")).toBe("%PDF-fake-content");
+		// Dateien wiederhergestellt (inkl. Sidecar-Metadaten) - und mit dem
+		// lokalen Schlüssel des Zielgeräts verschlüsselt abgelegt (Backups
+		// enthalten bewusst Klartext, siehe src/data/backup.ts).
+		const restoredFile = path.join(restoreDir, "files", "documents", "doc1.pdf");
+		expect(isEncryptedFile(restoredFile)).toBe(true);
+		await expect(readPlaintextFile(restoredFile)).resolves.toEqual(Buffer.from("%PDF-fake-content"));
 		expect(fs.existsSync(path.join(restoreDir, "files", "documents", "doc1.pdf.meta.json"))).toBe(true);
 
 		fs.rmSync(restoreDir, { recursive: true, force: true });
@@ -235,7 +271,9 @@ describe("Backup-Export/-Import (verschlüsselt)", () => {
 		const result = await importBackup(encryptedPath, "replace", { password: PASSWORD });
 		expect(result.mode).toBe("replace");
 		expect(getProperty(created.id)?.name).toBe("Musterhaus");
-		expect(fs.readFileSync(path.join(restoreDir, "files", "documents", "doc1.pdf"), "utf8")).toBe("%PDF-fake-content");
+		const restoredFile = path.join(restoreDir, "files", "documents", "doc1.pdf");
+		expect(isEncryptedFile(restoredFile)).toBe(true);
+		await expect(readPlaintextFile(restoredFile)).resolves.toEqual(Buffer.from("%PDF-fake-content"));
 
 		fs.rmSync(restoreDir, { recursive: true, force: true });
 	});
@@ -318,6 +356,55 @@ describe("Backup-Import (Zusammenführen)", () => {
 
 		await importBackup(zipPath, "merge");
 
-		expect(fs.readFileSync(localFile, "utf8")).toBe("lokaler Inhalt");
+		// Inhalt unverändert - nach dem Import liegt sie verschlüsselt vor
+		// (Merge überführt Klartext-Bestände in die Verschlüsselung at rest).
+		expect(isEncryptedFile(localFile)).toBe(true);
+		await expect(readPlaintextFile(localFile)).resolves.toEqual(Buffer.from("lokaler Inhalt"));
+	});
+});
+
+describe("Verschlüsselung at rest im Backup-Zusammenspiel", () => {
+	it("exportiert verschlüsselte Dateien als KLARTEXT ins ZIP (Prüfsumme über dem Klartext)", async () => {
+		const content = Buffer.from("geheimer PDF-Inhalt für den Export");
+		const saved = await saveGeneratedFile(content, "documents", "geheim.pdf");
+
+		// Ablage liegt verschlüsselt vor.
+		const absolute = path.join(testDir, "files", saved.relativePath);
+		expect(isEncryptedFile(absolute)).toBe(true);
+
+		await exportBackup(zipPath);
+
+		// Manifest-Prüfsumme/-Größe beziehen sich auf den Klartext ...
+		const listing = await readZipListing(zipPath);
+		const entry = listing.manifest.files.find((f) => f.path === `files/${saved.relativePath}`);
+		expect(entry).toBeDefined();
+		expect(entry!.sha256).toBe(createHash("sha256").update(content).digest("hex"));
+		expect(entry!.size).toBe(content.length);
+
+		// ... und der ZIP-Eintrag selbst enthält den Klartext (portierbar).
+		expect(await readZipEntryContent(zipPath, `files/${saved.relativePath}`)).toEqual(content);
+	});
+
+	it("stellt Geheimnisse geräteübergreifend wieder her (Export entschlüsselt, Import re-verschlüsselt)", async () => {
+		setSetting("smtp.pass", "smtp-geheimnis");
+		await exportBackup(zipPath);
+
+		// Neues Gerät = neues Datenverzeichnis = anderer Master-Schlüssel.
+		closeDb();
+		const restoreDir = fs.mkdtempSync(path.join(os.tmpdir(), "iv-restore-secrets-"));
+		process.env.APP_DATA_DIR = restoreDir;
+
+		await importBackup(zipPath, "replace");
+
+		// Wäre der Export nicht entschlüsselt worden, läge hier ein mit dem
+		// ALTEN Schlüssel verschlüsselter Wert vor (auf dem neuen Gerät
+		// unlesbar). Stattdessen: transparent lesbar ...
+		expect(getSetting("smtp.pass")).toBe("smtp-geheimnis");
+		// ... und at rest wieder verschlüsselt (mit dem lokalen Schlüssel).
+		const raw = getDb().prepare("SELECT value FROM app_settings WHERE key = 'smtp.pass'").get() as { value: string };
+		expect(raw.value).toMatch(/^enc:v1:/);
+		expect(raw.value).not.toContain("smtp-geheimnis");
+
+		fs.rmSync(restoreDir, { recursive: true, force: true });
 	});
 });
