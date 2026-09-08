@@ -15,6 +15,15 @@ export interface DesktopConnectionInfo {
 	port: number | null;
 }
 
+/** Spiegel von UpdateState aus electron/main/updater.ts. */
+export interface DesktopUpdateState {
+	status: "idle" | "checking" | "available" | "downloading" | "downloaded" | "error";
+	/** Version des gefundenen bzw. geladenen Updates (sonst null). */
+	version: string | null;
+	/** Download-Fortschritt in Prozent (nur bei Status "downloading"). */
+	percent: number | null;
+}
+
 export interface DesktopBridge {
 	isDesktop: true;
 	platform: NodeJS.Platform;
@@ -29,6 +38,12 @@ export interface DesktopBridge {
 	openConnectionSettings(): Promise<void>;
 	/** Blendet das Fenster ein/aus (für spätere Tray-Features reserviert). */
 	getAppVersion(): Promise<string>;
+	/** Aktueller Auto-Update-Status (nur gepackte Desktop-App, sonst "idle"). */
+	getUpdateState(): Promise<DesktopUpdateState>;
+	/** Abonniert Update-Status-Änderungen; Rückgabewert: Unsubscribe. */
+	onUpdateState(listener: (state: DesktopUpdateState) => void): () => void;
+	/** Installiert ein bereits geladenes Update sofort (beendet die App). */
+	installUpdateNow(): Promise<void>;
 }
 
 declare global {

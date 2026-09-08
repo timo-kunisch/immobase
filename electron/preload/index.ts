@@ -21,6 +21,11 @@ export interface IvBridge {
 	openConnectionSettings(): Promise<void>;
 	getAppVersion(): Promise<string>;
 
+	// Auto-Update (Status siehe UpdateState in electron/main/updater.ts)
+	getUpdateState(): Promise<unknown>;
+	onUpdateState(listener: (state: unknown) => void): () => void;
+	installUpdateNow(): Promise<void>;
+
 	// Shell-Seite (Setup/Client-Verbindung)
 	shellGetState(): Promise<unknown>;
 	shellSetMode(mode: "local" | "host" | "client"): Promise<{ ok: boolean; error?: string }>;
@@ -48,6 +53,13 @@ const bridge: IvBridge = {
 	},
 	openConnectionSettings: () => ipcRenderer.invoke("iv:open-connection-settings"),
 	getAppVersion: () => ipcRenderer.invoke("iv:get-app-version"),
+	getUpdateState: () => ipcRenderer.invoke("iv:get-update-state"),
+	onUpdateState: (listener) => {
+		const wrapped = (_event: Electron.IpcRendererEvent, state: unknown): void => listener(state);
+		ipcRenderer.on("iv:update-state", wrapped);
+		return () => ipcRenderer.removeListener("iv:update-state", wrapped);
+	},
+	installUpdateNow: () => ipcRenderer.invoke("iv:install-update"),
 
 	shellGetState: () => ipcRenderer.invoke("iv:shell-get-state"),
 	shellSetMode: (mode) => ipcRenderer.invoke("iv:shell-set-mode", mode),

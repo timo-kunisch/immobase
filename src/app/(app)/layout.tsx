@@ -1,5 +1,6 @@
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { UpdateBanner } from "@/components/layout/update-banner";
 import { requireUser } from "@/lib/auth/dal";
 import { isSmtpConfigured } from "@/lib/email/mailer";
 
@@ -12,7 +13,10 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 	return (
 		<SidebarProvider>
 			<AppSidebar user={{ email: user.email, role: user.role }} smtpConfigured={isSmtpConfigured()} />
-			<SidebarInset>{children}</SidebarInset>
+			<SidebarInset>
+				<UpdateBanner />
+				{children}
+			</SidebarInset>
 		</SidebarProvider>
 	);
 }

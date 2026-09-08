@@ -10,7 +10,7 @@ import { initMainLog, log } from "./log";
 import { checkDataDirNotOnNetworkDrive } from "./network-check";
 import { startEmbeddedServer, type RunningServer } from "./server";
 import { generateHostToken, SettingsStore, type AppMode } from "./settings";
-import { checkForUpdatesQuietly } from "./updater";
+import { checkForUpdatesQuietly, getUpdateState, installUpdateNow } from "./updater";
 
 /**
  * Electron-Main-Prozess von ImmoBase.
@@ -319,6 +319,10 @@ function registerIpcHandlers(): void {
 
 	// --- App-/Verbindungsinfo ---
 	ipcMain.handle("iv:get-app-version", () => app.getVersion());
+
+	// --- Auto-Update (Statusabfrage + sofortige Installation, siehe updater.ts) ---
+	ipcMain.handle("iv:get-update-state", () => getUpdateState());
+	ipcMain.handle("iv:install-update", () => installUpdateNow());
 	ipcMain.handle("iv:get-connection-info", () => ({ ...connectionState, platform: process.platform }));
 	ipcMain.handle("iv:open-connection-settings", () => showShellPage());
 

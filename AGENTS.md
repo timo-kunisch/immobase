@@ -118,7 +118,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
     Netzlaufwerk** – bei Befund wird der Start mit Erklärung abgebrochen.
   - `main/discovery.ts` – mDNS via `bonjour-service` (`_immobase._tcp`), manueller Fallback.
   - `main/settings.ts` – `settings.json` (Modus, Ports, Tokens) im userData-Verzeichnis.
-  - `main/updater.ts` – `electron-updater` (GitHub-Releases); offline still fehlschlagend.
+  - `main/updater.ts` – `electron-updater` (GitHub-Releases); offline still fehlschlagend. Der
+    Update-Status (`UpdateState`) geht per IPC (`iv:update-state`) an den Renderer; das UI blendet
+    bei gefundenem/geladenem Update eine Hinweisleiste ein
+    (`src/components/layout/update-banner.tsx`, Fehler bleiben bewusst ohne UI) und kann die
+    Installation sofort auslösen (`iv:install-update` → `quitAndInstall()`).
   - `preload/index.ts` – schmale `contextBridge`-API (`window.iv`), Vertragstypen in
     `src/lib/desktop-bridge.ts`.
   - `shell/connect.html` – Setup-/Verbindungs-Seite (Moduswahl, Client-Verbindung, Discovery-Liste,
