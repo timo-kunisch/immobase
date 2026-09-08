@@ -68,16 +68,6 @@ export function getLatestPostalShipmentForSource(sourceType: PostalShipmentSourc
 	return row ?? null;
 }
 
-export function listPostalShipmentsForSource(sourceType: PostalShipmentSourceType, sourceId: string): PostalShipment[] {
-	return getDb()
-		.prepare(
-			`SELECT ${SHIPMENT_COLUMNS} FROM postal_shipments
-			 WHERE source_type = ? AND source_id = ?
-			 ORDER BY created_at DESC`
-		)
-		.all(sourceType, sourceId) as PostalShipment[];
-}
-
 // ------------------------------------------------------------
 // Auflösung der polymorphen PDF-Quellen (Lesezugriffe)
 // ------------------------------------------------------------

@@ -27,13 +27,6 @@ export function centsToDecimalString(cents: number): string {
 	return `${sign}${euros}.${rest.toString().padStart(2, "0")}`;
 }
 
-/** Wandelt einen Decimal-String in eine number um (für Anzeige/Rechnen außerhalb von Cent-Kontexten). */
-export function toNumber(value: DecimalLike): number {
-	if (value === null || value === undefined) return 0;
-	const numeric = typeof value === "number" ? value : Number(value.toString());
-	return Number.isNaN(numeric) ? 0 : numeric;
-}
-
 /**
  * Verteilt einen Gesamtbetrag (in Cent) exakt auf mehrere Gewichte, sodass
  * die Summe der Teilbeträge immer genau dem Gesamtbetrag entspricht - keine

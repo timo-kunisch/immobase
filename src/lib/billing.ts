@@ -3,12 +3,6 @@ import { getRentForDate } from "@/lib/rent-history";
 import { toCents, distributeCents } from "@/lib/money";
 import { atMidnight, daysBetweenInclusive, daysInMonth, overlapRange } from "@/lib/date-range";
 
-// Re-export für bestehende Importe (src/lib/date-range.ts ist die neue,
-// domänenneutrale Quelle dieser Hilfsfunktionen - seit Einführung der
-// WEG-Verwaltung, die dieselbe taggenaue Zeitraum-Logik für Eigentümer-
-// wechsel benötigt, siehe src/lib/hoa-ownership.ts).
-export { daysBetweenInclusive, overlapRange };
-
 /**
  * Zentrale Berechnungslogik für die Nebenkostenabrechnung (Betriebskosten-
  * abrechnung nach § 2 BetrKV). Kapselt die komplette Umlage-Logik, damit sie

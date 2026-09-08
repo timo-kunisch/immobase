@@ -37,8 +37,6 @@ const MAGIC_LINE = "IMMOBASE-FILE-ENC:v1";
 const HEADER_LENGTH = MAGIC_LINE.length + 1 + 12; // Magic + "\n" + Nonce
 const NONCE_LENGTH = 12;
 const TAG_LENGTH = 16;
-/** Gesamt-Overhead gegenüber dem Klartext: Header + Auth-Tag. */
-export const ENCRYPTION_OVERHEAD_BYTES = HEADER_LENGTH + TAG_LENGTH;
 
 /** Sidecar-Metadaten werden bewusst NICHT verschlüsselt (nur Name/MIME-Type). */
 const META_SUFFIX = ".meta.json";

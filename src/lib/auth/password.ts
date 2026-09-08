@@ -9,11 +9,6 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, SALT_ROUNDS);
 }
 
-/** Prüft ein Klartext-Passwort gegen einen gespeicherten bcrypt-Hash. */
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-	return bcrypt.compare(password, hash);
-}
-
 // Fixer Dummy-Hash (Passwort "not-a-real-password"), gegen den wir auch
 // dann vergleichen, wenn kein Nutzer mit der eingegebenen E-Mail existiert.
 // So dauert eine Login-Anfrage für "unbekannte E-Mail" und "falsches

@@ -8,12 +8,6 @@ import type { Unit } from "./types";
  * aktive Mietverhältnisse). Konventionen siehe src/data/properties.ts.
  */
 
-const UNIT_COLUMNS = `
-	id, property_id AS propertyId, label, living_space AS livingSpace, rooms,
-	floor, co_ownership_share AS coOwnershipShare,
-	created_at AS createdAt, updated_at AS updatedAt
-`;
-
 export interface UnitInput {
 	propertyId: string;
 	label: string;
@@ -44,11 +38,6 @@ export function listUnits(filter?: { propertyId?: string }): UnitWithPropertyNam
 			 ORDER BY u.created_at DESC`
 		)
 		.all(...params) as UnitWithPropertyName[];
-}
-
-export function getUnit(id: string): Unit | null {
-	const row = getDb().prepare(`SELECT ${UNIT_COLUMNS} FROM units WHERE id = ?`).get(id) as Unit | undefined;
-	return row ?? null;
 }
 
 export function createUnit(input: UnitInput): Unit {

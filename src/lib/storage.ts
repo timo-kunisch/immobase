@@ -227,13 +227,6 @@ export async function deleteUploadedFile(relativePath: string): Promise<void> {
 	}
 }
 
-/** Prüft, ob eine Datei unter dem angegebenen relativen Pfad existiert. */
-export async function uploadedFileExists(relativePath: string): Promise<boolean> {
-	const absolute = resolveAbsolutePath(relativePath);
-	if (!absolute) return false;
-	return fs.existsSync(absolute);
-}
-
 /**
  * Lädt eine Datei aus der Ablage (für den Ausliefer-Route-Handler und den
  * Postversand). Gibt `null` zurück, wenn die Datei nicht existiert bzw. der

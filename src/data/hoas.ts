@@ -9,12 +9,6 @@ import type { Hoa, Property } from "./types";
  * src/data/properties.ts.
  */
 
-const HOA_COLUMNS = `
-	id, property_id AS propertyId, name, total_shares AS totalShares,
-	bank_iban AS bankIban, bank_bic AS bankBic, notes,
-	created_at AS createdAt, updated_at AS updatedAt
-`;
-
 export interface HoaInput {
 	propertyId: string;
 	name: string;
@@ -75,11 +69,6 @@ export function listHoasWithProperty(): HoaWithProperty[] {
 		)
 		.all() as HoaWithPropertyRow[];
 	return rows.map(mapHoaWithProperty);
-}
-
-export function getHoa(id: string): Hoa | null {
-	const row = getDb().prepare(`SELECT ${HOA_COLUMNS} FROM hoas WHERE id = ?`).get(id) as Hoa | undefined;
-	return row ?? null;
 }
 
 /**

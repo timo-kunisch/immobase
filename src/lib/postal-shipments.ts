@@ -3,12 +3,11 @@ import {
 	getDocumentPdfFile,
 	getGeneratedDocumentPdfFile,
 	getHoaAnnualStatementPdfFile,
-	getLatestPostalShipmentForSource,
 	getOwnerMeetingInvitationPdfFile,
 	getOwnerMeetingMinutesPdfFile,
 	getTenantStatementPdfFile,
 } from "@/data/postal-shipments";
-import type { PostalShipment, PostalShipmentSourceType, PostalShipmentStatus } from "@/data/types";
+import type { PostalShipmentSourceType, PostalShipmentStatus } from "@/data/types";
 import { getUploadedFile } from "@/lib/storage";
 import { getLetterXpressMode, isLetterXpressConfigured, LetterXpressError, sendPdfByPost } from "@/lib/letterxpress";
 
@@ -34,18 +33,6 @@ import { getLetterXpressMode, isLetterXpressConfigured, LetterXpressError, sendP
  * Absicherung (alle Versand-Actions laufen durch diese Funktion) früh ab,
  * ohne einen FAILED-Protokoll-Eintrag zu erzeugen.
  */
-
-export const postalShipmentStatusLabels: Record<PostalShipmentStatus, string> = {
-	PENDING: "Ausstehend",
-	REGISTERED: "Übermittelt",
-	FAILED: "Fehlgeschlagen",
-};
-
-export const postalShipmentStatusStyles: Record<PostalShipmentStatus, string> = {
-	PENDING: "bg-muted text-muted-foreground",
-	REGISTERED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-	FAILED: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
-};
 
 type SourceFile = { filePath: string; fileName: string };
 
@@ -156,9 +143,4 @@ export async function sendPdfByPostForSource(
 	}
 
 	return { success: true, jobId: jobId!, externalStatus, mode };
-}
-
-/** Letzter Versandversuch für eine PDF-Quelle (für die Anzeige in der jeweiligen Ansicht). */
-export function getLatestShipmentForSource(sourceType: PostalShipmentSourceType, sourceId: string): PostalShipment | null {
-	return getLatestPostalShipmentForSource(sourceType, sourceId);
 }

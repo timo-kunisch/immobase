@@ -52,11 +52,6 @@ export function isSecretSettingKey(key: string): boolean {
 	return SECRET_SETTING_KEYS.has(key);
 }
 
-/** Alle Schlüssel, die als Geheimnisse behandelt werden (Backup, Migration). */
-export function listSecretSettingKeys(): string[] {
-	return [...SECRET_SETTING_KEYS];
-}
-
 function encryptSecretValue(plaintext: string): string {
 	const nonce = randomBytes(SECRET_NONCE_LENGTH);
 	const cipher = createCipheriv("aes-256-gcm", getDataKey(), nonce);

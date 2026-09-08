@@ -1,5 +1,4 @@
 import type { AnnualStatementStatus } from "@/data/types";
-import { daysBetweenInclusive, overlapRange } from "@/lib/date-range";
 import { toCents } from "@/lib/money";
 import { calculateHoaAllocationResult, type HoaAllocationPeriodInput, type HoaAllocationResult } from "@/lib/hoa-allocation";
 
@@ -85,11 +84,6 @@ export function calculateAnnualStatementResult(period: HoaAllocationPeriodInput,
 
 	return { ownerResults, warnings: allocation.warnings };
 }
-
-// Re-Export für Aufrufer, die im WEG-Kontext dieselbe Zeitraum-Logik wie
-// die Nebenkostenabrechnung benötigen (z. B. für UI-Anzeige des
-// Zeitanteils), ohne selbst src/lib/date-range.ts importieren zu müssen.
-export { daysBetweenInclusive, overlapRange };
 
 export const annualStatementStatusLabels: Record<AnnualStatementStatus, string> = {
 	DRAFT: "Entwurf",
