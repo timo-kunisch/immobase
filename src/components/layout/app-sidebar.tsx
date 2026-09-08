@@ -83,7 +83,7 @@ const adminNavItems = [
 	{ title: "Einstellungen", href: "/einstellungen", icon: Settings },
 ];
 
-export function AppSidebar({ user }: { user: { email: string; role: string } }) {
+export function AppSidebar({ user, smtpConfigured }: { user: { email: string; role: string }; smtpConfigured: boolean }) {
 	const pathname = usePathname();
 
 	// "/" und "/weg" sind exakte Matches (sonst wäre der Dashboard- bzw.
@@ -182,7 +182,7 @@ export function AppSidebar({ user }: { user: { email: string; role: string } }) 
 						<span className="truncate text-xs font-medium">{user.email}</span>
 						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? "Administrator" : "Nutzer"}</span>
 					</div>
-					<ContactAdminDialog />
+					<ContactAdminDialog smtpConfigured={smtpConfigured} />
 					<form action={logoutAction}>
 						<Button type="submit" variant="ghost" size="icon-sm" title="Abmelden" aria-label="Abmelden">
 							<LogOut className="size-4" />
