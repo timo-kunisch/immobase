@@ -4,6 +4,7 @@ import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
 import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
+import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
@@ -60,6 +61,7 @@ export default async function EinstellungenPage() {
 				<SecurityCard status={securityStatus} />
 				<IntegrationSettingsForm settings={integrations} />
 				<ConnectionCard />
+				<ResetAppCard />
 			</div>
 		</div>
 	);

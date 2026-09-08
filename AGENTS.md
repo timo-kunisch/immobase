@@ -123,6 +123,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Download-Fallback via GET `/api/backup/export`, dort nur unverschlüsselt). Die automatische
   Vor-Import-Sicherung wird mit dem lokalen Datenschlüssel verschlüsselt abgelegt
   (`backups/pre-import-*.zip.enc`, Container-Format; der Import erkennt sie am Magic).
+- **Anwendungs-Reset** (Einstellungen → Anwendung zurücksetzen, nur Admins, Tipp-Bestätigung
+  `ZURÜCKSETZEN`): `src/data/reset.ts` löscht die DB in allen Formen (Klartext, WAL,
+  `data.db.enc`, `data.db.pre-migrate-*.enc`), `files/`, `backups/`, `logs/outbox.log` und
+  verwaiste Import-Temp-Verzeichnisse; `settings.json`/`.data-key`/`main.log` bleiben als
+  Geräte-/Installationsdateien erhalten. Danach wird die DB sofort frisch migriert angelegt,
+  das Session-Cookie serverseitig entfernt und der Client lädt `/setup` vollständig neu.
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
   - `main/index.ts` – Lifecycle, `requestSingleInstanceLock()`, Netzlaufwerk-Abbruch-Check,
     Modus-Orchestrierung (local/host/client), IPC, Fenster-Sicherheit (`contextIsolation: true`,
@@ -231,6 +237,7 @@ src/
     migrations/             # versionierte Migrationsschritte (TS-Module mit SQL-Strings)
     schema.sql              # generierte Referenz (npm run schema:dump)
     backup.ts               # Export/Import (ZIP, Manifest, SHA-256, db.backup)
+    reset.ts                # Vollständiger Anwendungs-Reset (Einstellungen, nur Admins)
     app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
