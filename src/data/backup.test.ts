@@ -10,10 +10,12 @@ import { exportBackup, importBackup } from "@/data/backup";
 import { closeDb, getDb } from "@/data/db";
 import { LATEST_SCHEMA_VERSION } from "@/data/migrate";
 import { createProperty, getProperty, listProperties } from "@/data/properties";
+import { isEncryptedBackupFile } from "@/lib/backup-crypto";
 
 /**
  * Export/Import-Roundtrip-Tests inkl. Prüfsummen-Validierung, Modi
- * "Ersetzen"/"Zusammenführen" und Ablehnung neuerer Schema-Versionen.
+ * "Ersetzen"/"Zusammenführen", Ablehnung neuerer Schema-Versionen und
+ * passwortverschlüsselte Container (.imbak, Roundtrip/Fehlerfälle).
  */
 
 let testDir: string;
@@ -210,6 +212,68 @@ describe("Backup-Import (Ersetzen)", () => {
 
 		// Ist-Zustand wurde ersetzt: "Zweites Haus" ist weg, "Musterhaus" ist da
 		expect(listProperties().map((p) => p.name)).toEqual(["Musterhaus"]);
+	});
+});
+
+describe("Backup-Export/-Import (verschlüsselt)", () => {
+	const PASSWORD = "geheim-123";
+
+	it("schreibt einen .imbak-Container (kein ZIP-Magic) und stellt daraus mit Passwort wieder her", async () => {
+		seedData();
+		const created = listProperties()[0];
+		const encryptedPath = path.join(testDir, "backup.imbak");
+		await exportBackup(encryptedPath, { password: PASSWORD });
+
+		// Container statt ZIP: erkennbar am Magic, nicht an "PK".
+		expect(isEncryptedBackupFile(encryptedPath)).toBe(true);
+
+		// Neues Datenverzeichnis = "frisches Gerät"
+		closeDb();
+		const restoreDir = fs.mkdtempSync(path.join(os.tmpdir(), "iv-restore-enc-"));
+		process.env.APP_DATA_DIR = restoreDir;
+
+		const result = await importBackup(encryptedPath, "replace", { password: PASSWORD });
+		expect(result.mode).toBe("replace");
+		expect(getProperty(created.id)?.name).toBe("Musterhaus");
+		expect(fs.readFileSync(path.join(restoreDir, "files", "documents", "doc1.pdf"), "utf8")).toBe("%PDF-fake-content");
+
+		fs.rmSync(restoreDir, { recursive: true, force: true });
+	});
+
+	it("lehnt den Import einer verschlüsselten Datei OHNE Passwort mit klarem Hinweis ab", async () => {
+		seedData();
+		const encryptedPath = path.join(testDir, "backup.imbak");
+		await exportBackup(encryptedPath, { password: PASSWORD });
+
+		await expect(importBackup(encryptedPath, "replace")).rejects.toThrow(/verschlüsselt.*Passwort/i);
+	});
+
+	it("lehnt den Import mit falschem Passwort ab", async () => {
+		seedData();
+		const encryptedPath = path.join(testDir, "backup.imbak");
+		await exportBackup(encryptedPath, { password: PASSWORD });
+
+		await expect(importBackup(encryptedPath, "replace", { password: "falsches-passwort" })).rejects.toThrow(
+			/Entschlüsselung fehlgeschlagen/
+		);
+		// Bestand bleibt unverändert (fehlgeschlagene Entschlüsselung rührt nichts an).
+		expect(listProperties().map((p) => p.name)).toEqual(["Musterhaus"]);
+	});
+
+	it("unterstützt auch den Merge-Modus aus einem verschlüsselten Container", async () => {
+		seedData();
+		const encryptedPath = path.join(testDir, "backup.imbak");
+		await exportBackup(encryptedPath, { password: PASSWORD });
+
+		closeDb();
+		const restoreDir = fs.mkdtempSync(path.join(os.tmpdir(), "iv-restore-enc-merge-"));
+		process.env.APP_DATA_DIR = restoreDir;
+
+		const result = await importBackup(encryptedPath, "merge", { password: PASSWORD });
+		expect(result.mode).toBe("merge");
+		expect(listProperties().map((p) => p.name)).toEqual(["Musterhaus"]);
+
+		fs.rmSync(restoreDir, { recursive: true, force: true });
 	});
 });
 

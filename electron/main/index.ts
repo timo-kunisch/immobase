@@ -291,7 +291,7 @@ function registerIpcHandlers(): void {
 		const result = await dialog.showSaveDialog(win, {
 			title: "Backup speichern",
 			defaultPath: defaultFileName,
-			filters: [{ name: "ZIP-Sicherung", extensions: ["zip"] }],
+			filters: [{ name: "Sicherung (.zip/.imbak)", extensions: ["zip", "imbak"] }],
 		});
 		return result.canceled ? null : result.filePath;
 	});
@@ -301,7 +301,10 @@ function registerIpcHandlers(): void {
 		const result = await dialog.showOpenDialog(win, {
 			title: "Backup auswählen",
 			properties: ["openFile"],
-			filters: [{ name: "ZIP-Sicherung", extensions: ["zip"] }],
+			filters: [
+				{ name: "Sicherung (.zip/.imbak)", extensions: ["zip", "imbak"] },
+				{ name: "Alle Dateien", extensions: ["*"] },
+			],
 		});
 		return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0];
 	});

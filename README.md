@@ -146,10 +146,14 @@ Beim ersten Start wählbar (später: Einstellungen → Verbindung):
 
 Einstellungen → Datensicherung: Export als eine ZIP (`manifest.json` mit
 SHA-256 je Datei, `data.db` über die SQLite-Backup-API, `files/`) –
-streaming-tauglich für mehrere GB. Der Import validiert Manifest und
-Prüfsummen, legt vorher automatisch eine Sicherung des Ist-Zustands an und
-arbeitet atomar. Modi: **Ersetzen** oder **Zusammenführen** (nur fehlende
-Einträge ergänzen, lokaler Bestand gewinnt).
+streaming-tauglich für mehrere GB. Optional kann das Backup in der
+Desktop-App **mit einem Passwort verschlüsselt** werden (AES-256-GCM,
+Schlüsselableitung per scrypt; Dateiendung `.imbak`). Der Import erkennt
+verschlüsselte Dateien automatisch und fragt das Passwort ab; validiert
+werden Manifest und Prüfsummen, vorher wird automatisch eine Sicherung des
+Ist-Zustands angelegt, die Arbeit läuft atomar. Modi: **Ersetzen** oder
+**Zusammenführen** (nur fehlende Einträge ergänzen, lokaler Bestand
+gewinnt).
 
 ## Mitmachen
 

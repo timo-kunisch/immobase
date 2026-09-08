@@ -2,16 +2,19 @@ import { NextResponse } from "next/server";
 
 import { createBackupZipStream, exportBackup } from "@/data/backup";
 import { requireAdmin } from "@/lib/auth/dal";
+import { MIN_BACKUP_PASSWORD_LENGTH } from "@/lib/backup-crypto";
 
 /**
  * Backup-Export (vollständige Anwendungsdaten: data.db + files/ + manifest
  * mit SHA-256-Prüfsummen, siehe src/data/backup.ts).
  *
  * - GET: Streaming-Download der ZIP (Browser-Fallback/Dev-Modus ohne
- *   Electron-Dateidialog).
- * - POST { targetPath }: schreibt die ZIP in einen lokalen Pfad (Aufruf aus
- *   der Desktop-App heraus, nachdem der Nutzer den Zielort im nativen
- *   Dateidialog gewählt hat).
+ *   Electron-Dateidialog) - unverschlüsselt.
+ * - POST { targetPath, password? }: schreibt die Sicherung in einen lokalen
+ *   Pfad (Aufruf aus der Desktop-App heraus, nachdem der Nutzer den Zielort
+ *   im nativen Dateidialog gewählt hat). Mit `password` wird ein
+ *   verschlüsselter `.imbak`-Container erzeugt (AES-256-GCM, siehe
+ *   src/lib/backup-crypto.ts).
  *
  * Nur für Admins (requireAdmin() leitet andernfalls um) - das Backup
  * enthält u. a. die komplette Nutzerverwaltung sowie alle personenbezogenen
@@ -55,9 +58,19 @@ export async function POST(request: Request) {
 	if (!targetPath) {
 		return NextResponse.json({ error: "Zielpfad fehlt." }, { status: 400 });
 	}
+	const password =
+		typeof (body as { password?: unknown })?.password === "string" && (body as { password: string }).password.length > 0
+			? (body as { password: string }).password
+			: null;
+	if (password !== null && password.length < MIN_BACKUP_PASSWORD_LENGTH) {
+		return NextResponse.json(
+			{ error: `Das Passwort muss mindestens ${MIN_BACKUP_PASSWORD_LENGTH} Zeichen lang sein.` },
+			{ status: 400 }
+		);
+	}
 
 	try {
-		const result = await exportBackup(targetPath);
+		const result = await exportBackup(targetPath, password !== null ? { password } : undefined);
 		return NextResponse.json({ ok: true, ...result });
 	} catch (error) {
 		console.error("Backup-Export fehlgeschlagen", error);

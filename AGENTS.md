@@ -66,9 +66,13 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   (`src/lib/postal-shipments.ts`, zentraler Durchgang aller Versand-Actions) bricht serverseitig
   früh ab (ohne FAILED-Protokoll-Eintrag); Zugangsdaten in `app_settings`.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
-  via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). UI: Einstellungen →
+  via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
+  passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
+  `.imbak`-Container mit Magic-Header, Auth-Tag am Dateiende, streaming; Import erkennt
+  Container am Magic und verlangt dann zwingend das Passwort). UI: Einstellungen →
   Datensicherung (Desktop: native Dateidialoge via IPC + POST an `/api/backup/*`; Browser-Dev:
-  Download-Fallback via GET `/api/backup/export`).
+  Download-Fallback via GET `/api/backup/export`, dort nur unverschlüsselt). Die automatische
+  Vor-Import-Sicherung (`backups/pre-import-*.zip`) bleibt bewusst unverschlüsselt.
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
   - `main/index.ts` – Lifecycle, `requestSingleInstanceLock()`, Netzlaufwerk-Abbruch-Check,
     Modus-Orchestrierung (local/host/client), IPC, Fenster-Sicherheit (`contextIsolation: true`,
@@ -181,6 +185,7 @@ src/
     storage.ts              # Dateisystem-Ablage (files/)
     letterxpress.ts         # LetterXpress-API (optionaler Postversand)
     postal-shipments.ts     # Postversand-Orchestrierung (Quelle -> PDF -> LetterXpress -> DB)
+    backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts

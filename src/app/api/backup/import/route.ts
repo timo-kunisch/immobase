@@ -5,9 +5,11 @@ import { requireAdmin } from "@/lib/auth/dal";
 
 /**
  * Backup-Import (Ersetzen oder Zusammenführen, siehe src/data/backup.ts).
- * Der Pfad zur Backup-ZIP wird aus der Desktop-App übergeben (nativer
- * Dateidialog im Electron-Main-Prozess); der eigentliche Import läuft hier
- * serverseitig (dort liegt die aktive Datenbankverbindung).
+ * Der Pfad zur Sicherungsdatei (ZIP oder verschlüsselter `.imbak`-Container)
+ * wird aus der Desktop-App übergeben (nativer Dateidialog im Electron-
+ * Main-Prozess); der eigentliche Import läuft hier serverseitig (dort liegt
+ * die aktive Datenbankverbindung). Bei verschlüsselten Dateien ist das
+ * Feld `password` Pflicht.
  *
  * Nur für Admins.
  */
@@ -23,12 +25,16 @@ export async function POST(request: Request) {
 
 	const path = typeof (body as { path?: unknown })?.path === "string" ? (body as { path: string }).path : null;
 	const mode = (body as { mode?: unknown })?.mode === "merge" ? ("merge" as const) : ("replace" as const);
+	const password =
+		typeof (body as { password?: unknown })?.password === "string" && (body as { password: string }).password.length > 0
+			? (body as { password: string }).password
+			: undefined;
 	if (!path) {
 		return NextResponse.json({ error: "Pfad zur Sicherungsdatei fehlt." }, { status: 400 });
 	}
 
 	try {
-		const result = await importBackup(path, mode);
+		const result = await importBackup(path, mode, password !== undefined ? { password } : undefined);
 		return NextResponse.json({ ok: true, ...result });
 	} catch (error) {
 		console.error("Backup-Import fehlgeschlagen", error);

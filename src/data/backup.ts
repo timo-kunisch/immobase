@@ -8,6 +8,8 @@ import archiver from "archiver";
 import BetterSqlite3 from "better-sqlite3";
 import yauzl from "yauzl";
 
+import { decryptBackupToTempZip, encryptStreamToFile, isEncryptedBackupFile } from "@/lib/backup-crypto";
+
 import { closeDb, getDb } from "./db";
 import { LATEST_SCHEMA_VERSION, migrateDatabase } from "./migrate";
 import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
@@ -42,6 +44,14 @@ import { getDataDir, getDatabaseFilePath, getFilesDir } from "./paths";
  * - Modi: "replace" (Ist-Zustand wird komplett ersetzt) und "merge"
  *   (Zusammenführen).
  *
+ * Optionale Verschlüsselung: Export und Import akzeptieren ein Passwort
+ * (`BackupOptions.password`). Der Export erzeugt dann keinen reinen ZIP,
+ * sondern einen AES-256-GCM-Container (`.imbak`, Format siehe
+ * src/lib/backup-crypto.ts); der Import erkennt solche Container am Magic
+ * und entschlüsselt sie vorab in ein temp-ZIP. Die automatische
+ * Vor-Import-Sicherung (`backups/pre-import-*.zip`) bleibt bewusst
+ * UNVERSCHLÜSSELT (lokale Sicherheitskopie im eigenen Datenverzeichnis).
+ *
  * KONFLIKTSTRATEGIE "merge": zeilenbasiert
  * pro Tabelle per `INSERT OR IGNORE` - existiert eine Zeile mit demselben
  * Primärschlüssel bereits, GEWINNT der lokale Bestand; nur neue Zeilen
@@ -71,6 +81,16 @@ export interface BackupImportResult {
 	importedFiles: number;
 	mergedRows?: Record<string, number>;
 	backupPath: string | null;
+}
+
+export interface BackupOptions {
+	/**
+	 * Optional: Passwort für die Verschlüsselung. Export: erzeugt einen
+	 * `.imbak`-Container statt eines reinen ZIP. Import: Pflicht, wenn die
+	 * Datei verschlüsselt ist (Erkennung am Magic); bei unverschlüsselten
+	 * Dateien wird ein übergebenes Passwort ignoriert.
+	 */
+	password?: string;
 }
 
 const MANIFEST_NAME = "manifest.json";
@@ -137,20 +157,35 @@ function collectFilesEntries(): FileEntry[] {
 	return entries;
 }
 
-async function writeZipArchive(targetPath: string, manifest: BackupManifest, entries: { absolutePath: string; zipPath: string }[]): Promise<void> {
+async function writeZipArchive(
+	targetPath: string,
+	manifest: BackupManifest,
+	entries: { absolutePath: string; zipPath: string }[],
+	password?: string
+): Promise<void> {
 	fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-	const output = fs.createWriteStream(targetPath);
 	const archive = archiver("zip", { zlib: { level: 6 } });
-	const done = finished(output);
-	archive.on("error", (error) => {
-		output.destroy(error);
-	});
-	archive.pipe(output);
 	// manifest.json zuerst eintragen, damit es beim Entpacken zuerst auftaucht.
 	archive.append(JSON.stringify(manifest, null, 2), { name: MANIFEST_NAME });
 	for (const entry of entries) {
 		archive.file(entry.absolutePath, { name: entry.zipPath });
 	}
+
+	if (password) {
+		// Verschlüsselter Container (.imbak): ZIP wird durch AES-256-GCM
+		// gestreamt, Header vorweg, Auth-Tag am Dateiende angehängt.
+		const encrypting = encryptStreamToFile(archive, targetPath, password);
+		void archive.finalize();
+		await encrypting;
+		return;
+	}
+
+	const output = fs.createWriteStream(targetPath);
+	const done = finished(output);
+	archive.on("error", (error) => {
+		output.destroy(error);
+	});
+	archive.pipe(output);
 	await archive.finalize();
 	await done;
 }
@@ -198,11 +233,13 @@ async function buildBackupEntries(): Promise<{
 /**
  * Exportiert die kompletten Anwendungsdaten (Datenbank + Dateien) als
  * Backup-ZIP in die angegebene Zieldatei (Streaming, Multi-GB-tauglich).
+ * Mit `options.password` wird stattdessen ein verschlüsselter
+ * `.imbak`-Container geschrieben (siehe src/lib/backup-crypto.ts).
  */
-export async function exportBackup(targetPath: string): Promise<BackupExportResult> {
+export async function exportBackup(targetPath: string, options?: BackupOptions): Promise<BackupExportResult> {
 	const { manifest, entries, totalBytes, cleanup } = await buildBackupEntries();
 	try {
-		await writeZipArchive(targetPath, manifest, entries);
+		await writeZipArchive(targetPath, manifest, entries, options?.password);
 		return { targetPath, fileCount: entries.length, totalBytes };
 	} finally {
 		cleanup();
@@ -549,31 +586,48 @@ async function importMerge(extractDir: string, manifest: BackupManifest): Promis
 // ------------------------------------------------------------
 
 /**
- * Importiert eine Backup-ZIP. Modi:
+ * Importiert eine Backup-ZIP (oder einen verschlüsselten `.imbak`-Container,
+ * Erkennung am Magic - dann ist `options.password` Pflicht). Modi:
  * - "replace": ersetzt den kompletten Ist-Zustand (atomar, mit Rollback).
  * - "merge":   fügt fehlende Zeilen/Dateien hinzu (Konfliktstrategie:
  *   lokaler Bestand gewinnt, siehe Dateikopf).
  *
  * Vorher wird automatisch ein Backup des Ist-Zustands unter
- * `<dataDir>/backups/` angelegt.
+ * `<dataDir>/backups/` angelegt (bewusst unverschlüsselt).
  */
-export async function importBackup(zipPath: string, mode: "replace" | "merge"): Promise<BackupImportResult> {
+export async function importBackup(zipPath: string, mode: "replace" | "merge", options?: BackupOptions): Promise<BackupImportResult> {
 	if (!fs.existsSync(zipPath)) {
 		throw new Error(`Die Datei wurde nicht gefunden: ${zipPath}`);
 	}
 
-	const { extractDir, manifest } = await extractAndValidate(zipPath);
-
-	const backupPath = await createPreImportBackup();
+	// Verschlüsselte Container werden vorab in ein temp-ZIP entschlüsselt.
+	let actualZipPath = zipPath;
+	let cleanupDecrypted: (() => void) | null = null;
+	if (isEncryptedBackupFile(zipPath)) {
+		if (!options?.password) {
+			throw new Error("Diese Sicherungsdatei ist verschlüsselt - bitte das Passwort eingeben.");
+		}
+		const decrypted = await decryptBackupToTempZip(zipPath, options.password);
+		actualZipPath = decrypted.zipPath;
+		cleanupDecrypted = decrypted.cleanup;
+	}
 
 	try {
-		if (mode === "replace") {
-			await importReplace(extractDir);
-			return { mode, importedFiles: manifest.files.length, backupPath };
+		const { extractDir, manifest } = await extractAndValidate(actualZipPath);
+
+		const backupPath = await createPreImportBackup();
+
+		try {
+			if (mode === "replace") {
+				await importReplace(extractDir);
+				return { mode, importedFiles: manifest.files.length, backupPath };
+			}
+			const mergedRows = await importMerge(extractDir, manifest);
+			return { mode, importedFiles: mergedRows["__files__"] ?? 0, mergedRows, backupPath };
+		} finally {
+			fs.rmSync(extractDir, { recursive: true, force: true });
 		}
-		const mergedRows = await importMerge(extractDir, manifest);
-		return { mode, importedFiles: mergedRows["__files__"] ?? 0, mergedRows, backupPath };
 	} finally {
-		fs.rmSync(extractDir, { recursive: true, force: true });
+		cleanupDecrypted?.();
 	}
 }
