@@ -78,7 +78,11 @@
 	<p class="sub">Verbindung &amp; Mehrbenutzer-Betrieb</p>
 
 	<div class="card">
-		<div class="status"><span id="status-dot" class="dot"></span><span id="status-text">Status wird geladen …</span></div>
+		<div class="status">
+			<span id="status-dot" class="dot"></span><span id="status-text">Status wird geladen …</span>
+			<span style="flex:1"></span>
+			<button id="back-to-app" class="secondary hidden">Zurück zur App</button>
+		</div>
 		<div id="last-error" class="error hidden"></div>
 	</div>
 
@@ -173,6 +177,14 @@
 			btn.classList.toggle("active", btn.dataset.mode === (selectedMode || state.settings.mode));
 		});
 
+		// "Modus übernehmen" nur bei abweichender Auswahl - der bereits aktive
+		// Modus muss nicht erneut angewendet (Server neu gestartet) werden.
+		$("apply-mode").disabled = !selectedMode || selectedMode === state.settings.mode;
+
+		// Rückweg in die App anbieten, sobald eine Verbindung besteht (die
+		// Shell-Seite ist sonst ohne Moduswechsel eine Sackgasse).
+		$("back-to-app").classList.toggle("hidden", !state.connection.connected);
+
 		$("section-host").classList.toggle("hidden", state.settings.mode !== "host");
 		$("section-client").classList.toggle("hidden", state.settings.mode !== "client");
 
@@ -241,17 +253,25 @@
 	document.querySelectorAll(".mode-btn").forEach(function (btn) {
 		btn.onclick = function () {
 			selectedMode = btn.dataset.mode;
-			$("apply-mode").disabled = false;
 			render();
 		};
 	});
 
 	$("apply-mode").onclick = function () {
-		if (!selectedMode) return;
+		if (!selectedMode || !state || selectedMode === state.settings.mode) return;
 		$("apply-mode").disabled = true;
 		iv.shellSetMode(selectedMode).then(function (result) {
-			if (!result.ok) alert("Wechsel fehlgeschlagen: " + (result.error || "unbekannt"));
+			if (!result.ok) {
+				selectedMode = null;
+				alert("Wechsel fehlgeschlagen: " + (result.error || "unbekannt"));
+			}
 			return refresh();
+		});
+	};
+
+	$("back-to-app").onclick = function () {
+		iv.shellBackToApp().then(function (result) {
+			if (!result.ok) alert("Zurück zur App fehlgeschlagen: " + (result.error || "unbekannt"));
 		});
 	};
 

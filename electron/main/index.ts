@@ -377,6 +377,23 @@ function registerIpcHandlers(): void {
 		return hostToken;
 	});
 
+	ipcMain.handle("iv:shell-back-to-app", async () => {
+		// Zurück zur App-Oberfläche, OHNE Moduswechsel/Server-Neustart - die
+		// Shell-Seite ist sonst eine Sackgasse (nur erreichbar über "Modus
+		// übernehmen", der den eingebetteten Server jedesmal neu startet).
+		const url = connectionState.mode === "client" ? connectionState.hostUrl : connectionState.localUrl;
+		if (!connectionState.connected || !url) {
+			return { ok: false, error: "Keine aktive Verbindung - bitte zuerst einen Modus übernehmen oder verbinden." };
+		}
+		try {
+			const win = getOrCreateWindow();
+			await win.loadURL(url);
+			return { ok: true };
+		} catch (error) {
+			return { ok: false, error: error instanceof Error ? error.message : String(error) };
+		}
+	});
+
 	// --- mDNS-Discovery (Client) ---
 	ipcMain.handle("iv:discovery-start", (event) => {
 		if (discoveryActive) return;

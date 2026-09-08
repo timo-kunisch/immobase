@@ -27,6 +27,7 @@ export interface IvBridge {
 	shellSetClientConnection(hostUrl: string, token: string): Promise<{ ok: boolean; error?: string }>;
 	shellRetry(): Promise<{ ok: boolean; error?: string }>;
 	shellRegenerateHostToken(): Promise<string>;
+	shellBackToApp(): Promise<{ ok: boolean; error?: string }>;
 	discoveryStart(): Promise<void>;
 	discoveryStop(): Promise<void>;
 	onServiceUp(listener: (host: unknown) => void): () => void;
@@ -53,6 +54,7 @@ const bridge: IvBridge = {
 	shellSetClientConnection: (hostUrl, token) => ipcRenderer.invoke("iv:shell-set-client-connection", hostUrl, token),
 	shellRetry: () => ipcRenderer.invoke("iv:shell-retry"),
 	shellRegenerateHostToken: () => ipcRenderer.invoke("iv:shell-regenerate-host-token"),
+	shellBackToApp: () => ipcRenderer.invoke("iv:shell-back-to-app"),
 	discoveryStart: () => ipcRenderer.invoke("iv:discovery-start"),
 	discoveryStop: () => ipcRenderer.invoke("iv:discovery-stop"),
 	onServiceUp: (listener) => {

@@ -78,7 +78,8 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   - `preload/index.ts` – schmale `contextBridge`-API (`window.iv`), Vertragstypen in
     `src/lib/desktop-bridge.ts`.
   - `shell/connect.html` – Setup-/Verbindungs-Seite (Moduswahl, Client-Verbindung, Discovery-Liste,
-    Reconnect mit Backoff).
+    Reconnect mit Backoff, „Zurück zur App“ ohne Moduswechsel/Server-Neustart via
+    `iv:shell-back-to-app`).
 - **Server Actions** für alle CRUD-Operationen. Muster: `useActionState` in Client-Dialogen +
   `"use server"`-Funktionen in `src/app/<modul>/actions.ts` + `revalidatePath`. **Jede** Server
   Action prüft selbst `requireUser()`/`requireAdmin()` (Defense-in-Depth).
