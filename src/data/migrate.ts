@@ -2,6 +2,8 @@ import fs from "node:fs";
 
 import type BetterSqlite3 from "better-sqlite3";
 
+import { encryptFileToFileSync } from "@/lib/file-crypto";
+
 import { migrations } from "./migrations";
 
 export interface Migration {
@@ -50,14 +52,22 @@ function setUserVersion(db: BetterSqlite3.Database, version: number): void {
  * (TRUNCATE) - danach ist die Hauptdatei konsistent und kann synchron
  * kopiert werden. (Für den nutzerseitigen Export einer laufenden DB gilt
  * dagegen: nur `db.backup()`, siehe src/data/backup.ts.)
+ *
+ * Das Backup wird als verschlüsselter Container abgelegt
+ * (`data.db.pre-migrate-<Zeitstempel>.enc`, Format siehe
+ * src/lib/file-crypto.ts), damit keine Klartext-Kopie der Datenbank at rest
+ * liegen bleibt (siehe src/data/db-vault.ts). Wiederherstellung manuell:
+ * App beenden, Container mit dem lokalen Datenschlüssel entschlüsseln
+ * (z. B. über einen Test-/Skriptaufruf von decryptFileToFileSync) und als
+ * data.db ablegen.
  */
 function backupBeforeMigration(db: BetterSqlite3.Database, dbFilePath: string, currentVersion: number): string | null {
 	// Bei einer frischen Datenbank (Version 0) gibt es nichts zu sichern.
 	if (currentVersion === 0 || !fs.existsSync(dbFilePath)) return null;
 	db.pragma("wal_checkpoint(TRUNCATE)");
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-	const backupPath = `${dbFilePath}.pre-migrate-${stamp}`;
-	fs.copyFileSync(dbFilePath, backupPath);
+	const backupPath = `${dbFilePath}.pre-migrate-${stamp}.enc`;
+	encryptFileToFileSync(dbFilePath, backupPath);
 	return backupPath;
 }
 
@@ -96,7 +106,9 @@ export function migrateDatabase(db: BetterSqlite3.Database, dbFilePath: string):
 			const reason = error instanceof Error ? error.message : String(error);
 			throw new Error(
 				`Migration ${migration.version} (${migration.name}) fehlgeschlagen: ${reason}. ` +
-					(backupPath ? `Ein Backup der Datenbank liegt unter: ${backupPath}` : "Es existierte noch keine Datenbankdatei."),
+					(backupPath
+						? `Ein verschlüsseltes Backup der Datenbank liegt unter: ${backupPath}`
+						: "Es existierte noch keine Datenbankdatei."),
 				{ cause: error }
 			);
 		}

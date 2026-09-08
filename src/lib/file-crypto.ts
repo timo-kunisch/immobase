@@ -210,6 +210,133 @@ export async function encryptFileInPlace(absolutePath: string): Promise<boolean>
 	}
 }
 
+// ------------------------------------------------------------
+// Datei-zu-Datei (Quelle bleibt erhalten) - async Variante
+// ------------------------------------------------------------
+
+/**
+ * Verschlüsselt eine Quelldatei gestreamt in eine NEUE Zieldatei (atomar:
+ * Temp-Datei im Zielverzeichnis + rename). Die Quelle bleibt unverändert.
+ */
+export async function encryptFileToFile(sourcePath: string, targetPath: string): Promise<void> {
+	const tmpPath = `${targetPath}.enc-${crypto.randomUUID()}.tmp`;
+	try {
+		const nonce = randomBytes(NONCE_LENGTH);
+		const cipher = createCipheriv("aes-256-gcm", getDataKey(), nonce);
+		const output = fs.createWriteStream(tmpPath, { mode: 0o600 });
+		output.write(Buffer.from(`${MAGIC_LINE}\n`, "utf8"));
+		output.write(nonce);
+		await pipeline(fs.createReadStream(sourcePath), cipher, output);
+		fs.appendFileSync(tmpPath, cipher.getAuthTag());
+		fs.renameSync(tmpPath, targetPath);
+	} catch (error) {
+		fs.rmSync(tmpPath, { force: true });
+		throw error;
+	}
+}
+
+/**
+ * Entschlüsselt eine Container-Datei gestreamt in eine NEUE Zieldatei
+ * (atomar: Temp-Datei im Zielverzeichnis + rename). Die Quelle bleibt
+ * unverändert. Wirft bei falschem Schlüssel/Manipulation - die Zieldatei
+ * existiert dann nicht.
+ */
+export async function decryptFileToFile(containerPath: string, targetPath: string): Promise<void> {
+	const tmpPath = `${targetPath}.dec-${crypto.randomUUID()}.tmp`;
+	try {
+		const parsed = parseFileContainer(containerPath);
+		const decipher = createDecipheriv("aes-256-gcm", getDataKey(), parsed.nonce);
+		decipher.setAuthTag(parsed.tag);
+		const input = fs.createReadStream(containerPath, { start: parsed.dataStart, end: parsed.dataEnd - 1 });
+		const output = fs.createWriteStream(tmpPath, { mode: 0o600 });
+		await pipeline(input, decipher, output);
+		fs.renameSync(tmpPath, targetPath);
+	} catch (error) {
+		fs.rmSync(tmpPath, { force: true });
+		throw error;
+	}
+}
+
+// ------------------------------------------------------------
+// Synchrone Varianten - für Prozess-Exit-Hooks (process.on("exit") erlaubt
+// nur synchronen Code) und den synchronen DB-Öffnungspfad (better-sqlite3).
+// Chunked gelesen (4 MiB), kein Vollpuffer.
+// ------------------------------------------------------------
+
+const SYNC_CHUNK_SIZE = 4 * 1024 * 1024;
+
+function writeAllSync(fd: number, data: Buffer | Uint8Array): void {
+	let offset = 0;
+	while (offset < data.length) {
+		offset += fs.writeSync(fd, data, offset);
+	}
+}
+
+/** Synchrone Variante von encryptFileToFile (atomar, Quelle bleibt erhalten). */
+export function encryptFileToFileSync(sourcePath: string, targetPath: string): void {
+	const tmpPath = `${targetPath}.enc-${crypto.randomUUID()}.tmp`;
+	let inFd: number | null = null;
+	let outFd: number | null = null;
+	try {
+		inFd = fs.openSync(sourcePath, "r");
+		outFd = fs.openSync(tmpPath, "w", 0o600);
+		const nonce = randomBytes(NONCE_LENGTH);
+		const cipher = createCipheriv("aes-256-gcm", getDataKey(), nonce);
+		writeAllSync(outFd, Buffer.from(`${MAGIC_LINE}\n`, "utf8"));
+		writeAllSync(outFd, nonce);
+		const buffer = Buffer.allocUnsafe(SYNC_CHUNK_SIZE);
+		let read: number;
+		while ((read = fs.readSync(inFd, buffer, 0, buffer.length, null)) > 0) {
+			writeAllSync(outFd, cipher.update(buffer.subarray(0, read)));
+		}
+		writeAllSync(outFd, cipher.final());
+		writeAllSync(outFd, cipher.getAuthTag());
+		fs.closeSync(outFd);
+		outFd = null;
+		fs.renameSync(tmpPath, targetPath);
+	} catch (error) {
+		fs.rmSync(tmpPath, { force: true });
+		throw error;
+	} finally {
+		if (inFd !== null) fs.closeSync(inFd);
+		if (outFd !== null) fs.closeSync(outFd);
+	}
+}
+
+/** Synchrone Variante von decryptFileToFile (atomar, Quelle bleibt erhalten). */
+export function decryptFileToFileSync(containerPath: string, targetPath: string): void {
+	const tmpPath = `${targetPath}.dec-${crypto.randomUUID()}.tmp`;
+	let inFd: number | null = null;
+	let outFd: number | null = null;
+	try {
+		const parsed = parseFileContainer(containerPath);
+		const decipher = createDecipheriv("aes-256-gcm", getDataKey(), parsed.nonce);
+		decipher.setAuthTag(parsed.tag);
+		inFd = fs.openSync(containerPath, "r");
+		outFd = fs.openSync(tmpPath, "w", 0o600);
+		const buffer = Buffer.allocUnsafe(SYNC_CHUNK_SIZE);
+		let position = parsed.dataStart;
+		let remaining = parsed.dataEnd - parsed.dataStart;
+		while (remaining > 0) {
+			const read = fs.readSync(inFd, buffer, 0, Math.min(buffer.length, remaining), position);
+			if (read === 0) throw new Error("Unerwartetes Dateiende im Ciphertext.");
+			position += read;
+			remaining -= read;
+			writeAllSync(outFd, decipher.update(buffer.subarray(0, read)));
+		}
+		writeAllSync(outFd, decipher.final());
+		fs.closeSync(outFd);
+		outFd = null;
+		fs.renameSync(tmpPath, targetPath);
+	} catch (error) {
+		fs.rmSync(tmpPath, { force: true });
+		throw error;
+	} finally {
+		if (inFd !== null) fs.closeSync(inFd);
+		if (outFd !== null) fs.closeSync(outFd);
+	}
+}
+
 export interface TreeEncryptionResult {
 	/** Gefundene Dateien (ohne Sidecar-Metadaten). */
 	scanned: number;

@@ -6,8 +6,10 @@ import { IntegrationSettingsForm } from "@/components/einstellungen/integration-
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
+import { getDatabaseFilePath } from "@/data/paths";
 import { getDataKeySource } from "@/lib/data-key";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
+import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
 
@@ -27,9 +29,11 @@ export default async function EinstellungenPage() {
 		lxMode: (getSetting("letterxpress.mode") === "live" ? "live" : "test") as "test" | "live",
 	};
 
-	// Status der lokalen Datenverschlüsselung at rest (Dateien + Geheimnisse).
+	// Status der lokalen Datenverschlüsselung at rest (Dateien + Geheimnisse +
+	// Datenbank-Container, siehe src/data/db-vault.ts).
 	const fileStatus = getTreeEncryptionStatus();
 	const secretStatus = getSecretSettingsStatus();
+	const dbPath = getDatabaseFilePath();
 	const securityStatus: SecurityStatus = {
 		keySource: getDataKeySource(),
 		filesTotal: fileStatus.total,
@@ -37,6 +41,7 @@ export default async function EinstellungenPage() {
 		filesPlaintext: fileStatus.plaintext,
 		secretsSet: secretStatus.secretsSet,
 		secretsEncrypted: secretStatus.secretsEncrypted,
+		databaseEncrypted: fs.existsSync(`${dbPath}.enc`),
 	};
 
 	return (

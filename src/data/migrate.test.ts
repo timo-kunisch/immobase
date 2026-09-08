@@ -86,6 +86,9 @@ describe("migrateDatabase", () => {
 
 		const backups = fs.readdirSync(testDir).filter((f) => f.includes("pre-migrate"));
 		expect(backups).toHaveLength(1);
+		// Das Auto-Backup liegt verschlüsselt vor (kein Klartext-Residuum der DB).
+		expect(backups[0]).toMatch(/\.enc$/);
+		expect(fs.readFileSync(path.join(testDir, backups[0])).subarray(0, 20).toString("utf8")).toBe("IMMOBASE-FILE-ENC:v1");
 	});
 
 	it("lehnt eine Datenbank ab, die neuer ist als die App", () => {

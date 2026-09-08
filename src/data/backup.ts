@@ -9,7 +9,14 @@ import BetterSqlite3 from "better-sqlite3";
 import yauzl from "yauzl";
 
 import { decryptBackupToTempZip, encryptStreamToFile, isEncryptedBackupFile } from "@/lib/backup-crypto";
-import { createPlaintextReadStream, encryptPlaintextFilesInTree, hashPlaintextFile, isEncryptedFile } from "@/lib/file-crypto";
+import {
+	createPlaintextReadStream,
+	decryptFileToFile,
+	encryptFileToFile,
+	encryptPlaintextFilesInTree,
+	hashPlaintextFile,
+	isEncryptedFile,
+} from "@/lib/file-crypto";
 
 import { decryptSecretsInDatabase, ensureSecretsEncrypted } from "./app-settings";
 import { closeDb, getDb } from "./db";
@@ -453,14 +460,24 @@ async function extractAndValidate(zipPath: string): Promise<ExtractedBackup> {
 /**
  * Legt ein vollständiges Sicherungs-Backup des IST-Zustands an (vor dem
  * Import). Gibt den Pfad zurück, oder null, wenn noch keine DB existiert.
+ *
+ * Die Sicherung liegt im eigenen Datenverzeichnis und wird daher mit dem
+ * lokalen Datenschlüssel verschlüsselt abgelegt (`*.zip.enc`, Container-
+ * Format von src/lib/file-crypto.ts - NICHT mit dem passwortgeschützten
+ * .imbak-Format verwechseln). Damit bleibt at rest keine Klartext-Kopie
+ * der Daten liegen (siehe src/data/db-vault.ts). importBackup() erkennt
+ * solche Container automatisch am Magic und entschlüsselt sie.
  */
 async function createPreImportBackup(): Promise<string | null> {
 	if (!fs.existsSync(getDatabaseFilePath())) return null;
 	const backupDir = path.join(getDataDir(), "backups");
 	const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-	const backupPath = path.join(backupDir, `pre-import-${stamp}.zip`);
-	await exportBackup(backupPath);
-	return backupPath;
+	const zipPath = path.join(backupDir, `pre-import-${stamp}.zip`);
+	await exportBackup(zipPath);
+	const encryptedPath = `${zipPath}.enc`;
+	await encryptFileToFile(zipPath, encryptedPath);
+	fs.rmSync(zipPath, { force: true });
+	return encryptedPath;
 }
 
 async function importReplace(extractDir: string): Promise<void> {
@@ -656,24 +673,50 @@ async function importMerge(extractDir: string, manifest: BackupManifest): Promis
 // ------------------------------------------------------------
 
 /**
- * Importiert eine Backup-ZIP (oder einen verschlüsselten `.imbak`-Container,
- * Erkennung am Magic - dann ist `options.password` Pflicht). Modi:
+ * Importiert eine Backup-ZIP. Erkannte Container-Formate (jeweils am Magic):
+ * - `*.zip.enc` (file-crypto-Container mit dem lokalen Datenschlüssel, z. B.
+ *   die automatischen Vor-Import-Sicherungen aus `backups/`): wird vorab
+ *   entschlüsselt, KEIN Passwort nötig.
+ * - `.imbak` (passwortgeschützter Export): dann ist `options.password` Pflicht.
+ * Modi:
  * - "replace": ersetzt den kompletten Ist-Zustand (atomar, mit Rollback).
  * - "merge":   fügt fehlende Zeilen/Dateien hinzu (Konfliktstrategie:
  *   lokaler Bestand gewinnt, siehe Dateikopf).
  *
- * Vorher wird automatisch ein Backup des Ist-Zustands unter
- * `<dataDir>/backups/` angelegt (bewusst unverschlüsselt).
+ * Vorher wird automatisch ein (verschlüsseltes) Backup des Ist-Zustands unter
+ * `<dataDir>/backups/` angelegt.
  */
 export async function importBackup(zipPath: string, mode: "replace" | "merge", options?: BackupOptions): Promise<BackupImportResult> {
 	if (!fs.existsSync(zipPath)) {
 		throw new Error(`Die Datei wurde nicht gefunden: ${zipPath}`);
 	}
 
-	// Verschlüsselte Container werden vorab in ein temp-ZIP entschlüsselt.
+	// file-crypto-Container (lokaler Datenschlüssel, z. B. Vor-Import-
+	// Sicherungen) werden vorab in ein temp-ZIP entschlüsselt.
 	let actualZipPath = zipPath;
 	let cleanupDecrypted: (() => void) | null = null;
-	if (isEncryptedBackupFile(zipPath)) {
+	if (isEncryptedFile(zipPath)) {
+		const tmpZip = path.join(os.tmpdir(), `iv-import-dec-${crypto.randomUUID()}.zip`);
+		try {
+			await decryptFileToFile(zipPath, tmpZip);
+		} catch (error) {
+			fs.rmSync(tmpZip, { force: true });
+			throw new Error(
+				"Die Sicherungsdatei ist mit dem Datenschlüssel dieses Geräts verschlüsselt und konnte nicht " +
+					"entschlüsselt werden (falsches Gerät/Schlüssel oder beschädigte Datei). " +
+					`Details: ${error instanceof Error ? error.message : String(error)}`
+			);
+		}
+		actualZipPath = tmpZip;
+		cleanupDecrypted = () => {
+			try {
+				fs.rmSync(tmpZip, { force: true });
+			} catch {
+				// Temp-Datei - Fehler beim Aufräumen ignorieren.
+			}
+		};
+	} else if (isEncryptedBackupFile(zipPath)) {
+		// Passwortgeschützter .imbak-Container.
 		if (!options?.password) {
 			throw new Error("Diese Sicherungsdatei ist verschlüsselt - bitte das Passwort eingeben.");
 		}

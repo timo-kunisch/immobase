@@ -15,6 +15,8 @@ export interface SecurityStatus {
 	filesPlaintext: number;
 	secretsSet: number;
 	secretsEncrypted: number;
+	/** Liegt die Datenbank aktuell als verschlüsselter Container vor (Ruhezustand)? */
+	databaseEncrypted: boolean;
 }
 
 /**
@@ -93,6 +95,14 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 			<CardContent className="space-y-4">
 				<dl className="space-y-1 text-sm">
 					<div className="flex justify-between gap-4">
+						<dt className="text-muted-foreground">Datenbank</dt>
+						<dd>
+							{status.databaseEncrypted
+								? "verschlüsselt abgelegt (Ruhezustand)"
+								: "aktiv entsperrt - wird beim Beenden der App verschlüsselt"}
+						</dd>
+					</div>
+					<div className="flex justify-between gap-4">
 						<dt className="text-muted-foreground">Dateien in der Ablage</dt>
 						<dd>
 							{status.filesTotal === 0
@@ -147,9 +157,10 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 				) : null}
 
 				<p className="text-xs text-muted-foreground">
-					Hinweis: Die Verschlüsselung ersetzt nicht die Festplattenverschlüsselung des Betriebssystems
-					(FileVault/BitLocker), sondern ergänzt sie (Schutz der Daten-Dateien, z. B. bei Weitergabe oder Cloud-Sync
-					des Datenverzeichnisses).
+					Hinweis: Die Datenbank liegt nur im beendeten Zustand als verschlüsselter Container vor - während die App
+					läuft (und nach einem Absturz ohne sauberes Beenden) ist sie entsperrt. Für vollständigen Schutz in diesen
+					Zuständen wird zusätzlich die Festplattenverschlüsselung des Betriebssystems (FileVault/BitLocker/LUKS)
+					empfohlen.
 				</p>
 			</CardContent>
 		</Card>

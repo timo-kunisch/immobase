@@ -235,7 +235,7 @@ describe("Backup-Import (Ersetzen)", () => {
 		await expect(importBackup(tampered, "replace")).rejects.toThrow(/Prüfsummenfehler/);
 	});
 
-	it("legt vor dem Ersetzen ein Backup des Ist-Zustands an", async () => {
+	it("legt vor dem Ersetzen ein verschlüsseltes Backup des Ist-Zustands an (re-importierbar)", async () => {
 		seedData();
 		await exportBackup(zipPath);
 
@@ -244,10 +244,21 @@ describe("Backup-Import (Ersetzen)", () => {
 
 		const result = await importBackup(zipPath, "replace");
 		expect(result.backupPath).not.toBeNull();
+		// Vor-Import-Sicherung liegt als lokaler Container (.zip.enc) vor,
+		// KEIN Klartext-ZIP im Datenverzeichnis.
+		expect(result.backupPath!).toMatch(/\.zip\.enc$/);
 		expect(fs.existsSync(result.backupPath!)).toBe(true);
+		expect(isEncryptedFile(result.backupPath!)).toBe(true);
+		expect(fs.existsSync(result.backupPath!.replace(/\.enc$/, ""))).toBe(false);
 
 		// Ist-Zustand wurde ersetzt: "Zweites Haus" ist weg, "Musterhaus" ist da
 		expect(listProperties().map((p) => p.name)).toEqual(["Musterhaus"]);
+
+		// Die verschlüsselte Vor-Import-Sicherung lässt sich direkt wieder
+		// einspielen (ohne Passwort - lokaler Datenschlüssel).
+		const reimport = await importBackup(result.backupPath!, "replace");
+		expect(reimport.mode).toBe("replace");
+		expect(listProperties().map((p) => p.name).sort()).toEqual(["Musterhaus", "Zweites Haus"]);
 	});
 });
 

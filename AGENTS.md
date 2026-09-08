@@ -72,16 +72,28 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   ohne Electron (Browser-Dev/Tests): Schlüsseldatei `<dataDir>/.data-key` (0600). Die Marker-Datei
   `.data-key.managed` verhindert, dass ein Server ohne übergebenen Schlüssel still einen neuen
   erzeugt. Wiederherstellungsschlüssel (base64) in der Admin-UI einsehbar (Einstellungen →
-  Lokale Datenverschlüsselung). **Die SQLite-DB selbst bleibt Klartext-SQLite** (better-sqlite3
-  hat keine SQLCipher-Unterstützung; ein natives SQLCipher-Fork-Modul würde Build/Rebuild/
-  Packaging gefährden - bewusste Entscheidung, Festplattenverschlüsselung wird empfohlen);
+  Lokale Datenverschlüsselung).
+- **Datenbank-Verschlüsselung at rest** (Container, `src/data/db-vault.ts`): Im Ruhezustand liegt
+  die SQLite-DB als `data.db.enc` (gleiches AES-256-GCM-Container-Format wie Dateien) vor.
+  `getDb()` entschlüsselt synchron vor dem Öffnen (atomar Temp+rename; Fehler = harter Abbruch,
+  niemals still mit leerer DB starten); beim Prozessende versiegelt `sealDatabaseForShutdown()`
+  (WAL-Checkpoint → close → Container atomar schreiben → Klartext inkl. WAL/SHM löschen),
+  registriert über `exit`/`SIGINT`/`SIGTERM`-Hooks in `src/data/db.ts` (in vitest deaktiviert).
+  Alle Schritte sind atomar, Crash-Fälle (beide Dateien vorhanden/Tmp-Reste) werden beim
+  Entsperren konsistent aufgelöst. **Einschränkung bewusst akzeptiert:** Zur Laufzeit und nach
+  einem nicht sauberen Beenden (Kill/Stromausfall) liegt die DB im Klartext vor - SQLCipher kam
+  nicht infrage (kein gepflegter better-sqlite3-kompatibler Fork: `@journeyapps/sqlcipher` v6 =
+  node-sqlite3-Basis ohne Windows-Support; `better-sqlite3-sqlcipher` = 2019/OpenSSL 1.0.2).
+  Auto-Backups sind ebenfalls Container: `data.db.pre-migrate-*.enc` (migrate.ts) und
+  `backups/pre-import-*.zip.enc` (backup.ts; Import erkennt sie am Magic).
   Verzeichnisse/`data.db`/`settings.json` sind auf 0700/0600 gehärtet.
 - **E-Mail** über `nodemailer` (SMTP), konfiguriert in der App unter Einstellungen →
   Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
-  Umgebungsvariablen für Dev/Tests). Ohne SMTP: Protokollierung in `<userData>/logs/outbox.log`.
-  **E-Mail-abhängige Funktionen sind ohne Konfiguration deaktiviert** (`isSmtpConfigured()`):
-  Kontakt-Dialog (UI-Hinweis + Server-Check), Freigabe-Benachrichtigung im Admin-Bereich (wird
-  übersprungen, Admin erhält Hinweis im Aktionsergebnis).
+  Umgebungsvariablen für Dev/Tests). Ohne SMTP: Protokollierung in `<userData>/logs/outbox.log`
+  (Klartext-Log – enthält E-Mail-Inhalte, bei Bedarf leeren). **E-Mail-abhängige Funktionen sind
+  ohne Konfiguration deaktiviert** (`isSmtpConfigured()`): Kontakt-Dialog (UI-Hinweis +
+  Server-Check), Freigabe-Benachrichtigung im Admin-Bereich (wird übersprungen, Admin erhält
+  Hinweis im Aktionsergebnis).
 - **Postversand von PDFs** über die externe **LetterXpress API v3** (`src/lib/letterxpress.ts`) –
   **optionale Online-Funktion, nicht Teil des Offline-Kernpfads**: ohne Zugangsdaten sind die
   Versand-Buttons deaktiviert (`isLetterXpressConfigured()`) **und** `sendPdfByPostForSource()`
@@ -193,7 +205,8 @@ src/
     <modul>/                # Modul-spezifische Dialoge/Formulare (Client Components)
     layout/                 # AppSidebar, SiteHeader, ContactAdminDialog
   data/                     # REPOSITORY-LAYER - EINZIGER Ort mit SQL
-    db.ts                   # better-sqlite3 Lazy-Singleton + Pragmas
+    db.ts                   # better-sqlite3 Lazy-Singleton + Pragmas + Shutdown-Versiegelung
+    db-vault.ts             # Container-Verschlüsselung der DB at rest (unlock/lock)
     migrate.ts              # user_version-Migrationen (up/down, Auto-Backup, Rollback)
     migrations/             # versionierte Migrationsschritte (TS-Module mit SQL-Strings)
     schema.sql              # generierte Referenz (npm run schema:dump)
@@ -367,12 +380,13 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 
 ## 9. Bekannte, bewusst offene Punkte
 
-- **Die SQLite-DB selbst ist nicht als Ganzes verschlüsselt** (Klartext-SQLite, siehe Abschnitt
-  2): better-sqlite3 unterstützt kein SQLCipher, und ein natives SQLCipher-Fork-Modul würde
-  Build/Rebuild/Packaging auf allen Plattformen gefährden. Abgedeckt sind stattdessen: Dateien in
-  `files/`, Geheimnisse in `app_settings` (beide AES-256-GCM), restriktive Dateirechte. Für vollen
-  At-Rest-Schutz der DB wird die Festplattenverschlüsselung des Systems (FileVault/BitLocker)
-  empfohlen.
+- **Datenbank-Verschlüsselung gilt nur im Ruhezustand** (Container `data.db.enc`, siehe Abschnitt
+  2): Während die App läuft und nach einem nicht sauberen Beenden (Prozess-Kill/Stromausfall)
+  liegt die DB im Klartext vor. Echte Transparentverschlüsselung zur Laufzeit (SQLCipher) kam
+  nicht infrage (kein gepflegter better-sqlite3-kompatibler Fork, s. o.). Für diese Zustände wird
+  zusätzlich die Festplattenverschlüsselung des Systems (FileVault/BitLocker/LUKS) empfohlen.
+  Direkter CLI-Zugriff (`sqlite3 data.db`) ist daher nur möglich, während die App läuft (bzw.
+  nach manueller Entschlüsselung des Containers).
 - **Host-Modus (LAN) ohne TLS**: Das Zugangs-Token schützt die Authentisierung, nicht die
   Vertraulichkeit der Übertragung im LAN. In nicht vertrauenswürdigen Netzen nur über
   verschlüsselte Strecke (z. B. VPN) betreiben.
