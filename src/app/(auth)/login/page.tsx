@@ -1,10 +1,23 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
+import { countUsers } from "@/data/users";
 
 export const metadata: Metadata = {
 	title: "Anmelden – ImmoBase",
 };
+
+// WICHTIG: force-dynamic ist hier aus zwei Gründen Pflicht (siehe auch den
+// ausführlichen Kommentar in register/page.tsx):
+// 1. Der countUsers()-Check (Weiterleitung zur Ersteinrichtung, solange
+//    noch kein Konto existiert) muss bei JEDEM Request live aus der
+//    Datenbank kommen - ein statisch prerenderter Build-Zeitstand würde
+//    sonst dauerhaft zur /setup-Seite weiterleiten (Redirect-Schleife,
+//    weil /setup korrekt dynamisch zurück zu /login leitet).
+// 2. Wie bei /register verhindert es veraltete Server-Action-Referenzen
+//    und Chunk-Pfade nach einem Deployment.
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage({
 	searchParams,
@@ -18,6 +31,13 @@ export default async function LoginPage({
 		passwordReset?: string;
 	}>;
 }) {
+	// Solange noch kein Benutzerkonto existiert, führt die Ersteinrichtung
+	// (Setup-Wizard) durch die Grundeinstellungen und legt das erste
+	// (Administrator-)Konto an.
+	if (countUsers() === 0) {
+		redirect("/setup");
+	}
+
 	const { registered, firstAdmin, emailSent, email, from, passwordReset } = await searchParams;
 
 	// emailSent=1 signalisiert, dass die Registrierung eine Verifizierungs-

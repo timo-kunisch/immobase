@@ -94,6 +94,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 - **Routen-Struktur** (Next.js Route-Groups, ändern NICHTS an den URLs):
   - `src/app/(auth)/` – öffentliche Seiten ohne Sidebar: `/login`, `/register`, `/verify-email`,
     `/forgot-password`, `/reset-password`.
+  - `src/app/(setup)/` – öffentliche Ersteinrichtung `/setup` (Setup-Wizard, eigenes breiteres
+    Layout, kein Sidebar): nur erreichbar, solange **noch kein Benutzerkonto existiert**
+    (`countUsers() === 0`); danach leitet die Seite zu `/login` um und jede Setup-Action sperrt
+    sich über `ensureSetupAllowed()`. Umgekehrt leiten `/login` und `/register` bei leerer
+    Nutzertabelle zu `/setup` um.
   - `src/app/(app)/` – geschützter App-Bereich (Dashboard + alle Fachmodule + `/admin/users` +
     `/einstellungen`) mit Sidebar. `src/app/(app)/layout.tsx` ruft `requireUser()` auf.
   - `src/app/(app)/admin/` und `src/app/(app)/einstellungen/` haben je ein zusätzliches
@@ -103,9 +108,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   2. `src/lib/auth/dal.ts`: `getCurrentUser()` (React `cache()`-memoized), `requireUser()`,
      `requireAdmin()` – autoritative Prüfung (DB, Ablauf, `isApproved`, `emailVerified`, Rolle).
      Wird in Layouts **und** in jeder Server Action aufgerufen.
-- **Bootstrapping** (`src/app/(auth)/register/actions.ts`): Der **erste** registrierte Nutzer wird
-  automatisch `ADMIN` + `isApproved=true`. Alle weiteren: `USER` + `isApproved=false`, bis ein Admin
-  sie unter `/admin/users` freischaltet.
+- **Bootstrapping** (`src/lib/auth/bootstrap.ts`, genutzt von Setup-Wizard und Registrierung): Der
+  **erste** Nutzer wird automatisch `ADMIN` + `isApproved=true`. Alle weiteren: `USER` +
+  `isApproved=false`, bis ein Admin sie unter `/admin/users` freischaltet. Der Normalpfad für das
+  erste Konto ist der **Setup-Wizard** `/setup` (Willkommen → Absenderdaten → Online-Integrationen →
+  Administratorkonto; die beiden mittleren Schritte sind überspringbar, das Konto wird bewusst als
+  letzter Schritt angelegt, damit der `countUsers() === 0`-Guard für alle Setup-Actions gilt). Ohne
+  SMTP meldet die letzte Setup-Action den Nutzer direkt an (Session + Redirect auf `/`); mit SMTP
+  gilt der klassische Verifizierungslink-Flow über `/login`.
 - **Login-Bedingungen** (beide erforderlich): `emailVerified != null` UND `isApproved == true`.
   Die E-Mail-Verifizierung ist an `isSmtpConfigured()` (`src/lib/email/mailer.ts`) gekoppelt: **Ohne
   SMTP-Konfiguration** (Normalfall der offline laufenden Desktop-App) kann eine Verifizierungs-Mail
@@ -141,6 +151,7 @@ src/
       weg/                  # WEG-Verwaltung - flache Top-Level-Module (siehe Abschnitt 7.1)
       actions/dashboard.ts  # Dashboard-Orchestrierung (kein "use server" - reines Lesen)
     (auth)/                 # Öffentliche Auth-Seiten, ohne Sidebar
+    (setup)/setup/          # Ersteinrichtungs-Wizard (nur solange countUsers() === 0)
     api/uploads/[...path]/  # Geschützter Route Handler für Dateiauslieferung
     api/backup/export|import/  # Backup-Routen (requireAdmin())
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
@@ -158,7 +169,7 @@ src/
     app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
-    auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, actions.ts
+    auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, bootstrap.ts, actions.ts
     email/mailer.ts         # nodemailer/Outbox-Log
     pdf/                    # document.ts (Briefe), billing-statement.ts (Abrechnungen)
     storage.ts              # Dateisystem-Ablage (files/)
@@ -324,7 +335,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Bei Bedarf direkt in der DB (z. B. per `sqlite3 data.dev`/`data.db`).
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen),
-  `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks) und
+  `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
+  `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –

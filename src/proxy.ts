@@ -20,7 +20,11 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
  * Peer-IP der Verbindung zur Verfügung (Loopback vs. LAN).
  */
 
-const PUBLIC_PATHS = ["/login", "/register", "/verify-email", "/forgot-password", "/reset-password"];
+// "/setup" (Ersteinrichtungs-Wizard) ist ebenfalls öffentlich: Er ist nur
+// erreichbar, solange noch kein Benutzerkonto existiert – die Seite selbst
+// prüft das autoritativ und leitet danach zu /login um (siehe
+// src/app/(setup)/setup/page.tsx).
+const PUBLIC_PATHS = ["/login", "/register", "/verify-email", "/forgot-password", "/reset-password", "/setup"];
 
 function isPublicPath(pathname: string): boolean {
 	return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));

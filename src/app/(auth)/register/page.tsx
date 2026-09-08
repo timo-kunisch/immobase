@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { RegisterForm } from "@/components/auth/register-form";
+import { countUsers } from "@/data/users";
 
 export const metadata: Metadata = {
 	title: "Registrieren – ImmoBase",
@@ -18,5 +20,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default function RegisterPage() {
+	// Das erste Konto wird über die Ersteinrichtung (Setup-Wizard) angelegt,
+	// die zusätzlich durch die Grundeinstellungen führt.
+	if (countUsers() === 0) {
+		redirect("/setup");
+	}
 	return <RegisterForm />;
 }

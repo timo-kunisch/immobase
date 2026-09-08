@@ -2,26 +2,16 @@
 
 import { redirect } from "next/navigation";
 
-import { countUsers, createUser, getUserByEmail, markEmailVerified } from "@/data/users";
+import { countUsers, getUserByEmail } from "@/data/users";
 import { ActionState } from "@/lib/action-state";
-import { hashPassword } from "@/lib/auth/password";
-import { createVerificationToken } from "@/lib/auth/tokens";
-import { isSmtpConfigured, sendVerificationEmail } from "@/lib/email/mailer";
+import { provisionUserAccount } from "@/lib/auth/bootstrap";
 import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/validation";
 
 /**
- * Registrierung neuer Nutzer – Bootstrapping-Muster:
- * - Der ERSTE Nutzer im System wird automatisch ADMIN und ist sofort
- *   freigeschaltet (isApproved = true).
- * - Alle weiteren Registrierungen sind USER und benötigen zusätzlich die
- *   Freigabe durch einen Administrator unter /admin/users.
- * - Wenn SMTP konfiguriert ist, wird eine Verifizierungs-E-Mail versendet;
- *   ein Login ist dann erst nach Bestätigung der E-Mail möglich.
- * - OHNE SMTP-Konfiguration (Normalfall der offline laufenden Desktop-App)
- *   kann eine Verifizierungs-Mail niemanden erreichen - sie würde nur in
- *   logs/outbox.log protokolliert. Die E-Mail-Adresse wird daher sofort als
- *   bestätigt markiert, damit der Login nicht an einem nicht zustellbaren
- *   Schritt hängt (Self-Healing für Altfälle zusätzlich im Login selbst).
+ * Registrierung neuer Nutzer – Bootstrapping-Muster (siehe
+ * src/lib/auth/bootstrap.ts): Der erste Nutzer wird automatisch ADMIN und
+ * ist sofort freigeschaltet, alle weiteren sind USER und benötigen die
+ * Freigabe durch einen Administrator.
  *
  * Hinweis: Bei zwei exakt gleichzeitigen Erst-Registrierungen könnten
  * theoretisch beide Anfragen "userCount === 0" sehen und beide Admin
@@ -53,22 +43,7 @@ export async function registerAction(_prevState: ActionState, formData: FormData
 	}
 
 	const isFirstUser = countUsers() === 0;
-	const passwordHash = await hashPassword(password);
-
-	createUser({
-		email,
-		passwordHash,
-		role: isFirstUser ? "ADMIN" : "USER",
-		isApproved: isFirstUser,
-	});
-
-	const emailSent = isSmtpConfigured();
-	if (emailSent) {
-		const token = await createVerificationToken(email);
-		await sendVerificationEmail(email, token);
-	} else {
-		markEmailVerified(email);
-	}
+	const { emailSent } = await provisionUserAccount(email, password, isFirstUser);
 
 	redirect(
 		`/login?registered=1${isFirstUser ? "&firstAdmin=1" : ""}${emailSent ? "&emailSent=1" : ""}&email=${encodeURIComponent(email)}`
