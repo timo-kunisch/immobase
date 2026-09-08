@@ -54,6 +54,13 @@ const nextConfig: NextConfig = {
 			"build/**/*",
 			"./.github/**/*",
 			".github/**/*",
+			// Durch das oben beschriebene Ueber-Tracing landet auch die
+			// Root-Config selbst in der NFT-Liste - Turbopack wertet genau
+			// diese Datei als Kanarienvogel und warnt mit "Encountered
+			// unexpected file in NFT list". Wird zur Laufzeit nicht benoetigt
+			// (der Standalone-Server ist bereits kompiliert).
+			"./next.config.ts",
+			"next.config.ts",
 		],
 	},
 };

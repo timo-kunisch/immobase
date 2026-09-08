@@ -19,6 +19,21 @@ const eslintConfig = defineConfig([
 			// for updates from some external system"). Die Regel schlägt sogar
 			// im von shadcn/ui generierten "use-mobile"-Hook an, daher deaktiviert.
 			"react-hooks/set-state-in-effect": "off",
+			// Übliche Unterstrich-Konvention für bewusst ungenutzte Bezeichner
+			// (z. B. einheitlich gebundene, aktuell ungenutzte Action-Parameter
+			// wie `_hoaId` in den WEG-Modul-Actions oder `_prevState` in
+			// useActionState-Actions). eslint-config-next setzt die Regel nur
+			// auf "warn" ohne Optionen - hier um die Ignore-Muster ergänzt.
+			"@typescript-eslint/no-unused-vars": [
+				"warn",
+				{
+					args: "after-used",
+					argsIgnorePattern: "^_",
+					varsIgnorePattern: "^_",
+					caughtErrorsIgnorePattern: "^_",
+					destructuredArrayIgnorePattern: "^_",
+				},
+			],
 		},
 	},
 	// Default ignores von eslint-config-next um Build-Ausgaben und generierte
