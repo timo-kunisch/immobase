@@ -153,7 +153,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   nicht-streamend). **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
   clientseitig als Base64 mitgesendet und serverseitig aufbereitet (`src/lib/ai/attachments.ts`,
   geteilte Konstanten in `attachment-types.ts` – client-sicher, kein Node-Import): **PDF** via
-  `pdfjs-dist` (legacy-Node-Build, Text je Seite, Scans ohne Textebene werden mit Hinweis
+  `pdfjs-dist` (**4.x gepinnt** – ab 5.x wird `DOMMatrix` als Browser-Global beim Modul-Import
+  zwingend erwartet, das fehlt im eingebetteten Node der Electron-Shell → Route lädt nicht mehr,
+  HTTP 500. Import daher auch lazy in `attachments.ts`, sodass ein pdfjs-Ladefehler nur
+  PDF-Anhänge betrifft, nicht den Chat. Text je Seite, Scans ohne Textebene werden mit Hinweis
   abgelehnt), **Excel** (.xlsx/.xlsm) via `exceljs` → Semikolon-CSV je Tabellenblatt,
   **Word/PowerPoint/OpenDocument** (.docx/.pptx/.odt/.ods/.odp) via `jszip` (Textextraktion aus
   dem XML-Inhalt; ODS-Zellen als Semikolon-Näherung), **Bilder** (.png/.jpg/.gif/.webp) als

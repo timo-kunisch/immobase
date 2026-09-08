@@ -1,7 +1,6 @@
 import { Workbook } from "exceljs";
 import type { CellValue } from "exceljs";
 import JSZip from "jszip";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
 import {
@@ -137,11 +136,36 @@ async function excelToText(buffer: Buffer, name: string): Promise<string> {
 // PDF (pdfjs-dist, legacy-Node-Build)
 // ------------------------------------------------------------
 
+/**
+ * pdfjs-dist wird bewusst LAZY importiert: Die Engine setzt je nach Version
+ * Browser-Globals voraus (z. B. DOMMatrix - fehlt in älterem Node, u. a. dem
+ * eingebetteten Node der Electron-Shell). Schlägt das Laden fehl, soll nur
+ * der PDF-Anhang scheitern (AttachmentError), nicht der gesamte Chat.
+ *
+ * Version bewusst auf der 4.x-Linie halten: Diese lädt im reinen
+ * Node-Kontext ohne DOM-Globals (ab 5.x wird DOMMatrix bereits beim
+ * Modul-Import zwingend erwartet bzw. @napi-rs/canvas als natives Polyfill
+ * gefordert - beides kommt für die App nicht infrage).
+ */
+async function loadPdfJs(): Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> {
+	try {
+		return await import("pdfjs-dist/legacy/build/pdf.mjs");
+	} catch (error) {
+		console.error("[ai] pdfjs-dist konnte nicht geladen werden:", error);
+		throw new AttachmentError(
+			"Die PDF-Unterstützung konnte nicht initialisiert werden (Details im Server-Log). Andere Dateitypen und der Chat ohne Anhang funktionieren weiterhin."
+		);
+	}
+}
+
 async function pdfToText(buffer: Buffer, name: string): Promise<string> {
+	const { getDocument } = await loadPdfJs();
+
 	let task: ReturnType<typeof getDocument>;
 	try {
 		task = getDocument({
 			data: new Uint8Array(buffer),
+			isEvalSupported: false,
 			// Keine Font-Einbettung nötig (reine Textextraktion) - vermeidet
 			// unnötige Dateisystem-/Netzwerkzugriffe der Engine.
 			useSystemFonts: true,

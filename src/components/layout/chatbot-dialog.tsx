@@ -139,9 +139,20 @@ export function ChatbotDialog({ aiConfigured, isAdmin }: { aiConfigured: boolean
 					attachments: sentAttachments,
 				}),
 			});
-			const data = (await response.json()) as { reply?: string; toolCalls?: ToolCallInfo[]; error?: string };
-			if (!response.ok) {
-				throw new Error(data.error ?? `Die Anfrage ist fehlgeschlagen (HTTP ${response.status}).`);
+			// Die Antwort kommt normalerweise als JSON - bei unerwarteten
+			// Serverfehlern (z. B. Next.js-Fehlerseite) aber als HTML/Text.
+			// Erst als Text lesen und tolerant parsen, damit die echte
+			// Fehlermeldung sichtbar wird statt eines JSON-Parse-Fehlers.
+			const responseText = await response.text();
+			let data: { reply?: string; toolCalls?: ToolCallInfo[]; error?: string } | null;
+			try {
+				data = JSON.parse(responseText) as { reply?: string; toolCalls?: ToolCallInfo[]; error?: string };
+			} catch {
+				data = null;
+			}
+			if (!response.ok || data === null) {
+				const serverSnippet = responseText && !responseText.startsWith("<") ? ` Antwort des Servers: ${responseText.slice(0, 300)}` : "";
+				throw new Error(data?.error ?? `Die Anfrage ist fehlgeschlagen (HTTP ${response.status}).${serverSnippet}`);
 			}
 			setMessages([...nextMessages, { role: "assistant", content: data.reply ?? "", toolCalls: data.toolCalls ?? [] }]);
 		} catch (cause) {

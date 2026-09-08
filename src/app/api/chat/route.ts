@@ -75,44 +75,53 @@ function parseBody(body: unknown): ParsedBody | string {
 }
 
 export async function POST(request: Request) {
-	const user = await getCurrentUser();
-	if (!user) {
-		return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
-	}
-	if (user.role !== "ADMIN") {
-		return NextResponse.json(
-			{ error: "Der KI-Assistent steht nur Administratoren zur Verfügung." },
-			{ status: 403 }
-		);
-	}
-
-	if (!isAiConfigured()) {
-		return NextResponse.json(
-			{ error: "Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent." },
-			{ status: 503 }
-		);
-	}
-
-	let rawBody: unknown;
+	// Äußerer Catch-All: Diese Route liefert IMMER JSON (auch bei
+	// unerwarteten Fehlern in Auth-/DB-Zugriffen) - der Chat-Client zeigt
+	// die Meldung direkt an; eine HTML-Fehlerseite von Next wäre dort nur
+	// als kryptischer JSON-Parse-Fehler sichtbar.
 	try {
-		rawBody = await request.json();
-	} catch {
-		return NextResponse.json({ error: "Der Request-Body ist kein gültiges JSON." }, { status: 400 });
-	}
-
-	const parsed = parseBody(rawBody);
-	if (typeof parsed === "string") {
-		return NextResponse.json({ error: parsed }, { status: 400 });
-	}
-
-	try {
-		const result = await runChat({ messages: parsed.messages, attachments: parsed.attachments, userEmail: user.email });
-		return NextResponse.json(result);
-	} catch (error) {
-		if (error instanceof ChatError || error instanceof AiClientError) {
-			return NextResponse.json({ error: error.message }, { status: 502 });
+		const user = await getCurrentUser();
+		if (!user) {
+			return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 		}
-		console.error("[ai] Chat-Endpunkt fehlgeschlagen:", error);
-		return NextResponse.json({ error: "Interner Fehler bei der Verarbeitung (Details im Server-Log)." }, { status: 500 });
+		if (user.role !== "ADMIN") {
+			return NextResponse.json(
+				{ error: "Der KI-Assistent steht nur Administratoren zur Verfügung." },
+				{ status: 403 }
+			);
+		}
+
+		if (!isAiConfigured()) {
+			return NextResponse.json(
+				{ error: "Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent." },
+				{ status: 503 }
+			);
+		}
+
+		let rawBody: unknown;
+		try {
+			rawBody = await request.json();
+		} catch {
+			return NextResponse.json({ error: "Der Request-Body ist kein gültiges JSON." }, { status: 400 });
+		}
+
+		const parsed = parseBody(rawBody);
+		if (typeof parsed === "string") {
+			return NextResponse.json({ error: parsed }, { status: 400 });
+		}
+
+		try {
+			const result = await runChat({ messages: parsed.messages, attachments: parsed.attachments, userEmail: user.email });
+			return NextResponse.json(result);
+		} catch (error) {
+			if (error instanceof ChatError || error instanceof AiClientError) {
+				return NextResponse.json({ error: error.message }, { status: 502 });
+			}
+			console.error("[ai] Chat-Endpunkt fehlgeschlagen:", error);
+			return NextResponse.json({ error: "Interner Fehler bei der Verarbeitung (Details im Server-Log)." }, { status: 500 });
+		}
+	} catch (error) {
+		console.error("[ai] Unerwarteter Fehler im Chat-Endpunkt:", error);
+		return NextResponse.json({ error: "Interner Serverfehler im Chat-Endpunkt (Details im Server-Log)." }, { status: 500 });
 	}
 }
