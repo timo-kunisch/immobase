@@ -27,17 +27,18 @@ const nextConfig: NextConfig = {
 	// Symlink-Ziel im Paket real. Für lokale Standalone-Tests (node
 	// .next/standalone/server.js) muss das Ziel analog gelegt werden, z. B.
 	// ln -s ../../node_modules/better-sqlite3 .next/standalone/node_modules/better-sqlite3
+	//
+	// Turbopack ueber-traced bei Routen mit Dateisystem-/Stream-Zugriff
+	// (storage/backup/pdf) das KOMPLETTE Projektverzeichnis - inkl.
+	// dist/, sodass jeder Build die Artefakte aller vorherigen Builds
+	// rekursiv in den Standalone-Output (und damit ins Electron-Paket)
+	// einbettet. Diese Pfade werden zur Laufzeit nicht benoetigt: Der
+	// Server laeuft aus den kompilierten Chunks unter .next/server,
+	// statische Assets und public/ kommen via extraResources ins Paket.
 	outputFileTracingExcludes: {
 		"*": [
 			"./node_modules/better-sqlite3/**/*",
 			"node_modules/better-sqlite3/**/*",
-			// Turbopack ueber-traced bei Routen mit Dateisystem-/Stream-Zugriff
-			// (storage/backup/pdf) das KOMPLETTE Projektverzeichnis - inkl.
-			// dist/, sodass jeder Build die Artefakte aller vorherigen Builds
-			// rekursiv in den Standalone-Output (und damit ins Electron-Paket)
-			// einbettet. Diese Pfade werden zur Laufzeit nicht benoetigt: Der
-			// Server laeuft aus den kompilierten Chunks unter .next/server,
-			// statische Assets und public/ kommen via extraResources ins Paket.
 			"./dist/**/*",
 			"dist/**/*",
 			"./dist-electron/**/*",
@@ -62,6 +63,14 @@ const nextConfig: NextConfig = {
 			"./next.config.ts",
 			"next.config.ts",
 		],
+	},
+	// Der Turbopack-Standalone-Trace verfehlt das Turbo-Runtime-Modul fuer
+	// App-Routen (app-route-turbo.runtime.prod.js) - es wird nicht in die
+	// nft.json aufgenommen, obwohl die Route es zur Laufzeit benoetigt.
+	// Das fuehrt im Standalone/Electron zu "Cannot find module" (HTTP 500).
+	// Explizit aufnehmen:
+	outputFileTracingIncludes: {
+		"/api/**": ["./node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js"],
 	},
 };
 

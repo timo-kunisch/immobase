@@ -443,6 +443,14 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `extraResources` ins Paket. Nach Änderungen daran Standalone-Größe (`du -sh .next/standalone`,
   ~30 MB) und Boot-Test (`node .next/standalone/server.js`, better-sqlite3-Symlink beachten)
   prüfen.
+- **Tracing-Falle 2 (fehlendes Turbo-Runtime-Modul):** Der Standalone-Trace verfehlt
+  `next/dist/compiled/next-server/app-route-turbo.runtime.prod.js` (Runtime aller App-Route-
+  Handler), weil Turbopack es nicht als Dependency erkennt – Folge: JEDE Route unter `/api/*`
+  liefert in der gepackten Desktop-App HTTP 500 („Cannot find module"), obwohl dev- und
+  `node .next/standalone/server.js`-Betrieb funktionieren (dort steht das volle `node_modules`
+  zur Verfügung). Fix: `outputFileTracingIncludes` in `next.config.ts` nimmt das Modul für
+  `/api/**` explizit auf. Nach Änderungen am Tracing immer `npm run pack` und eine API-Route in
+  der gepackten App testen.
 
 ## 9. Bekannte, bewusst offene Punkte
 
