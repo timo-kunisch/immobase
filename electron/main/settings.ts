@@ -11,7 +11,10 @@ import path from "node:path";
 export type AppMode = "local" | "host" | "client";
 
 export interface AppSettings {
-	/** null = Erststart -> Setup-Assistent wird gezeigt. */
+	/**
+	 * null = Erststart -> die Modus-Auswahl erfolgt im Setup-Wizard (/setup);
+	 * bis dahin läuft der eingebettete Server im lokalen Modus.
+	 */
 	mode: AppMode | null;
 	/** Zuletzt verwendeter Port (Stabilität für E-Mail-Links/LAN-URL). */
 	lastPort: number | null;

@@ -36,6 +36,12 @@ export interface DesktopBridge {
 	onConnectionState(listener: (info: DesktopConnectionInfo) => void): () => void;
 	/** Öffnet den Verbindungs-/Modus-Einstellungsdialog der Shell. */
 	openConnectionSettings(): Promise<void>;
+	/**
+	 * Übernimmt den Betriebsmodus (Setup-Wizard + Shell-Seite). Idempotent:
+	 * Ein bereits aktiver Modus startet den Server nicht neu. Bei "client"
+	 * wechselt das Fenster auf die Verbindungsseite der Shell.
+	 */
+	setMode(mode: "local" | "host" | "client"): Promise<{ ok: boolean; error?: string }>;
 	/** Blendet das Fenster ein/aus (für spätere Tray-Features reserviert). */
 	getAppVersion(): Promise<string>;
 	/** Aktueller Auto-Update-Status (nur gepackte Desktop-App, sonst "idle"). */

@@ -148,9 +148,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
     Installation sofort auslösen (`iv:install-update` → `quitAndInstall()`).
   - `preload/index.ts` – schmale `contextBridge`-API (`window.iv`), Vertragstypen in
     `src/lib/desktop-bridge.ts`.
-  - `shell/connect.html` – Setup-/Verbindungs-Seite (Moduswahl, Client-Verbindung, Discovery-Liste,
-    Reconnect mit Backoff, „Zurück zur App“ ohne Moduswechsel/Server-Neustart via
-    `iv:shell-back-to-app`).
+  - `shell/connect.html` – Verbindungs-Seite (nachträglicher Moduswechsel aus den Einstellungen,
+    Client-Verbindung, Discovery-Liste, Reconnect mit Backoff, „Zurück zur App“ ohne
+    Moduswechsel/Server-Neustart via `iv:shell-back-to-app`). Die **Erststart-Moduswahl** liegt
+    dagegen im Setup-Wizard (`/setup`, Schritt nach der Begrüßung): Beim ersten Start
+    (`settings.mode === null`) startet der Main-Prozess den eingebetteten Server im lokalen Modus
+    (ohne Persistenz) und lädt direkt die App; der Wizard übergibt die Wahl per IPC `iv:set-mode`
+    (idempotent, kein Server-Neustart/Reload bei unverändertem Modus; bei `client` wird der lokale
+    Server gestoppt und die Shell-Seite für die Host-Verbindung gezeigt).
 - **Server Actions** für alle CRUD-Operationen. Muster: `useActionState` in Client-Dialogen +
   `"use server"`-Funktionen in `src/app/<modul>/actions.ts` + `revalidatePath`. **Jede** Server
   Action prüft selbst `requireUser()`/`requireAdmin()` (Defense-in-Depth).
@@ -183,9 +188,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 - **Bootstrapping** (`src/lib/auth/bootstrap.ts`, genutzt von Setup-Wizard und Registrierung): Der
   **erste** Nutzer wird automatisch `ADMIN` + `isApproved=true`. Alle weiteren: `USER` +
   `isApproved=false`, bis ein Admin sie unter `/admin/users` freischaltet. Der Normalpfad für das
-  erste Konto ist der **Setup-Wizard** `/setup` (Willkommen → Absenderdaten → Online-Integrationen →
-  Wiederherstellungsschlüssel → Administratorkonto; die beiden Schritte nach dem Willkommens-Schritt
-  sind überspringbar, der Schlüssel-Schritt verlangt eine Lesebestätigung per Checkbox, das Konto wird
+  erste Konto ist der **Setup-Wizard** `/setup` (Willkommen → Betriebsmodus → Absenderdaten →
+  Online-Integrationen → Wiederherstellungsschlüssel → Administratorkonto; der Modus-Schritt gilt nur
+  der Desktop-App und geht per IPC an den Main-Prozess, die Schritte Absenderdaten/Integrationen sind
+  überspringbar, der Schlüssel-Schritt verlangt eine Lesebestätigung per Checkbox, das Konto wird
   bewusst als letzter Schritt angelegt, damit der `countUsers() === 0`-Guard für alle Setup-Actions
   gilt). Ohne
   SMTP meldet die letzte Setup-Action den Nutzer direkt an (Session + Redirect auf `/`); mit SMTP
@@ -215,7 +221,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 electron/
   main/                     # Main-Prozess (index/server/settings/network-check/discovery/updater/log/data-key)
   preload/index.ts          # contextBridge-API (window.iv)
-  shell/connect.html        # Setup-/Verbindungsseite (plain HTML/JS, kein Build)
+  shell/connect.html        # Verbindungsseite (Moduswechsel/Client-Verbindung, plain HTML/JS, kein Build)
   tsconfig.json             # strict TS für die Shell (npx tsc -p electron/tsconfig.json)
 src/
   app/

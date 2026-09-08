@@ -144,6 +144,24 @@ function showShellPage(): void {
 	void win.loadFile(page);
 }
 
+/**
+ * Lädt eine App-URL ins Hauptfenster, sofern das Fenster nicht bereits
+ * dieselbe Origin zeigt. Bei einem Server-Neustart mit gleichem Port
+ * (Moduswechsel local <-> host zur Laufzeit) bleibt die bereits geladene
+ * Seite so erhalten und Client-State (z. B. der Setup-Wizard) geht nicht
+ * verloren.
+ */
+async function loadAppUrlIfNeeded(url: string): Promise<void> {
+	const win = getOrCreateWindow();
+	let sameOrigin = false;
+	try {
+		sameOrigin = new URL(win.webContents.getURL()).origin === new URL(url).origin;
+	} catch {
+		// about:blank o. ä. - Origin-Vergleich nicht möglich -> laden
+	}
+	if (!sameOrigin) await win.loadURL(url);
+}
+
 // ------------------------------------------------------------
 // Server-Start (Modi local + host)
 // ------------------------------------------------------------
@@ -197,8 +215,7 @@ async function startLocalServer(mode: "local" | "host"): Promise<void> {
 		lastError: null,
 	});
 
-	const win = getOrCreateWindow();
-	await win.loadURL(runningServer.localUrl);
+	await loadAppUrlIfNeeded(runningServer.localUrl);
 }
 
 // ------------------------------------------------------------
@@ -253,16 +270,15 @@ async function connectToHost(): Promise<void> {
 // ------------------------------------------------------------
 
 async function boot(): Promise<void> {
-	const mode = settings.get().mode;
-	setConnectionState({ mode });
+	// Erststart (noch kein Modus gewählt): Die Modus-Auswahl ist Teil des
+	// Setup-Wizards (/setup, Schritt nach der Begrüßung). Bis zur Wahl läuft
+	// der eingebettete Server im lokalen Modus, ohne dass settings.mode
+	// persistiert wird - der Wizard übernimmt die Wahl über iv:set-mode
+	// (bei "client" wechselt die App auf die Shell-Seite für die Verbindung).
+	const effectiveMode = settings.get().mode ?? "local";
+	setConnectionState({ mode: effectiveMode });
 
-	if (mode === null) {
-		// Erststart: Setup-Assistent (Modus wählen).
-		showShellPage();
-		return;
-	}
-
-	if (mode === "client") {
+	if (effectiveMode === "client") {
 		await connectToHost();
 		return;
 	}
@@ -271,7 +287,7 @@ async function boot(): Promise<void> {
 	if (isDev) {
 		// Entwicklung: `next dev` läuft separat (npm run electron:dev).
 		const devUrl = process.env.IV_DEV_SERVER_URL ?? "http://127.0.0.1:3000";
-		setConnectionState({ mode, localUrl: devUrl, connected: true });
+		setConnectionState({ mode: effectiveMode, localUrl: devUrl, connected: true });
 		const win = getOrCreateWindow();
 		// Dev-Server kann noch hochfahren - bei Fehler kurz warten und erneut versuchen.
 		win.webContents.on("did-fail-load", (_event, _code, _desc, validatedURL) => {
@@ -285,7 +301,7 @@ async function boot(): Promise<void> {
 		return;
 	}
 
-	await startLocalServer(mode);
+	await startLocalServer(effectiveMode);
 }
 
 // ------------------------------------------------------------
@@ -346,18 +362,44 @@ function registerIpcHandlers(): void {
 		};
 	});
 
-	ipcMain.handle("iv:shell-set-mode", async (_event, mode: AppMode) => {
+	// Modus übernehmen und persistieren. Wird sowohl vom Setup-Wizard
+	// (Erststart, Schritt "Betriebsmodus") als auch von der Shell-Seite
+	// (Einstellungen -> Verbindung) genutzt. Idempotent: Läuft der Server
+	// bereits im gewünschten Modus, wird er nicht neu gestartet und das
+	// Fenster nicht neu geladen (Client-State bleibt erhalten).
+	ipcMain.handle("iv:set-mode", async (_event, mode: AppMode) => {
 		settings.update({ mode });
-		setConnectionState({ mode });
+
 		if (mode === "client") {
+			// Client-Modus = keine lokalen Daten: lokalen Server und ggf.
+			// Host-Freigabe stoppen; die Verbindung zum Host wird über die
+			// Shell-Seite hergestellt (Discovery, URL + Token).
+			if (runningServer) {
+				await runningServer.close();
+				runningServer = null;
+			}
+			if (unpublishHost) {
+				unpublishHost();
+				unpublishHost = null;
+			}
+			setConnectionState({ mode, localUrl: null, hostUrl: null, hostPort: null, connected: false, lastError: null });
 			showShellPage();
 			return { ok: true };
 		}
+
+		// local | host
 		try {
 			if (isDev) {
-				await boot();
-			} else {
+				// Entwicklung: `next dev` läuft separat (npm run electron:dev).
+				const devUrl = process.env.IV_DEV_SERVER_URL ?? "http://127.0.0.1:3000";
+				setConnectionState({ mode, localUrl: devUrl, connected: true, lastError: null });
+				await loadAppUrlIfNeeded(devUrl);
+				return { ok: true };
+			}
+			if (!runningServer || connectionState.mode !== mode) {
 				await startLocalServer(mode);
+			} else {
+				setConnectionState({ lastError: null });
 			}
 			return { ok: true };
 		} catch (error) {

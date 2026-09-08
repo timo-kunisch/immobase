@@ -260,7 +260,7 @@
 	$("apply-mode").onclick = function () {
 		if (!selectedMode || !state || selectedMode === state.settings.mode) return;
 		$("apply-mode").disabled = true;
-		iv.shellSetMode(selectedMode).then(function (result) {
+		iv.setMode(selectedMode).then(function (result) {
 			if (!result.ok) {
 				selectedMode = null;
 				alert("Wechsel fehlgeschlagen: " + (result.error || "unbekannt"));
