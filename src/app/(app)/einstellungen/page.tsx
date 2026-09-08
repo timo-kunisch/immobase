@@ -1,4 +1,5 @@
 import { SiteHeader } from "@/components/layout/site-header";
+import { Button } from "@/components/ui/button";
 import { CompanySettingsForm } from "@/components/einstellungen/company-settings-form";
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
@@ -15,6 +16,18 @@ import { getTreeEncryptionStatus } from "@/lib/file-crypto";
 import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
+
+// Sprungziele für die Bereichs-Navigation oben auf der Seite (Anchor-Links auf
+// die <section id="...">-Wrapper der einzelnen Einstellungs-Karten).
+const settingsSections = [
+	{ id: "absenderdaten", label: "Absenderdaten" },
+	{ id: "datensicherung", label: "Datensicherung" },
+	{ id: "dropbox-backup", label: "Dropbox-Backup" },
+	{ id: "datenverschluesselung", label: "Lokale Datenverschlüsselung" },
+	{ id: "online-integrationen", label: "Online-Integrationen" },
+	{ id: "verbindung", label: "Verbindung & Mehrbenutzer" },
+	{ id: "zuruecksetzen", label: "Anwendung zurücksetzen" },
+];
 
 export default async function EinstellungenPage() {
 	const settings = getCompanySettings();
@@ -55,13 +68,35 @@ export default async function EinstellungenPage() {
 			/>
 
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
-				<CompanySettingsForm settings={settings} />
-				<DataExportCard />
-				<DropboxBackupCard state={getDropboxUiState()} />
-				<SecurityCard status={securityStatus} />
-				<IntegrationSettingsForm settings={integrations} />
-				<ConnectionCard />
-				<ResetAppCard />
+				<nav aria-label="Einstellungsbereiche" className="flex flex-wrap gap-2">
+					{settingsSections.map((section) => (
+						<Button key={section.id} variant="outline" size="sm" asChild>
+							<a href={`#${section.id}`}>{section.label}</a>
+						</Button>
+					))}
+				</nav>
+
+				<section id="absenderdaten" className="scroll-mt-6">
+					<CompanySettingsForm settings={settings} />
+				</section>
+				<section id="datensicherung" className="scroll-mt-6">
+					<DataExportCard />
+				</section>
+				<section id="dropbox-backup" className="scroll-mt-6">
+					<DropboxBackupCard state={getDropboxUiState()} />
+				</section>
+				<section id="datenverschluesselung" className="scroll-mt-6">
+					<SecurityCard status={securityStatus} />
+				</section>
+				<section id="online-integrationen" className="scroll-mt-6">
+					<IntegrationSettingsForm settings={integrations} />
+				</section>
+				<section id="verbindung" className="scroll-mt-6">
+					<ConnectionCard />
+				</section>
+				<section id="zuruecksetzen" className="scroll-mt-6">
+					<ResetAppCard />
+				</section>
 			</div>
 		</div>
 	);

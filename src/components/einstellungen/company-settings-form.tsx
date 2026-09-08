@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2, Save } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +34,13 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
 
 	return (
 		<Card className="max-w-xl">
-			<CardContent className="pt-6">
+			<CardHeader>
+				<CardTitle>Absenderdaten</CardTitle>
+				<CardDescription>
+					Diese Angaben erscheinen als Briefkopf auf erzeugten PDFs (aktuell: Nebenkostenabrechnungen).
+				</CardDescription>
+			</CardHeader>
+			<CardContent>
 				<form action={formAction} className="space-y-4">
 					<div className="grid gap-2">
 						<Label htmlFor="name">Name / Firma</Label>
