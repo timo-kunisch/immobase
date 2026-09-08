@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 import { Loader2, Save, ShieldAlert, Sparkles } from "lucide-react";
 
 import { saveAiSettingsAction } from "@/app/(app)/einstellungen/actions";
+import { Guide, GuideStep } from "@/components/einstellungen/guide";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -80,6 +81,51 @@ export function AiCard({ state }: { state: AiCardState }) {
 						<dd>{state.apiKeySet ? "hinterlegt" : "nicht hinterlegt (optional)"}</dd>
 					</div>
 				</dl>
+
+				<Guide title="Anleitung: KI-Assistenten einrichten">
+					<GuideStep step={1} title="Anbieter wählen">
+						<p>
+							Entweder ein KI-Anbieter in der Cloud (z. B. OpenAI - kostenpflichtig nach Verbrauch) oder ein
+							lokales Modell auf diesem Rechner (z. B. mit LM Studio oder Ollama - kostenlos, die Daten bleiben
+							auf dem eigenen Gerät).
+						</p>
+					</GuideStep>
+					<GuideStep step={2} title="Zugang vorbereiten">
+						<p>
+							<strong>OpenAI:</strong> Auf <code className="rounded bg-muted px-1 py-0.5 text-xs">platform.openai.com</code>{" "}
+							unter „API keys“ einen neuen Schlüssel erzeugen (beginnt mit „sk-…“).
+						</p>
+						<p>
+							<strong>LM Studio:</strong> Programm installieren, ein Modell herunterladen und darin den lokalen
+							Server starten (Standard-Adresse:{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>).
+						</p>
+					</GuideStep>
+					<GuideStep step={3} title="Basis-URL und Modell eintragen">
+						<p>
+							OpenAI: <code className="rounded bg-muted px-1 py-0.5 text-xs">https://api.openai.com/v1</code> und
+							z. B. <code className="rounded bg-muted px-1 py-0.5 text-xs">gpt-4o-mini</code>. LM Studio:{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code> und den Namen
+							des geladenen Modells.
+						</p>
+						<p>
+							Wichtig: Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen - sonst kann der
+							Assistent nicht auf die App-Daten zugreifen.
+						</p>
+					</GuideStep>
+					<GuideStep step={4} title="API-Schlüssel eintragen">
+						<p>
+							Bei OpenAI den erzeugten Schlüssel einfügen (wird verschlüsselt gespeichert). Bei einem lokalen
+							Server das Feld einfach leer lassen.
+						</p>
+					</GuideStep>
+					<GuideStep step={5} title="Speichern und ausprobieren">
+						<p>
+							Nach dem Speichern wird die Sprechblase unten in der Seitenleiste aktiv. Ein erster Test: „Welche
+							Liegenschaften sind angelegt?“
+						</p>
+					</GuideStep>
+				</Guide>
 
 				<form action={formAction} className="space-y-4">
 					<div className="grid gap-2">

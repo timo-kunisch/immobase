@@ -1,5 +1,4 @@
 import { SiteHeader } from "@/components/layout/site-header";
-import { Button } from "@/components/ui/button";
 import { AiCard } from "@/components/einstellungen/ai-card";
 import { CompanySettingsForm } from "@/components/einstellungen/company-settings-form";
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
@@ -9,6 +8,7 @@ import { IntegrationSettingsForm } from "@/components/einstellungen/integration-
 import { McpCard } from "@/components/einstellungen/mcp-card";
 import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
+import { SettingsTabs } from "@/components/einstellungen/settings-tabs";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
 import { getDatabaseFilePath } from "@/data/paths";
@@ -20,20 +20,6 @@ import { hasMcpToken, isMcpEnabled } from "@/lib/mcp/auth";
 import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
-
-// Sprungziele für die Bereichs-Navigation oben auf der Seite (Anchor-Links auf
-// die <section id="...">-Wrapper der einzelnen Einstellungs-Karten).
-const settingsSections = [
-	{ id: "absenderdaten", label: "Absenderdaten" },
-	{ id: "datensicherung", label: "Datensicherung" },
-	{ id: "dropbox-backup", label: "Dropbox-Backup" },
-	{ id: "datenverschluesselung", label: "Lokale Datenverschlüsselung" },
-	{ id: "online-integrationen", label: "Online-Integrationen" },
-	{ id: "ki-assistent", label: "KI-Assistent" },
-	{ id: "mcp-server", label: "MCP-Server (KI-Zugriff)" },
-	{ id: "verbindung", label: "Verbindung & Mehrbenutzer" },
-	{ id: "zuruecksetzen", label: "Anwendung zurücksetzen" },
-];
 
 export default async function EinstellungenPage() {
 	const settings = getCompanySettings();
@@ -70,52 +56,62 @@ export default async function EinstellungenPage() {
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
 				title="Einstellungen"
-				description="Absenderdaten für erzeugte PDFs, Datensicherung, Online-Integrationen und Verbindung (Mehrbenutzer-Betrieb)."
+				description="Absenderdaten für erzeugte PDFs, Datensicherung, Online-Integrationen und Sicherheit - thematisch gruppiert in Bereichen."
 			/>
 
-			<div className="flex-1 space-y-6 p-4 sm:p-6">
-				<nav aria-label="Einstellungsbereiche" className="flex flex-wrap gap-2">
-					{settingsSections.map((section) => (
-						<Button key={section.id} variant="outline" size="sm" asChild>
-							<a href={`#${section.id}`}>{section.label}</a>
-						</Button>
-					))}
-				</nav>
-
-				<section id="absenderdaten" className="scroll-mt-6">
-					<CompanySettingsForm settings={settings} />
-				</section>
-				<section id="datensicherung" className="scroll-mt-6">
-					<DataExportCard />
-				</section>
-				<section id="dropbox-backup" className="scroll-mt-6">
-					<DropboxBackupCard state={getDropboxUiState()} />
-				</section>
-				<section id="datenverschluesselung" className="scroll-mt-6">
-					<SecurityCard status={securityStatus} />
-				</section>
-				<section id="online-integrationen" className="scroll-mt-6">
-					<IntegrationSettingsForm settings={integrations} />
-				</section>
-				<section id="ki-assistent" className="scroll-mt-6">
-					<AiCard
-						state={{
-							baseUrl: getSetting("ai.base_url") ?? "",
-							model: getSetting("ai.model") ?? "",
-							apiKeySet: Boolean(getSetting("ai.apikey")),
-							configured: isAiConfigured(),
-						}}
-					/>
-				</section>
-				<section id="mcp-server" className="scroll-mt-6">
-					<McpCard state={{ enabled: isMcpEnabled(), tokenSet: hasMcpToken() }} />
-				</section>
-				<section id="verbindung" className="scroll-mt-6">
-					<ConnectionCard />
-				</section>
-				<section id="zuruecksetzen" className="scroll-mt-6">
-					<ResetAppCard />
-				</section>
+			<div className="flex-1 p-4 sm:p-6">
+				<SettingsTabs
+					tabs={[
+						{
+							value: "allgemein",
+							label: "Allgemein",
+							content: (
+								<>
+									<CompanySettingsForm settings={settings} />
+									<ConnectionCard />
+								</>
+							),
+						},
+						{
+							value: "datensicherung",
+							label: "Datensicherung",
+							content: (
+								<>
+									<DataExportCard />
+									<DropboxBackupCard state={getDropboxUiState()} />
+								</>
+							),
+						},
+						{
+							value: "integrationen",
+							label: "Integrationen & KI",
+							content: (
+								<>
+									<IntegrationSettingsForm settings={integrations} />
+									<AiCard
+										state={{
+											baseUrl: getSetting("ai.base_url") ?? "",
+											model: getSetting("ai.model") ?? "",
+											apiKeySet: Boolean(getSetting("ai.apikey")),
+											configured: isAiConfigured(),
+										}}
+									/>
+									<McpCard state={{ enabled: isMcpEnabled(), tokenSet: hasMcpToken() }} />
+								</>
+							),
+						},
+						{
+							value: "sicherheit",
+							label: "Sicherheit",
+							content: (
+								<>
+									<SecurityCard status={securityStatus} />
+									<ResetAppCard />
+								</>
+							),
+						},
+					]}
+				/>
 			</div>
 		</div>
 	);

@@ -12,6 +12,7 @@ import {
 	saveDropboxBackupSettingsAction,
 	startDropboxConnectAction,
 } from "@/app/(app)/einstellungen/dropbox-actions";
+import { Guide, GuideStep } from "@/components/einstellungen/guide";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -208,6 +209,45 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 
 				{!state.connected ? (
 					<div className="space-y-3">
+						<Guide title="Anleitung: Dropbox-Backup einrichten">
+							<GuideStep step={1} title="Dropbox-App anlegen (einmalig)">
+								<p>
+									Mit dem eigenen Dropbox-Konto auf{" "}
+									<code className="rounded bg-muted px-1 py-0.5 text-xs">dropbox.com/developers/apps</code>{" "}
+									anmelden und auf „Create app“ klicken. Dabei „Scoped access“ wählen, als Zugriffsbereich „App
+									folder“ und einen beliebigen Namen vergeben, z. B. „ImmoBase-Sicherung“. Die Sicherungen landen
+									später in genau diesem Ordner in der Dropbox.
+								</p>
+							</GuideStep>
+							<GuideStep step={2} title="Berechtigungen setzen">
+								<p>
+									In der neu angelegten App zum Reiter „Permissions“ wechseln und die Häkchen bei{" "}
+									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.write</code> und{" "}
+									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.read</code> setzen, dann
+									unten auf „Submit“ klicken.
+								</p>
+							</GuideStep>
+							<GuideStep step={3} title="App-Schlüssel kopieren">
+								<p>
+									Zurück im Reiter „Settings“ den „App key“ kopieren und unten im Feld „Dropbox-App-Schlüssel“
+									eintragen.
+								</p>
+							</GuideStep>
+							<GuideStep step={4} title="Konto verknüpfen">
+								<p>
+									Auf „Mit Dropbox verbinden“ klicken: Es öffnet sich eine Dropbox-Seite im Browser. Dort
+									anmelden, den Zugriff erlauben und den anschließend angezeigten Code hier einfügen.
+								</p>
+							</GuideStep>
+							<GuideStep step={5} title="Automatische Sicherung einrichten">
+								<p>
+									Nach dem Verbinden Intervall und Aufbewahrung festlegen und auf Wunsch ein Passwort für die
+									Verschlüsselung setzen. Die App lädt die Sicherung dann automatisch hoch, solange sie geöffnet
+									ist - ohne Internetverbindung holt sie es beim nächsten Start nach.
+								</p>
+							</GuideStep>
+						</Guide>
+
 						{state.appKeyFromEnv ? (
 							<p className="text-xs text-muted-foreground">
 								Der Dropbox-App-Schlüssel ist per Umgebungsvariable (DROPBOX_APP_KEY) vorgegeben.
@@ -223,11 +263,6 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 									autoComplete="off"
 									disabled={connectStep === "awaiting-code"}
 								/>
-								<p className="text-xs text-muted-foreground">
-									Einmalig eine eigene App unter dropbox.com/developers/apps anlegen („Scoped access“, „App
-									folder“, Berechtigungen files.content.write und files.content.read) und deren App-Schlüssel hier
-									eintragen.
-								</p>
 							</div>
 						)}
 
