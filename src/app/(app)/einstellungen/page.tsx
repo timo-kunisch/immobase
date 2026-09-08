@@ -2,12 +2,14 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { CompanySettingsForm } from "@/components/einstellungen/company-settings-form";
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
+import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
 import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
 import { getDatabaseFilePath } from "@/data/paths";
 import { getDataKeySource } from "@/lib/data-key";
+import { getDropboxUiState } from "@/lib/dropbox-backup";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
 import fs from "node:fs";
 
@@ -54,6 +56,7 @@ export default async function EinstellungenPage() {
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<CompanySettingsForm settings={settings} />
 				<DataExportCard />
+				<DropboxBackupCard state={getDropboxUiState()} />
 				<SecurityCard status={securityStatus} />
 				<IntegrationSettingsForm settings={integrations} />
 				<ConnectionCard />

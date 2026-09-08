@@ -99,6 +99,21 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Versand-Buttons deaktiviert (`isLetterXpressConfigured()`) **und** `sendPdfByPostForSource()`
   (`src/lib/postal-shipments.ts`, zentraler Durchgang aller Versand-Actions) bricht serverseitig
   früh ab (ohne FAILED-Protokoll-Eintrag); Zugangsdaten in `app_settings`.
+- **Cloud-Sicherung nach Dropbox** (`src/lib/dropbox.ts` = reiner API-Client, nur natives fetch;
+  `src/lib/dropbox-backup.ts` = Orchestrierung) – ebenfalls **optionale Online-Funktion**: OAuth
+  2.0 mit PKCE im Code-Flow **ohne redirect_uri** (Dropbox zeigt den Code zum Kopieren an – der
+  lokale Server läuft auf dynamischem Port, ein vorregistrierter Redirect wäre unmöglich).
+  Refresh-/Access-Token, PKCE-Zwischenstand und das optionale Backup-Passwort liegen
+  feldverschlüsselt in `app_settings`. Ein Scheduler (Start im geschützten App-Layout
+  `src/app/(app)/layout.tsx` bei der ersten authentifizierten Seitenanzeige – bewusst NICHT in
+  `src/instrumentation.ts`, weil der Instrumentation-Trace nicht von den
+  `outputFileTracingExcludes` erfasst wird; Prüfung alle 30 min, `unref`'d) lädt fällige
+  Sicherungen hoch: gleicher Export wie die manuelle
+  Datensicherung (`src/data/backup.ts`), optional passwortverschlüsselt (`.imbak`). Upload chunked
+  über Upload-Sessions (8-MiB-Chunks, Wiederaufsetzen per `incorrect_offset`/`correct_offset`),
+  danach Aufbewahrung (älteste `immobase-backup-*`-Dateien bis auf die letzten N löschen). Der
+  Dropbox-App-Schlüssel wird in den Einstellungen hinterlegt (Fallback `DROPBOX_APP_KEY`); UI:
+  Einstellungen → Dropbox-Backup.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -227,6 +242,8 @@ src/
     file-crypto.ts          # AES-256-GCM-Dateiverschlüsselung at rest + Bestandsmigration
     letterxpress.ts         # LetterXpress-API (optionaler Postversand)
     postal-shipments.ts     # Postversand-Orchestrierung (Quelle -> PDF -> LetterXpress -> DB)
+    dropbox.ts              # Dropbox-API-Client (OAuth-PKCE, Chunked-Upload, List/Delete)
+    dropbox-backup.ts       # Cloud-Sicherung: Verbindung, Scheduler, Upload, Aufbewahrung
     backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
@@ -404,7 +421,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
-  `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
+  `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
+  gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –

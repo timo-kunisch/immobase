@@ -15,7 +15,8 @@ import { now } from "./helpers";
  * getSetting).
  *
  * Geheimnisse (Schlüssel in SECRET_SETTING_KEYS: SMTP-Passwort,
- * LetterXpress-API-Key) werden transparent FELD-VERSCHLÜSSELT gespeichert
+ * LetterXpress-API-Key, Dropbox-Tokens/-Backup-Passwort) werden transparent
+ * FELD-VERSCHLÜSSELT gespeichert
  * (AES-256-GCM, Master-Schlüssel siehe src/lib/data-key.ts), Format:
  * "enc:v1:" + base64(Nonce | Ciphertext | Auth-Tag). Damit liegen die
  * Zugangsdaten nicht mehr im Klartext in der Datenbankdatei.
@@ -44,8 +45,20 @@ const SECRET_PREFIX = "enc:v1:";
 const SECRET_NONCE_LENGTH = 12;
 const SECRET_TAG_LENGTH = 16;
 
-/** Schlüssel, deren Werte als Geheimnisse verschlüsselt gespeichert werden. */
-const SECRET_SETTING_KEYS = new Set(["smtp.pass", "letterxpress.apikey"]);
+/**
+ * Schlüssel, deren Werte als Geheimnisse verschlüsselt gespeichert werden.
+ * Dropbox: Refresh-/Access-Token des verbundenen Kontos, das zwischenge-
+ * speicherte PKCE-Paar des laufenden Verbindungsvorgangs sowie das optionale
+ * Passwort für die automatische Cloud-Sicherung (src/lib/dropbox-backup.ts).
+ */
+const SECRET_SETTING_KEYS = new Set([
+	"smtp.pass",
+	"letterxpress.apikey",
+	"dropbox.refresh_token",
+	"dropbox.access_token",
+	"dropbox.oauth_pending",
+	"dropbox.backup_password",
+]);
 
 /** Ist der Schlüssel ein Geheimnis (feldverschlüsselte Ablage)? */
 export function isSecretSettingKey(key: string): boolean {

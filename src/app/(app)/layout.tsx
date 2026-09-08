@@ -2,6 +2,7 @@ import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { UpdateBanner } from "@/components/layout/update-banner";
 import { requireUser } from "@/lib/auth/dal";
+import { startDropboxBackupScheduler } from "@/lib/dropbox-backup";
 import { isSmtpConfigured } from "@/lib/email/mailer";
 
 // Autoritativer Auth-Check für den gesamten geschützten Bereich der App
@@ -9,6 +10,14 @@ import { isSmtpConfigured } from "@/lib/email/mailer";
 // requireUser() leitet nicht angemeldete Nutzer zu /login um.
 export default async function AppLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	const user = await requireUser();
+
+	// Scheduler für die automatische Dropbox-Cloud-Sicherung (idempotent,
+	// blockiert das Rendering nicht). Start bewusst HIER statt in
+	// src/instrumentation.ts: Der Instrumentation-Entry wird von den
+	// outputFileTracingExcludes nicht erfasst und würde die Backup-Kette
+	// (archiver/Streams) ungefiltert in den Standalone-Trace ziehen - die
+	// Route-Traces dagegen werden korrekt gefiltert (siehe next.config.ts).
+	startDropboxBackupScheduler();
 
 	return (
 		<SidebarProvider>
