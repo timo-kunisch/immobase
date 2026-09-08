@@ -83,6 +83,13 @@ describe("transactions-Pagination", () => {
 		// Gleiche Gesamtreihenfolge wie die unpaginierte Liste.
 		expect(allIds).toEqual(listTransactions({ leaseId: lease.id }).map((row) => row.id));
 
+		// Status-Filter (alle drei Listen-Funktionen teilen die WHERE-Logik).
+		expect(countTransactions({ leaseId: lease.id, status: "OPEN" })).toBe(6);
+		expect(countTransactions({ status: "PAID" })).toBe(1);
+		expect(countTransactions({ leaseId: lease.id, status: "CANCELLED" })).toBe(0);
+		expect(listTransactions({ status: "PAID" })).toHaveLength(1);
+		expect(listTransactionsPage({ leaseId: lease.id, status: "OPEN" }, { limit: 50, offset: 0 })).toHaveLength(6);
+
 		// Rückstände: alle offenen, fälligen (due_date <= Stichtag) - die PAID-Zahlung nicht.
 		const arrears = listOpenTransactionArrearAmounts(new Date("2026-02-15T00:00:00.000Z"), { leaseId: lease.id });
 		expect(arrears).toHaveLength(5);

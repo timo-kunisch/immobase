@@ -111,10 +111,30 @@ export interface TransactionInput {
 	status: TransactionStatus;
 }
 
+/** Filter der Listen-Funktionen: nach Vertrag und/oder Zahlungsstatus. */
+export interface TransactionFilter {
+	leaseId?: string;
+	status?: TransactionStatus;
+}
+
+/** Gemeinsame WHERE-Klausel der Listen-Funktionen (Filter per AND verknüpft). */
+function buildTransactionWhere(filter: TransactionFilter): { where: string; params: string[] } {
+	const conditions: string[] = [];
+	const params: string[] = [];
+	if (filter.leaseId) {
+		conditions.push("tr.lease_id = ?");
+		params.push(filter.leaseId);
+	}
+	if (filter.status) {
+		conditions.push("tr.status = ?");
+		params.push(filter.status);
+	}
+	return { where: conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "", params };
+}
+
 /** Listet Zahlungen (neueste Fälligkeit zuerst) inkl. Vertrags-Relationen. */
-export function listTransactions(filter: { leaseId?: string } = {}): TransactionWithLease[] {
-	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
-	const params = filter.leaseId ? [filter.leaseId] : [];
+export function listTransactions(filter: TransactionFilter = {}): TransactionWithLease[] {
+	const { where, params } = buildTransactionWhere(filter);
 	const rows = getDb()
 		.prepare(`SELECT ${TRANSACTION_JOIN_COLUMNS} ${TRANSACTION_JOIN_FROM} ${where} ${TRANSACTION_ORDER}`)
 		.all(...params) as TransactionJoinRow[];
@@ -122,9 +142,8 @@ export function listTransactions(filter: { leaseId?: string } = {}): Transaction
 }
 
 /** Zählt Zahlungen (gleicher Filter wie listTransactions) - Grundlage der Seitennummerierung. */
-export function countTransactions(filter: { leaseId?: string } = {}): number {
-	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
-	const params = filter.leaseId ? [filter.leaseId] : [];
+export function countTransactions(filter: TransactionFilter = {}): number {
+	const { where, params } = buildTransactionWhere(filter);
 	const row = getDb().prepare(`SELECT COUNT(*) AS value FROM transactions tr ${where}`).get(...params) as { value: number };
 	return row.value;
 }
@@ -135,9 +154,8 @@ export function countTransactions(filter: { leaseId?: string } = {}): number {
  * resolvePagination (src/lib/pagination.ts), die Sortierung ist dank
  * Tie-Breaker deterministisch.
  */
-export function listTransactionsPage(filter: { leaseId?: string } = {}, page: { limit: number; offset: number }): TransactionWithLease[] {
-	const where = filter.leaseId ? "WHERE tr.lease_id = ?" : "";
-	const params = filter.leaseId ? [filter.leaseId] : [];
+export function listTransactionsPage(filter: TransactionFilter = {}, page: { limit: number; offset: number }): TransactionWithLease[] {
+	const { where, params } = buildTransactionWhere(filter);
 	const rows = getDb()
 		.prepare(`SELECT ${TRANSACTION_JOIN_COLUMNS} ${TRANSACTION_JOIN_FROM} ${where} ${TRANSACTION_ORDER} LIMIT ? OFFSET ?`)
 		.all(...params, page.limit, page.offset) as TransactionJoinRow[];

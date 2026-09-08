@@ -3,7 +3,9 @@ import { AlertTriangle, PiggyBank, Wallet } from "lucide-react";
 
 import { getLeaseWithDetails, listLeasesWithDetails } from "@/data/leases";
 import { countTransactions, listOpenTransactionArrearAmounts, listTransactionsPage } from "@/data/transactions";
+import type { TransactionStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,12 +36,15 @@ const depositStatusStyles: Record<string, string> = {
 	REFUNDED: "bg-muted text-muted-foreground",
 };
 
-const transactionStatusLabels: Record<string, string> = {
+const transactionStatusLabels: Record<TransactionStatus, string> = {
 	OPEN: "Fällig",
 	PAID: "Bezahlt",
 	OVERDUE: "Überfällig",
 	CANCELLED: "Storniert",
 };
+
+/** Gültige Status-Werte für den Filter (Absicherung gegen beliebige Query-Strings). */
+const transactionStatuses = Object.keys(transactionStatusLabels) as TransactionStatus[];
 
 const transactionStatusStyles: Record<string, string> = {
 	OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
@@ -48,15 +53,19 @@ const transactionStatusStyles: Record<string, string> = {
 	CANCELLED: "bg-muted text-muted-foreground",
 };
 
-export default async function FinanzenPage({ searchParams }: { searchParams: Promise<{ leaseId?: string; page?: string }> }) {
-	const { leaseId, page: pageParam } = await searchParams;
+export default async function FinanzenPage({ searchParams }: { searchParams: Promise<{ leaseId?: string; status?: string; page?: string }> }) {
+	const { leaseId, status: statusParam, page: pageParam } = await searchParams;
+
+	// Status-Filter nur akzeptieren, wenn es ein gültiger Zahlungsstatus ist.
+	const status = transactionStatuses.find((value) => value === statusParam);
 
 	const leaseList = listLeasesWithDetails({ leaseId });
 	const filteredLease = leaseId ? getLeaseWithDetails(leaseId) : null;
 
 	// Paginierte Mieteingangs-Liste (wächst unbegrenzt, eine Seite = 50 Einträge).
-	const transactionPagination = resolvePagination(pageParam, countTransactions({ leaseId }));
-	const transactionList = listTransactionsPage({ leaseId }, transactionPagination);
+	const transactionFilter = { leaseId, status };
+	const transactionPagination = resolvePagination(pageParam, countTransactions(transactionFilter));
+	const transactionList = listTransactionsPage(transactionFilter, transactionPagination);
 
 	const filterLabel = filteredLease ? `${filteredLease.tenant.firstName} ${filteredLease.tenant.lastName} · ${filteredLease.unit.property.name} – ${filteredLease.unit.label}` : null;
 
@@ -99,9 +108,38 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 							</Card>
 						) : null}
 
-						<div className="flex flex-wrap justify-end gap-2">
-							<GenerateDueTransactionsDialog />
-							<TransactionFormDialog leases={leaseList} />
+						<div className="flex flex-wrap items-end justify-between gap-2">
+							{/* Status-Filter als schlichtes GET-Formular (Server-Navigation, kein
+							    Client-State nötig; page wird dadurch automatisch zurückgesetzt).
+							    Ein gesetzter Vertrags-Filter (leaseId) bleibt per hidden input erhalten. */}
+							<form method="get" className="flex flex-wrap items-end gap-2">
+								{leaseId ? <input type="hidden" name="leaseId" value={leaseId} /> : null}
+								<div className="flex flex-col gap-1">
+									<label htmlFor="status" className="text-xs text-muted-foreground">
+										Status
+									</label>
+									<select id="status" name="status" defaultValue={status ?? ""} className="h-9 rounded-md border bg-background px-3 text-sm">
+										<option value="">Alle Status</option>
+										{transactionStatuses.map((value) => (
+											<option key={value} value={value}>
+												{transactionStatusLabels[value]}
+											</option>
+										))}
+									</select>
+								</div>
+								<Button type="submit" variant="outline" size="sm">
+									Filtern
+								</Button>
+								{status ? (
+									<Button asChild variant="ghost" size="sm">
+										<Link href={leaseId ? `/finanzen?leaseId=${leaseId}` : "/finanzen"}>Zurücksetzen</Link>
+									</Button>
+								) : null}
+							</form>
+							<div className="flex flex-wrap gap-2">
+								<GenerateDueTransactionsDialog />
+								<TransactionFormDialog leases={leaseList} />
+							</div>
 						</div>
 
 						<Card>
@@ -109,7 +147,7 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 								{transactionList.length === 0 ? (
 									<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 										<Wallet className="size-8" />
-										<p>Noch keine Zahlungen erfasst.</p>
+										<p>{status ? "Keine Zahlungen für den gewählten Status." : "Noch keine Zahlungen erfasst."}</p>
 									</div>
 								) : (
 									<Table>
@@ -157,7 +195,7 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 							</CardContent>
 						</Card>
 
-						<PaginationBar basePath="/finanzen" pagination={transactionPagination} params={{ leaseId }} />
+						<PaginationBar basePath="/finanzen" pagination={transactionPagination} params={{ leaseId, status }} />
 					</TabsContent>
 
 					<TabsContent value="kautionen" className="space-y-4">
