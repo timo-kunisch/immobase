@@ -6,6 +6,7 @@ import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, User, W
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { ACCEPTED_FILE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/ai/attachment-types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,8 +17,11 @@ import { cn } from "@/lib/utils";
  * der Dialog steht daher nur Administratoren zur Verfügung und ist
  * deaktiviert, solange kein KI-Endpunkt konfiguriert ist.
  *
- * Datei-Anhänge (z. B. Excel-Tabellen mit Mietern) werden als Base64
- * mitgesendet und serverseitig in Text umgewandelt (src/lib/ai/attachments.ts).
+ * Datei-Anhänge (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen,
+ * Word-/PowerPoint-Dokumente, Bilder, Text-/Code-Dateien) werden als Base64
+ * mitgesendet und serverseitig aufbereitet (src/lib/ai/attachments.ts):
+ * Text extrahiert bzw. direkt übernommen, Bilder als Vision-Input
+ * durchgereicht.
  *
  * Der Gesprächsverlauf liegt im State dieser (immer gemounteten) Komponente -
  * Radix unmountet den Dialog-INHALT beim Schließen; so bleibt das Gespräch
@@ -44,9 +48,7 @@ interface PendingAttachment {
 	dataBase64: string;
 }
 
-const MAX_ATTACHMENTS = 5;
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-const ACCEPTED_FILE_TYPES = ".xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.xml,.log";
+const MAX_ATTACHMENTS = MAX_ATTACHMENTS_PER_MESSAGE;
 
 async function fileToBase64(file: File): Promise<string> {
 	const bytes = new Uint8Array(await file.arrayBuffer());
@@ -178,7 +180,7 @@ export function ChatbotDialog({ aiConfigured, isAdmin }: { aiConfigured: boolean
 					</DialogTitle>
 					<DialogDescription>
 						Beantwortet Fragen zu Ihren Daten und kann auf Wunsch Änderungen vornehmen (über die Werkzeuge des
-						MCP-Servers). Dateien wie Excel-Tabellen können angehängt werden.
+						MCP-Servers). Dateien (PDF, Office-Dokumente, Excel, Bilder, Text/Code) können angehängt werden.
 					</DialogDescription>
 				</DialogHeader>
 
@@ -271,7 +273,7 @@ export function ChatbotDialog({ aiConfigured, isAdmin }: { aiConfigured: boolean
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title="Datei anhängen (Excel, CSV, Text)"
+							title="Datei anhängen (PDF, Office, Excel, Bilder, Text/Code)"
 							aria-label="Datei anhängen"
 							disabled={pending || attachments.length >= MAX_ATTACHMENTS}
 							onClick={() => fileInputRef.current?.click()}

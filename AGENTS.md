@@ -150,12 +150,20 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
   (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
   Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
-  nicht-streamend). **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern) werden clientseitig als
-  Base64 mitgesendet und serverseitig in Text umgewandelt (`src/lib/ai/attachments.ts`:
-  .xlsx/.xlsm via `exceljs` → Semikolon-CSV je Tabellenblatt, .csv/.tsv/.txt/.md/.json/.xml/.log
-  direkt; Obergrenzen 10 MB/Datei, 500 Zeilen/Blatt, 60k Zeichen/Datei; Legacy-.xls wird mit
-  Hinweis abgelehnt). Hinweis: `exceljs` statt `xlsx`, weil das npm-Paket `xlsx` ungepatchte
-  High-Vulnerabilities hat (SheetJS patcht nur noch die eigene CDN-Distribution).
+  nicht-streamend). **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
+  clientseitig als Base64 mitgesendet und serverseitig aufbereitet (`src/lib/ai/attachments.ts`,
+  geteilte Konstanten in `attachment-types.ts` – client-sicher, kein Node-Import): **PDF** via
+  `pdfjs-dist` (legacy-Node-Build, Text je Seite, Scans ohne Textebene werden mit Hinweis
+  abgelehnt), **Excel** (.xlsx/.xlsm) via `exceljs` → Semikolon-CSV je Tabellenblatt,
+  **Word/PowerPoint/OpenDocument** (.docx/.pptx/.odt/.ods/.odp) via `jszip` (Textextraktion aus
+  dem XML-Inhalt; ODS-Zellen als Semikolon-Näherung), **Bilder** (.png/.jpg/.gif/.webp) als
+  Vision-Input (OpenAI-`image_url`-Content-Parts mit Data-URL – setzt ein multimodales Modell
+  voraus) sowie **Text-/Code-Dateien** (.csv/.tsv/.txt/.md/.json/.xml/.yaml/.sql/.ts/.py u. a.)
+  direkt. Legacy-Formate (.xls/.doc/.ppt) werden mit Konvertierungs-Hinweis abgelehnt.
+  Obergrenzen: 10 MB/Datei, 5 Anhänge/Nachricht, 500 Zeilen/Blatt, 200 PDF-Seiten, 60k
+  Zeichen/Datei (je mit Kürzungshinweis im Text). Hinweis: `exceljs` statt `xlsx`, weil das
+  npm-Paket `xlsx` ungepatchte High-Vulnerabilities hat (SheetJS patcht nur noch die eigene
+  CDN-Distribution).
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -310,8 +318,9 @@ src/
                             # (JSON-RPC), registry.ts (Tool-Definition + CRUD-Generator),
                             # tools-rental/-hoa/-system.ts (Werkzeuge), tools.ts (Sammel-Import)
     ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
-                            # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts
-                            # (Excel-/Text-Extraktion), chat.ts (Tool-Loop über die MCP-Registry)
+                            # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
+                            # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
+                            # chat.ts (Tool-Loop über die MCP-Registry)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
     money.ts, date-range.ts, rent-history.ts, lease-status.ts, hoa-ownership.ts
@@ -500,8 +509,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled, JSON-RPC-Protokoll, Werkzeug-Durchstiche inkl.
   Fachregeln), `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
-  Secret-Verschlüsselung, Excel-/Text-Anhang-Extraktion, Tool-Loop gegen gemockten
-  OpenAI-Endpunkt) sowie
+  Secret-Verschlüsselung, Anhang-Aufbereitung für PDF/Office/Bilder/Excel/Text, Tool-Loop gegen
+  gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts) sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –

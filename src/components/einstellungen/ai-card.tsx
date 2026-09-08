@@ -101,7 +101,8 @@ export function AiCard({ state }: { state: AiCardState }) {
 						<Input id="aiModel" name="aiModel" defaultValue={state.model} placeholder="gpt-4o-mini" autoComplete="off" />
 						<p className="text-xs text-muted-foreground">
 							Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen, damit der Assistent auf die
-							App-Daten zugreifen kann.
+							App-Daten zugreifen kann. Für angehängte Bilder ist zusätzlich ein multimodales („vision“-fähiges)
+							Modell nötig.
 						</p>
 					</div>
 					<div className="grid gap-2">

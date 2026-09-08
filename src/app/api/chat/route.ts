@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_BASE64_CHARS } from "@/lib/ai/attachment-types";
 import { runChat, ChatError, type ChatAttachmentInput, type ChatHistoryMessage } from "@/lib/ai/chat";
 import { AiClientError } from "@/lib/ai/client";
 import { isAiConfigured } from "@/lib/ai/config";
@@ -23,9 +24,6 @@ export const runtime = "nodejs";
 
 const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 20_000;
-const MAX_ATTACHMENTS = 5;
-/** Base64 kodiert ~4/3 der Rohgröße; 14 MB ≈ 10 MB Rohdaten (siehe attachments.ts). */
-const MAX_ATTACHMENT_BASE64_CHARS = 14 * 1024 * 1024;
 
 interface ParsedBody {
 	messages: ChatHistoryMessage[];
@@ -55,8 +53,8 @@ function parseBody(body: unknown): ParsedBody | string {
 
 	const parsedAttachments: ChatAttachmentInput[] = [];
 	if (attachments !== undefined) {
-		if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS) {
-			return `Erwartet werden höchstens ${MAX_ATTACHMENTS} Datei-Anhänge.`;
+		if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
+			return `Erwartet werden höchstens ${MAX_ATTACHMENTS_PER_MESSAGE} Datei-Anhänge.`;
 		}
 		for (const attachment of attachments) {
 			if (typeof attachment !== "object" || attachment === null) return "Ungültiges Anhang-Format.";

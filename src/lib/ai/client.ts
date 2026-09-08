@@ -20,9 +20,15 @@ export interface OpenAiToolCall {
 	function: { name: string; arguments: string };
 }
 
+/** Content-Part einer Nachricht (OpenAI-Multimodal-Format). */
+export type OpenAiContentPart =
+	| { type: "text"; text: string }
+	| { type: "image_url"; image_url: { url: string } };
+
 export interface OpenAiMessage {
 	role: "system" | "user" | "assistant" | "tool";
-	content: string | null;
+	/** String (Normalfall) oder Content-Part-Array (bei Nutzernachrichten mit Bildern). */
+	content: string | null | OpenAiContentPart[];
 	/** Nur bei role "assistant": vom Modell angeforderte Werkzeugaufrufe. */
 	tool_calls?: OpenAiToolCall[];
 	/** Nur bei role "tool": Bezug auf den beantworteten Werkzeugaufruf. */

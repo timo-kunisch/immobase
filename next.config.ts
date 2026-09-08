@@ -7,7 +7,13 @@ const nextConfig: NextConfig = {
 	output: "standalone",
 	// better-sqlite3 ist ein natives Modul und darf nicht vom Next-Bundler
 	// verpackt werden (wird zur Laufzeit per require geladen).
-	serverExternalPackages: ["better-sqlite3"],
+	// pdfjs-dist wird ebenfalls nicht gebündelt: Die Engine lädt ihre
+	// Worker-Datei (pdf.worker.mjs) zur Laufzeit per Dateipfad nach - im
+	// gebündelten Chunk stimmt dieser Pfad nicht (HTTP 500 "Setting up fake
+	// worker failed: Cannot find module .../chunks/pdf.worker.mjs"). Als
+	// externes Paket liegt sie im Standalone-node_modules und wird über
+	// outputFileTracingIncludes mit ins Paket genommen (siehe unten).
+	serverExternalPackages: ["better-sqlite3", "pdfjs-dist"],
 	experimental: {
 		serverActions: {
 			// Next.js-Standardlimit ist 1 MB – für Dokumenten-/Fotouploads (DMS,
@@ -71,6 +77,18 @@ const nextConfig: NextConfig = {
 	// Explizit aufnehmen:
 	outputFileTracingIncludes: {
 		"/api/**": ["./node_modules/next/dist/compiled/next-server/app-route-turbo.runtime.prod.js"],
+		// pdfjs-dist ist externalisiert (siehe serverExternalPackages): Der
+		// Turbopack-NFT-Trace erfasst das Paket nicht vollständig - ohne diese
+		// Angabe fehlen build-/worker-Dateien im gepackten Standalone und die
+		// PDF-Extraktion schlägt mit "Cannot find module pdf.worker.mjs" fehl.
+		// Bewusst nur die benötigten Dateien (Hauptmodul + Worker, jeweils
+		// flache Bundles; keine .map/.min-Varianten) - das komplette Paket
+		// würde den Standalone um ~40 MB aufblähen.
+		"/api/chat": [
+			"./node_modules/pdfjs-dist/package.json",
+			"./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+			"./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+		],
 	},
 };
 

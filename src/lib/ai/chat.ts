@@ -1,4 +1,4 @@
-import { AttachmentError, extractAttachmentText } from "./attachments";
+import { AttachmentError, processAttachment } from "./attachments";
 import { AiClientError, createChatCompletion, type OpenAiMessage, type OpenAiTool } from "./client";
 import { getAiConfig } from "./config";
 import { McpToolError } from "@/lib/mcp/registry";
@@ -73,7 +73,7 @@ function buildSystemPrompt(userEmail: string): string {
 		"- Nutze die Werkzeuge, um aktuelle Daten abzufragen, statt zu raten oder zu erfinden. IDs vorhandener Datensätze ermittelst du über die *_list-Werkzeuge (mit Filtern), Details über die *_get-Werkzeuge.",
 		"- Geldbeträge sind Dezimal-Strings (\"123.45\"), Datumswerte ISO-8601 (\"2026-09-08\"). Die Werkzeuge akzeptieren bei Beträgen auch Komma-Schreibweise.",
 		"- Vor destruktiven oder unwiderruflichen Aktionen (Löschen, Finalisieren von Abrechnungen/Wirtschaftsplänen/Jahresabrechnungen) fasse die geplante Aktion samt betroffenen Datensätzen kurz zusammen und hole die ausdrückliche Bestätigung des Nutzers ein - es sei denn, der Nutzer hat die Aktion bereits eindeutig angefordert.",
-		"- Wenn der Nutzer Dateien anhängt (z. B. Excel-Tabellen), wird deren Inhalt als Text in seine Nachricht eingefügt. Übernimm daraus die gewünschten Datensätze gewissenhaft über die passenden *_create-Werkzeuge. Prüfe vor dem Anlegen, welche verknüpften Datensätze (z. B. Liegenschaft, Einheit) bereits existieren, und berichte abschließend knapp, was angelegt wurde und was nicht geklappt hat.",
+		"- Wenn der Nutzer Dateien anhängt (z. B. Excel-Tabellen, PDFs, Office-Dokumente), wird deren Inhalt als Text in seine Nachricht eingefügt; angehängte Bilder werden dir direkt als Bild-Input übergeben. Übernimm Daten aus den Anhängen gewissenhaft über die passenden *_create-Werkzeuge. Prüfe vor dem Anlegen, welche verknüpften Datensätze (z. B. Liegenschaft, Einheit) bereits existieren, und berichte abschließend knapp, was angelegt wurde und was nicht geklappt hat.",
 		"- Melde Werkzeug-Fehler (isError/Fehlertext) ehrlich zurück und versuche nicht, sie zu verbergen.",
 		"",
 		`Aktuelles Datum: ${today}. Angemeldeter Nutzer: ${userEmail}.`,
@@ -111,28 +111,42 @@ export async function runChat(input: {
 		throw new ChatError("Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent.");
 	}
 
-	// Anhänge serverseitig in Text umwandeln und der letzten Nutzernachricht
-	// beilegen (Endpunkte akzeptieren i. d. R. keine Datei-Uploads).
+	// Anhänge serverseitig aufbereiten: Text-Inhalte werden der letzten
+	// Nutzernachricht beigelegt, Bilder als eigene Vision-Content-Parts
+	// (OpenAI-"image_url" mit Base64-Data-URL) - die wenigsten Endpunkte
+	// akzeptieren Datei-Uploads direkt.
 	let attachmentSection = "";
+	const imageParts: { type: "image_url"; image_url: { url: string } }[] = [];
 	for (const attachment of input.attachments) {
-		let text: string;
+		let processed;
 		try {
-			text = await extractAttachmentText(attachment.name, attachment.dataBase64);
+			processed = await processAttachment(attachment.name, attachment.dataBase64);
 		} catch (error) {
 			if (error instanceof AttachmentError) throw new ChatError(error.message);
 			console.error("[ai] Anhang-Verarbeitung fehlgeschlagen:", error);
 			throw new ChatError(`Der Anhang "${attachment.name}" konnte nicht verarbeitet werden (Details im Server-Log).`);
 		}
-		attachmentSection += `\n\n--- Beginn Datei-Anhang "${attachment.name}" ---\n${text}\n--- Ende Datei-Anhang "${attachment.name}" ---`;
+		if (processed.kind === "image") {
+			imageParts.push({ type: "image_url", image_url: { url: `data:${processed.mimeType};base64,${processed.dataBase64}` } });
+		} else {
+			attachmentSection += `\n\n--- Beginn Datei-Anhang "${attachment.name}" ---\n${processed.text}\n--- Ende Datei-Anhang "${attachment.name}" ---`;
+		}
 	}
 
 	const openAiMessages: OpenAiMessage[] = [{ role: "system", content: buildSystemPrompt(input.userEmail) }];
 	for (let index = 0; index < input.messages.length; index++) {
 		const message = input.messages[index];
 		const isLastUserMessage = index === input.messages.length - 1 && message.role === "user";
+		if (!isLastUserMessage) {
+			openAiMessages.push({ role: message.role, content: message.content });
+			continue;
+		}
+		const text = `${message.content}${attachmentSection}`;
+		// Mit Bildern muss der Inhalt als Content-Part-Array gesendet werden
+		// (OpenAI-Multimodal-Format); ohne Bilder bleibt es ein schlichter String.
 		openAiMessages.push({
-			role: message.role,
-			content: isLastUserMessage ? `${message.content}${attachmentSection}` : message.content,
+			role: "user",
+			content: imageParts.length > 0 ? [{ type: "text" as const, text }, ...imageParts] : text,
 		});
 	}
 
@@ -144,7 +158,9 @@ export async function runChat(input: {
 		const requestedCalls = (assistantMessage.tool_calls ?? []).filter((call) => call.type === "function");
 
 		if (requestedCalls.length === 0) {
-			const reply = (assistantMessage.content ?? "").trim();
+			// Content-Parts kommen nur in Nutzernachrichten vor - die
+			// Assistant-Antwort ist definitionsgemäß ein String (oder null).
+			const reply = (typeof assistantMessage.content === "string" ? assistantMessage.content : "").trim();
 			if (!reply) {
 				throw new AiClientError("Das Modell hat eine leere Antwort geliefert. Bitte versuchen Sie es erneut.");
 			}
