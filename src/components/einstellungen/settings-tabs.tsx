@@ -17,7 +17,11 @@ export interface SettingsTab {
  * der Dropbox- oder KI-Einstellungen) wieder derselbe Bereich geöffnet.
  *
  * Inaktive Inhalte bleiben gemountet (forceMount), damit halb ausgefüllte
- * Formulare beim Tab-Wechsel nicht verloren gehen.
+ * Formulare beim Tab-Wechsel nicht verloren gehen. Achtung: Bei forceMount
+ * setzt Radix das hidden-Attribut NICHT selbst (present ist dann immer
+ * true) - die Sichtbarkeit wird daher hier über ein eigenes hidden-Prop
+ * gesteuert (überschreibt das interne, weil contentProps danach gespreaddet
+ * werden).
  */
 export function SettingsTabs({ tabs }: { tabs: SettingsTab[] }) {
 	const [active, setActive] = useState(tabs[0]?.value ?? "");
@@ -47,7 +51,7 @@ export function SettingsTabs({ tabs }: { tabs: SettingsTab[] }) {
 				))}
 			</TabsList>
 			{tabs.map((tab) => (
-				<TabsContent key={tab.value} value={tab.value} forceMount className="space-y-6">
+				<TabsContent key={tab.value} value={tab.value} forceMount hidden={active !== tab.value} className="space-y-6">
 					{tab.content}
 				</TabsContent>
 			))}
