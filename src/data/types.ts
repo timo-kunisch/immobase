@@ -722,6 +722,36 @@ export interface KnowledgeBaseArticle {
 }
 
 // ============================================================
+// KI-Assistent (persistenter Chat-Verlauf)
+// ============================================================
+
+/** Rolle einer Chat-Nachricht des KI-Assistenten. */
+export type ChatMessageRole = "user" | "assistant";
+
+/** In einer Assistenten-Runde ausgeführter Werkzeug-Aufruf (nur Anzeige in der UI). */
+export interface ChatMessageToolCall {
+	name: string;
+	ok: boolean;
+}
+
+/**
+ * Eine Nachricht im persistenten Chat-Verlauf des KI-Assistenten
+ * (Tabelle `chat_messages`, pro Nutzer). Der Verlauf bleibt bis zum
+ * manuellen Löschen im Dialog erhalten und wird bei jeder Anfrage
+ * vollständig an den KI-Endpunkt mitgesendet. `toolCalls` ist eine
+ * JSON-TEXT-Spalte - das Mapping erfolgt ausschließlich im Repository
+ * (src/data/chat-messages.ts).
+ */
+export interface ChatMessage {
+	id: string;
+	userId: string;
+	role: ChatMessageRole;
+	content: string;
+	toolCalls: ChatMessageToolCall[];
+	createdAt: string;
+}
+
+// ============================================================
 // Aktivitätsprotokoll (Audit Log)
 // ============================================================
 

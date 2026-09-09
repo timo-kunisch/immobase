@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, User, Wrench, X } from "lucide-react";
+import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, TriangleAlert, User, Wrench, X } from "lucide-react";
 
 import { MarkdownContent } from "@/components/layout/markdown-content";
 import { Button } from "@/components/ui/button";
@@ -28,11 +28,14 @@ import { cn } from "@/lib/utils";
  * Text extrahiert bzw. direkt übernommen, Bilder als Vision-Input
  * durchgereicht.
  *
- * Der Gesprächsverlauf liegt im State dieser (immer gemounteten) Komponente -
- * Radix unmountet den Dialog-INHALT beim Schließen; so bleibt das Gespräch
- * über das Schließen hinaus erhalten („Neues Gespräch“ setzt es zurück). Der
- * Server ist zustandslos: Der Verlauf wird bei jeder Anfrage vollständig
- * mitgesendet.
+ * Der Gesprächsverlauf wird serverseitig pro Nutzer persistiert (Tabelle
+ * chat_messages, Zugriff über /api/chat/history) und bleibt über das
+ * Schließen des Dialogs, Seiten-Neuladen und App-Neustarts hinaus erhalten,
+ * bis er manuell gelöscht wird (Papierkorb-Button bzw. die Größen-Warnung).
+ * Der KI-Endpunkt bleibt zustandslos: Der gesamte Verlauf wird bei jeder
+ * Anfrage mitgesendet - ab CHAT_HISTORY_WARNING_CHARS Zeichen blendet der
+ * Dialog eine Warnung zum steigenden Token-Verbrauch ein und empfiehlt das
+ * Löschen.
  */
 
 interface ToolCallInfo {
@@ -55,6 +58,14 @@ interface PendingAttachment {
 
 const MAX_ATTACHMENTS = MAX_ATTACHMENTS_PER_MESSAGE;
 
+/**
+ * Ab dieser Verlaufsgröße (Summe der Nachrichten-Zeichen) wird eine Warnung
+ * eingeblendet: Der gesamte Verlauf fließt bei jeder Anfrage in den Kontext
+ * des KI-Endpunkts (grob ≈ 4 Zeichen pro Token) - 100.000 Zeichen entsprechen
+ * rund 25.000 Tokens Mehrverbrauch pro Nachricht.
+ */
+const CHAT_HISTORY_WARNING_CHARS = 100_000;
+
 async function fileToBase64(file: File): Promise<string> {
 	const bytes = new Uint8Array(await file.arrayBuffer());
 	// btoa arbeitet auf Binärstrings - chunkweise wandeln (Call-Stack-Limit).
@@ -72,12 +83,19 @@ function formatBytes(bytes: number): string {
 	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** Zeichenanzahl mit deutschem Tausendertrennzeichen (für die Größen-Warnung). */
+function formatCharCount(count: number): string {
+	return new Intl.NumberFormat("de-DE").format(count);
+}
+
 export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const [open, setOpen] = useState(false);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
+	const [historyLoaded, setHistoryLoaded] = useState(false);
 	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
 	const [input, setInput] = useState("");
 	const [pending, setPending] = useState(false);
+	const [clearing, setClearing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -87,6 +105,36 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const enabled = aiConfigured;
 	const disabledHint =
 		"Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren";
+
+	// Gesamtlänge des Verlaufs - steuert die Größen-Warnung (der komplette
+	// Verlauf fließt bei jeder Anfrage in den KI-Kontext).
+	const totalHistoryChars = messages.reduce((sum, message) => sum + message.content.length, 0);
+	const historyTooLarge = totalHistoryChars >= CHAT_HISTORY_WARNING_CHARS;
+
+	// Gespeicherten Verlauf beim Mount laden (serverseitig pro Nutzer
+	// persistiert - bleibt bis zum manuellen Löschen erhalten).
+	useEffect(() => {
+		let cancelled = false;
+		void (async () => {
+			try {
+				const response = await fetch("/api/chat/history");
+				const data = (await response.json().catch(() => null)) as { messages?: ChatMessage[]; error?: string } | null;
+				if (!response.ok || data === null || !Array.isArray(data.messages)) {
+					throw new Error(data?.error ?? `Der Chat-Verlauf konnte nicht geladen werden (HTTP ${response.status}).`);
+				}
+				if (!cancelled) setMessages(data.messages);
+			} catch (cause) {
+				if (!cancelled) {
+					setError(cause instanceof Error ? cause.message : "Der Chat-Verlauf konnte nicht geladen werden.");
+				}
+			} finally {
+				if (!cancelled) setHistoryLoaded(true);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, []);
 
 	// Bei neuen Nachrichten/laufender Anfrage ans Ende scrollen.
 	useEffect(() => {
@@ -135,11 +183,13 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		setError(null);
 
 		try {
+			// Nur die neue Nachricht senden - der bisherige Verlauf liegt
+			// serverseitig (chat_messages) und wird dort ergänzt.
 			const response = await fetch("/api/chat", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					messages: nextMessages.map(({ role, content }) => ({ role, content })),
+					message: userMessage.content,
 					attachments: sentAttachments,
 				}),
 			});
@@ -167,12 +217,30 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		}
 	}
 
-	function handleReset(): void {
-		if (pending) return;
-		setMessages([]);
-		setAttachments([]);
+	/**
+	 * Löscht den gesamten Chatverlauf - serverseitig (chat_messages) und
+	 * lokal. Bewusst der einzige Weg, den Verlauf zu beenden: Er übersteht
+	 * sonst Dialog-Schließen, Neuladen und App-Neustarts.
+	 */
+	async function handleClearHistory(): Promise<void> {
+		if (pending || clearing) return;
+		setClearing(true);
 		setError(null);
-		setInput("");
+		try {
+			const response = await fetch("/api/chat/history", { method: "DELETE" });
+			if (!response.ok) {
+				const data = (await response.json().catch(() => null)) as { error?: string } | null;
+				throw new Error(data?.error ?? `Der Chat-Verlauf konnte nicht gelöscht werden (HTTP ${response.status}).`);
+			}
+			setMessages([]);
+			setAttachments([]);
+			setInput("");
+		} catch (cause) {
+			setError(cause instanceof Error ? cause.message : "Der Chat-Verlauf konnte nicht gelöscht werden.");
+		} finally {
+			setClearing(false);
+			textareaRef.current?.focus();
+		}
 	}
 
 	return (
@@ -200,7 +268,12 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				</DialogHeader>
 
 				<div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-					{messages.length === 0 ? (
+					{!historyLoaded && messages.length === 0 ? (
+						<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
+							<Loader2 className="size-4 animate-spin" />
+							Der gespeicherte Chatverlauf wird geladen…
+						</div>
+					) : messages.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
 							<Bot className="size-8" />
 							<p>
@@ -208,6 +281,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 								<br />
 								z. B. „Welche Mietverträge laufen 2026 aus?“ oder „Lege die Mieter aus der angehängten
 								Excel-Tabelle an“.
+							</p>
+							<p className="text-xs">
+								Der Verlauf bleibt gespeichert, bis Sie ihn über den Papierkorb-Button löschen.
 							</p>
 						</div>
 					) : (
@@ -259,6 +335,29 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				</div>
 
 				<div className="space-y-2 border-t px-4 py-3">
+					{historyTooLarge ? (
+						<div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
+							<div className="space-y-1">
+								<p className="font-medium">
+									Der Chatverlauf ist sehr groß geworden ({formatCharCount(totalHistoryChars)} Zeichen).
+								</p>
+								<p>
+									Da der gesamte Verlauf bei jeder Nachricht an die KI mitgesendet wird, steigt der
+									Token-Verbrauch (und damit Kosten und Antwortzeit) spürbar. Es wird empfohlen, den Verlauf
+									zu löschen und ein neues Gespräch zu beginnen.
+								</p>
+								<button
+									type="button"
+									onClick={() => void handleClearHistory()}
+									disabled={pending || clearing}
+									className="font-medium underline underline-offset-2 hover:no-underline disabled:pointer-events-none disabled:opacity-50"
+								>
+									Verlauf jetzt löschen
+								</button>
+							</div>
+						</div>
+					) : null}
 					{attachments.length > 0 ? (
 						<div className="flex flex-wrap gap-1">
 							{attachments.map((attachment, index) => (
@@ -329,12 +428,12 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title="Neues Gespräch beginnen (Verlauf verwerfen)"
-							aria-label="Neues Gespräch beginnen"
-							disabled={pending || messages.length === 0}
-							onClick={handleReset}
+							title="Chatverlauf löschen (neues Gespräch beginnen)"
+							aria-label="Chatverlauf löschen"
+							disabled={pending || clearing || messages.length === 0}
+							onClick={() => void handleClearHistory()}
 						>
-							<Trash2 className="size-4" />
+							{clearing ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
 						</Button>
 					</div>
 				</div>

@@ -87,6 +87,16 @@ CREATE TABLE calendar_events (
 	updated_at text NOT NULL
 );
 
+CREATE TABLE chat_messages (
+	id text PRIMARY KEY NOT NULL,
+	user_id text NOT NULL,
+	role text NOT NULL,
+	content text NOT NULL,
+	tool_calls text,
+	created_at text NOT NULL,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+);
+
 CREATE TABLE company_settings (
 	id text PRIMARY KEY DEFAULT 'singleton' NOT NULL,
 	name text DEFAULT '' NOT NULL,
@@ -652,6 +662,8 @@ CREATE INDEX audit_log_entries_user_id_idx ON audit_log_entries (user_id);
 CREATE INDEX billing_periods_property_id_idx ON billing_periods (property_id);
 
 CREATE INDEX calendar_events_start_date_idx ON calendar_events (start_date);
+
+CREATE INDEX chat_messages_user_idx ON chat_messages (user_id);
 
 CREATE UNIQUE INDEX consumption_values_cost_item_id_unit_id_key ON consumption_values (cost_item_id, unit_id);
 

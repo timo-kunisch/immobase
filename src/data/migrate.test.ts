@@ -105,17 +105,17 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Tabelle der jeweils letzten Migration (derzeit 0006).
-		expect(tableNames(db)).toContain("ticket_messages");
+		// Stichprobe = Tabelle der jeweils letzten Migration (derzeit 0007).
+		expect(tableNames(db)).toContain("chat_messages");
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(tableNames(db)).not.toContain("ticket_messages");
+		expect(tableNames(db)).not.toContain("chat_messages");
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(tableNames(db)).toContain("ticket_messages");
+		expect(tableNames(db)).toContain("chat_messages");
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

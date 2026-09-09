@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_BASE64_CHARS } from "@/lib/ai/attachment-types";
-import { runChat, ChatError, type ChatAttachmentInput, type ChatHistoryMessage } from "@/lib/ai/chat";
+import { runChat, ChatError, type ChatAttachmentInput } from "@/lib/ai/chat";
 import { AiClientError } from "@/lib/ai/client";
 import { isAiConfigured } from "@/lib/ai/config";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { appendChatMessages, listChatMessages } from "@/data/chat-messages";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,35 +22,31 @@ export const runtime = "nodejs";
  * Werkzeuge (Nutzerverwaltung, Absenderdaten) bleiben Administratoren
  * vorbehalten. getCurrentUser() statt requireUser(), damit die Ablehnung
  * als sauberes JSON (401) statt als HTML-Redirect an den fetch-Client geht.
+ *
+ * Gesprächsverlauf: Der Verlauf liegt serverseitig pro Nutzer in der
+ * Tabelle chat_messages (src/data/chat-messages.ts) und bleibt bis zum
+ * manuellen Löschen im Dialog erhalten (DELETE /api/chat/history). Der
+ * Client sendet daher nur die NEUE Nachricht; diese Route lädt den
+ * bisherigen Verlauf, reicht ihn vollständig an den KI-Endpunkt weiter
+ * und persistiert Nutzerfrage + Assistenten-Antwort nach erfolgreichem
+ * Durchlauf. Bewusst KEINE serverseitige Längenkappung des Verlaufs -
+ * der Verlauf soll vollständig erhalten bleiben; auf den damit
+ * steigenden Token-Verbrauch weist eine Größen-Warnung im Dialog hin.
  */
 
-const MAX_MESSAGES = 50;
 const MAX_MESSAGE_CHARS = 20_000;
 
 interface ParsedBody {
-	messages: ChatHistoryMessage[];
+	message: string;
 	attachments: ChatAttachmentInput[];
 }
 
 function parseBody(body: unknown): ParsedBody | string {
 	if (typeof body !== "object" || body === null) return "Der Request-Body muss ein JSON-Objekt sein.";
-	const { messages, attachments } = body as { messages?: unknown; attachments?: unknown };
+	const { message, attachments } = body as { message?: unknown; attachments?: unknown };
 
-	if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
-		return `Erwartet werden 1 bis ${MAX_MESSAGES} Nachrichten.`;
-	}
-	const parsedMessages: ChatHistoryMessage[] = [];
-	for (const message of messages) {
-		if (typeof message !== "object" || message === null) return "Ungültiges Nachrichtenformat.";
-		const { role, content } = message as { role?: unknown; content?: unknown };
-		if (role !== "user" && role !== "assistant") return 'Nachrichten müssen die Rolle "user" oder "assistant" haben.';
-		if (typeof content !== "string" || content.trim() === "" || content.length > MAX_MESSAGE_CHARS) {
-			return `Nachrichten müssen nicht-leere Texte mit höchstens ${MAX_MESSAGE_CHARS} Zeichen sein.`;
-		}
-		parsedMessages.push({ role, content });
-	}
-	if (parsedMessages[parsedMessages.length - 1].role !== "user") {
-		return "Die letzte Nachricht muss vom Nutzer stammen.";
+	if (typeof message !== "string" || message.trim() === "" || message.length > MAX_MESSAGE_CHARS) {
+		return `Erwartet wird eine nicht-leere Nachricht mit höchstens ${MAX_MESSAGE_CHARS} Zeichen.`;
 	}
 
 	const parsedAttachments: ChatAttachmentInput[] = [];
@@ -66,13 +63,9 @@ function parseBody(body: unknown): ParsedBody | string {
 			}
 			parsedAttachments.push({ name: name.trim(), dataBase64 });
 		}
-		// Anhänge gehören fachlich zur letzten Nutzernachricht - ohne sie ergeben sie keinen Sinn.
-		if (parsedAttachments.length > 0 && parsedMessages[parsedMessages.length - 1].role !== "user") {
-			return "Datei-Anhänge sind nur zusammen mit einer Nutzernachricht erlaubt.";
-		}
 	}
 
-	return { messages: parsedMessages, attachments: parsedAttachments };
+	return { message: message.trim(), attachments: parsedAttachments };
 }
 
 export async function POST(request: Request) {
@@ -106,12 +99,21 @@ export async function POST(request: Request) {
 		}
 
 		try {
+			// Gespeicherter Verlauf + die neue Nutzernachricht bilden den
+			// Kontext für den KI-Endpunkt.
+			const history = listChatMessages(user.id).map(({ role, content }) => ({ role, content }));
 			const result = await runChat({
-				messages: parsed.messages,
+				messages: [...history, { role: "user", content: parsed.message }],
 				attachments: parsed.attachments,
 				userEmail: user.email,
 				userRole: user.role,
 			});
+			// Erst nach erfolgreichem Durchlauf persistieren: Nutzerfrage und
+			// Assistenten-Antwort gehören zusammen (eine Transaktion).
+			appendChatMessages(user.id, [
+				{ role: "user", content: parsed.message },
+				{ role: "assistant", content: result.reply, toolCalls: result.toolCalls.map(({ name, ok }) => ({ name, ok })) },
+			]);
 			return NextResponse.json(result);
 		} catch (error) {
 			if (error instanceof ChatError || error instanceof AiClientError) {

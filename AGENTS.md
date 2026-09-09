@@ -202,10 +202,19 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Vision-Input (OpenAI-`image_url`-Content-Parts mit Data-URL – setzt ein multimodales Modell
   voraus) sowie **Text-/Code-Dateien** (.csv/.tsv/.txt/.md/.json/.xml/.yaml/.sql/.ts/.py u. a.)
   direkt. Legacy-Formate (.xls/.doc/.ppt) werden mit Konvertierungs-Hinweis abgelehnt.
-  Obergrenzen: 10 MB/Datei, 5 Anhänge/Nachricht, 500 Zeilen/Blatt, 200 PDF-Seiten, 60k
-  Zeichen/Datei (je mit Kürzungshinweis im Text). Hinweis: `exceljs` statt `xlsx`, weil das
-  npm-Paket `xlsx` ungepatchte High-Vulnerabilities hat (SheetJS patcht nur noch die eigene
-  CDN-Distribution).
+   Obergrenzen: 10 MB/Datei, 5 Anhänge/Nachricht, 500 Zeilen/Blatt, 200 PDF-Seiten, 60k
+   Zeichen/Datei (je mit Kürzungshinweis im Text). Hinweis: `exceljs` statt `xlsx`, weil das
+   npm-Paket `xlsx` ungepatchte High-Vulnerabilities hat (SheetJS patcht nur noch die eigene
+   CDN-Distribution). **Der Gesprächsverlauf ist persistent** (Tabelle `chat_messages` pro
+   Nutzer, Repository `src/data/chat-messages.ts`, Route `src/app/api/chat/history/route.ts`
+   mit GET/DELETE): Er bleibt über Dialog-Schließen, Seiten-Neuladen und App-Neustarts
+   erhalten, bis er im Dialog manuell gelöscht wird (Papierkorb-Button). Der Client sendet
+   daher nur die neue Nachricht an `/api/chat`; die Route lädt den gespeicherten Verlauf,
+   reicht ihn vollständig an den Endpunkt weiter (bewusst keine serverseitige Kappung) und
+   persistiert Nutzerfrage + Assistenten-Antwort nach erfolgreichem Durchlauf (eine
+   Transaktion). Datei-Anhänge werden nicht gespeichert. Ab 100.000 Zeichen
+   Gesamt-Verlaufsgröße (`CHAT_HISTORY_WARNING_CHARS` im Dialog) blendet die UI eine
+   Warnung zum steigenden Token-Verbrauch ein und empfiehlt das Löschen.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -330,6 +339,7 @@ src/
     api/backup/export|import/  # Backup-Routen (requireAdmin())
     api/mcp/route.ts        # MCP-Endpunkt (Bearer-Token, optional aktivierbar)
     api/chat/route.ts       # KI-Assistent-Chat (Session, alle Nutzer; Rolle bestimmt Werkzeug-Scope)
+    api/chat/history/route.ts  # Persistenter Chat-Verlauf (GET laden / DELETE löschen, pro Nutzer)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
@@ -436,6 +446,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
   den Fachdaten berechnet, `src/lib/calendar.ts`)
 - **Wissensdatenbank:** `knowledge_base_articles` (einfache Text-Artikel mit optionalem
   Kategorie-Schlagwort; Suche per LIKE über Titel/Kategorie/Inhalt)
+- **KI-Assistent:** `chat_messages` (persistenter Chat-Verlauf pro Nutzer – `user_id` ON
+  DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige; bleibt bis zum
+  manuellen Löschen im Dialog erhalten, siehe Abschnitt 2)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
   (technische Key/Value-Konfiguration: SMTP, LetterXpress, KI-Endpunkt, URL-Overrides – keine Fachdaten;
   Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
@@ -582,7 +595,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Bei Bedarf direkt in der DB (z. B. per `sqlite3 data.dev`/`data.db`).
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen;
-  `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Dedup/Threading + IMAP-Sync-Stand),
+  `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Dedup/Threading + IMAP-Sync-Stand,
+  `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen),
   `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Verlauf-Ablage;
   Mailer gemockt),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
