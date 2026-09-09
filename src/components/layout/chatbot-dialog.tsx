@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, TriangleAlert, User, Wrench, X } from "lucide-react";
 
 import { MarkdownContent } from "@/components/layout/markdown-content";
@@ -136,7 +136,20 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		};
 	}, []);
 
-	// Bei neuen Nachrichten/laufender Anfrage ans Ende scrollen.
+	// Beim Öffnen des Dialogs direkt ans Ende (neueste Nachricht) scrollen:
+	// Radix unmountet den Dialog-INHALT beim Schließen, der Scroll-Container
+	// wird bei jedem Öffnen also frisch gemountet (Startposition wäre sonst
+	// oben). Der stabile useCallback-Ref läuft dabei in der Commit-Phase vor
+	// dem ersten Paint - kein sichtbares Nach-unten-Springen. (Nicht inline
+	// schreiben: Ein neuer Funktions-Ref je Render würde bei JEDEM Render
+	// ans Ende zwingen und das Hochscrollen im offenen Dialog verhindern.)
+	const setScrollRef = useCallback((element: HTMLDivElement | null) => {
+		scrollRef.current = element;
+		if (element) element.scrollTop = element.scrollHeight;
+	}, []);
+
+	// Bei neuen Nachrichten/laufender Anfrage ans Ende scrollen (solange der
+	// Dialog geöffnet ist).
 	useEffect(() => {
 		const el = scrollRef.current;
 		if (el) el.scrollTop = el.scrollHeight;
@@ -267,7 +280,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 					</DialogDescription>
 				</DialogHeader>
 
-				<div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+				<div ref={setScrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
 					{!historyLoaded && messages.length === 0 ? (
 						<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
 							<Loader2 className="size-4 animate-spin" />
