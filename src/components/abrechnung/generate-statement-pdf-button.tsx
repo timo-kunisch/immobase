@@ -66,7 +66,7 @@ export function GenerateStatementPdfButton({
 				<SendByPostButton
 					sendAction={() => sendStatementByPostAction(tenantStatementId)}
 					disabled={!postalConfigured}
-					disabledReason="Postversand nicht konfiguriert (Einstellungen → Online-Integrationen)"
+					disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)"
 				/>
 			</div>
 			{error ? <span className="text-xs text-destructive">{error}</span> : null}

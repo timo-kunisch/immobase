@@ -88,7 +88,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   `backups/pre-import-*.zip.enc` (backup.ts; Import erkennt sie am Magic).
   Verzeichnisse/`data.db`/`settings.json` sind auf 0700/0600 gehärtet.
 - **E-Mail** über `nodemailer` (SMTP), konfiguriert in der App unter Einstellungen →
-  Online-Integrationen (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
+  Integrationen & KI (Tabelle `app_settings`, Zugriff nur über `src/data/app-settings.ts`; Fallback
   Umgebungsvariablen für Dev/Tests). **Ohne SMTP-Konfiguration sind sämtliche E-Mail-Funktionen
   deaktiviert** (`isSmtpConfigured()`, `src/lib/email/mailer.ts`): `sendMail` wird zum No-Op (kein
   Versand, kein Fallback-Log), der Passwort-Reset sperrt sich mit
@@ -96,7 +96,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Hinweis im Aktionsergebnis) und die E-Mail-Verifizierung gilt als automatisch erfüllt (siehe
   Abschnitt 3).
 - **Ticket-Postfach (IMAP-Empfang, „Mini-Zendesk")** – **optionale Online-Funktion**: Der Admin
-  hinterlegt einen IMAP-Server unter Einstellungen → Integrationen (`imap.host/.port/.secure/.user/
+  hinterlegt einen IMAP-Server unter Einstellungen → Integrationen & KI (`imap.host/.port/.secure/.user/
   .mailbox` Klartext, `imap.pass` feldverschlüsselt in `SECRET_SETTING_KEYS`; Env-Fallbacks
   `IMAP_HOST` etc.; `src/lib/email/imap.ts`, `isImapConfigured()`). Wenn konfiguriert, erscheint das
   Modul `/postfach` in der Sidebar: `src/lib/email/imap-sync.ts` ruft neue Nachrichten per

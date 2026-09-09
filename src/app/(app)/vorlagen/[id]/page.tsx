@@ -99,7 +99,7 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
 												<TableCell className="text-muted-foreground">{formatDate(document.createdAt)}</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
-														<SendByPostButton sendAction={sendGeneratedDocumentByPostAction.bind(null, document.id)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Online-Integrationen)" />
+														<SendByPostButton sendAction={sendGeneratedDocumentByPostAction.bind(null, document.id)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" />
 														<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage="Dieses erzeugte Schreiben wirklich löschen?" />
 													</div>
 												</TableCell>

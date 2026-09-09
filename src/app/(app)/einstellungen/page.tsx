@@ -5,11 +5,12 @@ import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
 import { ImapCard } from "@/components/einstellungen/imap-card";
-import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
+import { LetterXpressCard } from "@/components/einstellungen/letterxpress-card";
 import { McpCard } from "@/components/einstellungen/mcp-card";
 import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
 import { SecurityCard, type SecurityStatus } from "@/components/einstellungen/security-card";
 import { SettingsTabs } from "@/components/einstellungen/settings-tabs";
+import { SmtpCard } from "@/components/einstellungen/smtp-card";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
 import { getDatabaseFilePath } from "@/data/paths";
@@ -26,13 +27,15 @@ export default async function EinstellungenPage() {
 	const settings = getCompanySettings();
 	// Gespeicherte Geheimnisse werden NICHT an den Client gegeben - nur die
 	// Information, ob sie gesetzt sind (Platzhalter im Formular).
-	const integrations = {
+	const smtpSettings = {
 		smtpHost: getSetting("smtp.host") ?? "",
 		smtpPort: getSetting("smtp.port") ?? "",
 		smtpSecure: getSetting("smtp.secure") === "true",
 		smtpUser: getSetting("smtp.user") ?? "",
 		smtpPassSet: Boolean(getSetting("smtp.pass")),
 		smtpFrom: getSetting("smtp.from") ?? "",
+	};
+	const letterXpressSettings = {
 		lxUsername: getSetting("letterxpress.username") ?? "",
 		lxApiKeySet: Boolean(getSetting("letterxpress.apikey")),
 		lxMode: (getSetting("letterxpress.mode") === "live" ? "live" : "test") as "test" | "live",
@@ -65,7 +68,7 @@ export default async function EinstellungenPage() {
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
 				title="Einstellungen"
-				description="Absenderdaten für erzeugte PDFs, Datensicherung, Online-Integrationen und Sicherheit - thematisch gruppiert in Bereichen."
+				description="Absenderdaten für erzeugte PDFs, Datensicherung, Integrationen & KI und Sicherheit - thematisch gruppiert in Bereichen."
 			/>
 
 			<div className="flex-1 p-4 sm:p-6">
@@ -96,8 +99,13 @@ export default async function EinstellungenPage() {
 							label: "Integrationen & KI",
 							content: (
 								<>
-									<IntegrationSettingsForm settings={integrations} />
+									<p className="max-w-xl text-sm text-muted-foreground">
+										Die App läuft vollständig offline. Alle Dienste in diesem Bereich sind optional und lassen sich einzeln
+										einrichten.
+									</p>
+									<SmtpCard settings={smtpSettings} />
 									<ImapCard settings={imapSettings} />
+									<LetterXpressCard settings={letterXpressSettings} />
 									<AiCard
 										state={{
 											baseUrl: getSetting("ai.base_url") ?? "",

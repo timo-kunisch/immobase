@@ -55,16 +55,15 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
 }
 
 /**
- * Speichert die Integrations-Einstellungen (SMTP für E-Mail-Versand,
- * LetterXpress für Postversand) in der app_settings-Tabelle. Leere
- * Geheimnis-Felder (Passwort/API-Key) bleiben unverändert - so muss die UI
- * vorhandene Werte nicht anzeigen. Nur für Admins.
+ * Speichert die SMTP-Einstellungen (E-Mail-Versand) in der
+ * app_settings-Tabelle. Das leere Passwort-Feld bleibt unverändert - so muss
+ * die UI vorhandene Werte nicht anzeigen. Nur für Admins.
  */
-export async function saveIntegrationSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+export async function saveSmtpSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
 
 	try {
-		// SMTP (leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet)
+		// Leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet
 		setSetting("smtp.host", getString(formData, "smtpHost"));
 		setSetting("smtp.port", getString(formData, "smtpPort"));
 		setSetting("smtp.secure", formData.get("smtpSecure") === "on" ? "true" : "false");
@@ -73,15 +72,34 @@ export async function saveIntegrationSettingsAction(_prevState: ActionState, for
 		if (smtpPass) setSetting("smtp.pass", smtpPass);
 		setSetting("smtp.from", getString(formData, "smtpFrom"));
 
-		// LetterXpress (Postversand - optionale Online-Funktion)
+		logActivity(admin, "UPDATE", "einstellungen", "SMTP-Einstellungen (E-Mail-Versand) aktualisiert");
+	} catch (error) {
+		console.error("saveSmtpSettingsAction failed", error);
+		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+	}
+
+	revalidatePath("/einstellungen");
+	return { success: true };
+}
+
+/**
+ * Speichert die LetterXpress-Einstellungen (Postversand, optionale
+ * Online-Funktion) in der app_settings-Tabelle. Das leere API-Key-Feld
+ * bleibt unverändert - so muss die UI vorhandene Werte nicht anzeigen.
+ * Nur für Admins.
+ */
+export async function saveLetterXpressSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const admin = await requireAdmin();
+
+	try {
 		setSetting("letterxpress.username", getString(formData, "lxUsername"));
 		const lxApiKey = getString(formData, "lxApiKey");
 		if (lxApiKey) setSetting("letterxpress.apikey", lxApiKey);
 		setSetting("letterxpress.mode", getString(formData, "lxMode") === "live" ? "live" : "test");
 
-		logActivity(admin, "UPDATE", "einstellungen", "SMTP- und LetterXpress-Einstellungen aktualisiert");
+		logActivity(admin, "UPDATE", "einstellungen", "LetterXpress-Einstellungen (Postversand) aktualisiert");
 	} catch (error) {
-		console.error("saveIntegrationSettingsAction failed", error);
+		console.error("saveLetterXpressSettingsAction failed", error);
 		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
 	}
 

@@ -104,7 +104,7 @@ export default async function OwnerMeetingDetailPage({ params }: { params: Promi
 				<Card>
 					<CardContent className="flex flex-wrap items-center gap-3 py-4">
 						<GenerateMeetingPdfButton action={generateInvitationPdfAction.bind(null, meeting.id, meeting.hoaId)} label="Einladung erzeugen" pdfPath={meeting.invitationPdfPath} pdfFileSize={meeting.invitationPdfFileSize} pdfGeneratedAt={meeting.invitationPdfGeneratedAt} />
-						{meeting.invitationPdfPath ? <SendByPostButton sendAction={sendInvitationByPostAction.bind(null, meeting.id, meeting.hoaId)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Online-Integrationen)" /> : null}
+						{meeting.invitationPdfPath ? <SendByPostButton sendAction={sendInvitationByPostAction.bind(null, meeting.id, meeting.hoaId)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" /> : null}
 					</CardContent>
 				</Card>
 
@@ -163,7 +163,7 @@ export default async function OwnerMeetingDetailPage({ params }: { params: Promi
 						<MinutesTextForm hoaId={meeting.hoaId} meetingId={meeting.id} minutesText={meeting.minutesText} />
 						<div className="flex flex-wrap items-center gap-3 border-t pt-4">
 							<GenerateMeetingPdfButton action={generateMinutesPdfAction.bind(null, meeting.id, meeting.hoaId)} label="Protokoll erzeugen" pdfPath={meeting.minutesPdfPath} pdfFileSize={meeting.minutesPdfFileSize} pdfGeneratedAt={meeting.minutesPdfGeneratedAt} />
-							{meeting.minutesPdfPath ? <SendByPostButton sendAction={sendMinutesByPostAction.bind(null, meeting.id, meeting.hoaId)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Online-Integrationen)" /> : null}
+							{meeting.minutesPdfPath ? <SendByPostButton sendAction={sendMinutesByPostAction.bind(null, meeting.id, meeting.hoaId)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" /> : null}
 						</div>
 						{meeting.minutesFinalizedAt ? (
 							<p className="flex items-center gap-2 text-xs text-muted-foreground">

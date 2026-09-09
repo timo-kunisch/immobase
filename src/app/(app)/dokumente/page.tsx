@@ -152,7 +152,7 @@ export default async function DokumentePage({
 													<SendByPostButton
 														sendAction={sendAnyDocumentByPostAction.bind(null, document.sourceType, document.id)}
 														disabled={!postalConfigured || document.mimeType !== "application/pdf"}
-														disabledReason={!postalConfigured ? "Postversand nicht konfiguriert (Einstellungen → Online-Integrationen)" : "Nur PDF-Dokumente können per Post versendet werden."}
+														disabledReason={!postalConfigured ? "Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" : "Nur PDF-Dokumente können per Post versendet werden."}
 													/>
 													{document.sourceType !== "TENANT_STATEMENT" ? (
 														<ConfirmDeleteButton

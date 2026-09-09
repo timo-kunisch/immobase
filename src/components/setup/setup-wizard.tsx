@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { CompanySettings } from "@/data/types";
-import type { IntegrationSettings } from "@/components/einstellungen/integration-settings-form";
+import type { LetterXpressSettings } from "@/components/einstellungen/letterxpress-card";
+import type { SmtpSettings } from "@/components/einstellungen/smtp-card";
 
 import {
 	getSetupRecoveryKeyAction,
@@ -323,12 +324,19 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 	);
 }
 
+/**
+ * Eingabewerte des Wizard-Schritts „Online-Integrationen“: kombiniert die
+ * Einstellungen der SMTP- und LetterXpress-Karte aus /einstellungen (dort
+ * zwei getrennte Karten, hier ein gemeinsamer Schritt).
+ */
+type SetupIntegrationSettings = SmtpSettings & LetterXpressSettings;
+
 function IntegrationsStep({
 	initial,
 	onDone,
 	onBack,
 }: {
-	initial: IntegrationSettings;
+	initial: SetupIntegrationSettings;
 	onDone: () => void;
 	onBack: () => void;
 }) {
@@ -607,7 +615,7 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 	);
 }
 
-export function SetupWizard({ company, integrations }: { company: CompanySettings; integrations: IntegrationSettings }) {
+export function SetupWizard({ company, integrations }: { company: CompanySettings; integrations: SetupIntegrationSettings }) {
 	const [step, setStep] = useState(0);
 
 	return (

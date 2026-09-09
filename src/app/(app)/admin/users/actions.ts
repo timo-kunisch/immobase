@@ -56,7 +56,7 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 			return {
 				success: true,
 				message:
-					"Freigabe erteilt. Hinweis: Es ist kein E-Mail-Server konfiguriert (Einstellungen → Online-Integrationen) - der Nutzer wurde nicht per E-Mail benachrichtigt.",
+					"Freigabe erteilt. Hinweis: Es ist kein E-Mail-Server konfiguriert (Einstellungen → Integrationen & KI) - der Nutzer wurde nicht per E-Mail benachrichtigt.",
 			};
 		}
 		// Best-effort-Benachrichtigung, Fehler beim Mailversand sollen die

@@ -89,7 +89,7 @@ export async function sendPdfByPostForSource(
 	// Protokoll-Eintrag - ein Versuch kann ohne Konfiguration nie erfolgreich
 	// sein und soll die Sendungsübersicht nicht mit FAILED-Zeilen füllen.
 	if (!isLetterXpressConfigured()) {
-		return { error: "Der Postversand ist nicht eingerichtet. Bitte hinterlegen Sie die LetterXpress-Zugangsdaten unter Einstellungen → Online-Integrationen." };
+		return { error: "Der Postversand ist nicht eingerichtet. Bitte hinterlegen Sie die LetterXpress-Zugangsdaten unter Einstellungen → Integrationen & KI." };
 	}
 
 	const source = loadSourceFile(sourceType, sourceId);
