@@ -11,15 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import type { CompanySettings } from "@/data/types";
-import type { LetterXpressSettings } from "@/components/einstellungen/letterxpress-card";
-import type { SmtpSettings } from "@/components/einstellungen/smtp-card";
 
-import {
-	getSetupRecoveryKeyAction,
-	setupAccountAction,
-	setupCompanySettingsAction,
-	setupIntegrationSettingsAction,
-} from "@/app/(setup)/setup/actions";
+import { getSetupRecoveryKeyAction, setupAccountAction, setupCompanySettingsAction } from "@/app/(setup)/setup/actions";
 
 /**
  * Setup-Wizard für die Ersteinrichtung (Route /setup, nur erreichbar solange
@@ -28,7 +21,8 @@ import {
  *   1. Willkommen (Einführung)
  *   2. Betriebsmodus wählen (Lokal/Host/Client, Desktop-App)
  *   3. Absenderdaten für erzeugte PDFs (überspringbar)
- *   4. Online-Integrationen SMTP/LetterXpress (überspringbar)
+ *   4. Online-Integrationen (reiner Hinweisschritt ohne Konfiguration – die
+ *      optionalen Dienste werden einheitlich in den Einstellungen eingerichtet)
  *   5. Wiederherstellungsschlüssel der lokalen Datenverschlüsselung sichern
  *      (nicht überspringbar, aber ohne Eingabe – Bestätigung per Checkbox)
  *   6. Administratorkonto anlegen (erforderlich, letzter Schritt)
@@ -65,7 +59,7 @@ const STEP_TITLES = [
  * Die Wizard-Karten haben eine farblich abgesetzte Fußleiste (CardFooter mit
  * bg-muted): Die Card trägt dafür unten keinen eigenen Innenabstand
  * (has-card-footer:pb-0), daher bekommt der Inhalt selbst den Abstand zur
- * Leiste. Ohne ihn würde z. B. das Modus-Auswahlfeld der Online-Integrationen
+ * Leiste. Ohne ihn würde z. B. die Hinweisliste der Online-Integrationen
  * direkt an die Leiste stoßen.
  */
 const STEP_CONTENT = "pb-(--card-spacing)";
@@ -100,7 +94,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
 			<ul className="list-disc space-y-1 pl-5">
 				<li>Betriebsmodus (Lokal/Host/Client – Desktop-App)</li>
 				<li>Absenderdaten für erzeugte PDFs (optional)</li>
-				<li>Online-Integrationen für E-Mail- und Postversand (optional)</li>
+				<li>Online-Integrationen (Überblick – die Einrichtung erfolgt später unter „Einstellungen“)</li>
 				<li>Wiederherstellungsschlüssel der lokalen Datenverschlüsselung sichern (erforderlich)</li>
 				<li>Ihr Administratorkonto (erforderlich)</li>
 			</ul>
@@ -325,133 +319,55 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 }
 
 /**
- * Eingabewerte des Wizard-Schritts „Online-Integrationen“: kombiniert die
- * Einstellungen der SMTP- und LetterXpress-Karte aus /einstellungen (dort
- * zwei getrennte Karten, hier ein gemeinsamer Schritt).
+ * Setup-Schritt „Online-Integrationen“: reiner Hinweisschritt OHNE
+ * Konfigurationsmöglichkeit. Die optionalen Online-Dienste (SMTP, IMAP,
+ * LetterXpress, KI-Assistent, MCP-Server, Dropbox-Backup) werden einheitlich
+ * erst nach der Einrichtung in den Einstellungen eingerichtet – der Wizard
+ * weist hier nur darauf hin, damit die Konfigurationswege nicht an zwei
+ * Stellen gepflegt werden müssen.
  */
-type SetupIntegrationSettings = SmtpSettings & LetterXpressSettings;
-
-function IntegrationsStep({
-	initial,
-	onDone,
-	onBack,
-}: {
-	initial: SetupIntegrationSettings;
-	onDone: () => void;
-	onBack: () => void;
-}) {
-	const [state, formAction, isPending] = useActionState(
-		async (prevState: ActionState, formData: FormData) => {
-			const result = await setupIntegrationSettingsAction(prevState, formData);
-			if (result.success) onDone();
-			return result;
-		},
-		initialActionState
-	);
-
+function IntegrationsStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
 	return (
 		<Card>
-			<form action={formAction}>
-				<CardHeader>
-					<CardTitle>Online-Integrationen</CardTitle>
-					<CardDescription>
-						Die App läuft vollständig offline. Diese optionalen Dienste aktivieren E-Mail- bzw. Postversand und können
-						jederzeit unter „Einstellungen“ eingerichtet werden.
-					</CardDescription>
-				</CardHeader>
-				<CardContent className={`${STEP_CONTENT} space-y-6`}>
-					<fieldset className="space-y-4">
-						<legend className="text-sm font-medium">E-Mail-Versand (SMTP)</legend>
-						<div className="grid grid-cols-3 gap-4">
-							<div className="col-span-2 grid gap-2">
-								<Label htmlFor="setup-smtpHost">SMTP-Server</Label>
-								<Input id="setup-smtpHost" name="smtpHost" defaultValue={initial.smtpHost} placeholder="smtp.example.com" />
-							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="setup-smtpPort">Port</Label>
-								<Input id="setup-smtpPort" name="smtpPort" defaultValue={initial.smtpPort} placeholder="587" />
-							</div>
-						</div>
-						<div className="grid grid-cols-2 gap-4">
-							<div className="grid gap-2">
-								<Label htmlFor="setup-smtpUser">Benutzername</Label>
-								<Input id="setup-smtpUser" name="smtpUser" defaultValue={initial.smtpUser} autoComplete="off" />
-							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="setup-smtpPass">Passwort</Label>
-								<Input
-									id="setup-smtpPass"
-									name="smtpPass"
-									type="password"
-									placeholder={initial.smtpPassSet ? "•••••••• (gespeichert, unverändert wenn leer)" : ""}
-									autoComplete="new-password"
-								/>
-							</div>
-						</div>
-						<div className="grid gap-2">
-							<Label htmlFor="setup-smtpFrom">Absenderadresse</Label>
-							<Input id="setup-smtpFrom" name="smtpFrom" defaultValue={initial.smtpFrom} placeholder="verwaltung@example.com" />
-						</div>
-						<label className="flex items-center gap-2 text-sm">
-							<input type="checkbox" name="smtpSecure" defaultChecked={initial.smtpSecure} />
-							SSL/TLS (Port 465)
-						</label>
-						<p className="text-xs text-muted-foreground">
-							Ohne SMTP-Konfiguration sind alle E-Mail-Funktionen (Verifizierung, Passwort-Reset) deaktiviert.
-						</p>
-					</fieldset>
-
-					<fieldset className="space-y-4 border-t pt-4">
-						<legend className="text-sm font-medium">Postversand (LetterXpress)</legend>
-						<div className="grid grid-cols-2 gap-4">
-							<div className="grid gap-2">
-								<Label htmlFor="setup-lxUsername">Benutzername</Label>
-								<Input id="setup-lxUsername" name="lxUsername" defaultValue={initial.lxUsername} autoComplete="off" />
-							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="setup-lxApiKey">API-Schlüssel</Label>
-								<Input
-									id="setup-lxApiKey"
-									name="lxApiKey"
-									type="password"
-									placeholder={initial.lxApiKeySet ? "•••••••• (gespeichert, unverändert wenn leer)" : ""}
-									autoComplete="new-password"
-								/>
-							</div>
-						</div>
-						<div className="grid gap-2">
-							<Label htmlFor="setup-lxMode">Modus</Label>
-							<select
-								id="setup-lxMode"
-								name="lxMode"
-								defaultValue={initial.lxMode}
-								className="h-9 rounded-md border bg-background px-3 text-sm"
-							>
-								<option value="test">Test (kein echter Versand, Aufträge landen nur in der LetterXpress-Postbox)</option>
-								<option value="live">Live (echter, kostenpflichtiger Versand)</option>
-							</select>
-						</div>
-					</fieldset>
-
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-				</CardContent>
-				<CardFooter className="justify-between">
-					<Button type="button" variant="ghost" onClick={onBack}>
-						<ChevronLeft />
-						Zurück
-					</Button>
-					<div className="flex gap-2">
-						<Button type="button" variant="outline" onClick={onDone}>
-							<SkipForward />
-							Überspringen
-						</Button>
-						<Button type="submit" disabled={isPending}>
-							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern und weiter
-						</Button>
-					</div>
-				</CardFooter>
-			</form>
+			<CardHeader>
+				<CardTitle>Online-Integrationen (optional)</CardTitle>
+				<CardDescription>
+					ImmoBase läuft vollständig offline – alle Daten bleiben auf diesem Rechner. Die folgenden optionalen
+					Dienste richten Sie bei Bedarf nach der Einrichtung unter „Einstellungen“ ein.
+				</CardDescription>
+			</CardHeader>
+			<CardContent className={`${STEP_CONTENT} space-y-4 text-sm`}>
+				<div>
+					<p className="font-medium">Einstellungen → „Integrationen &amp; KI“</p>
+					<ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+						<li>E-Mail-Versand (SMTP) – z. B. für Verifizierungs- und Ticket-E-Mails</li>
+						<li>E-Mail-Postfach (IMAP) – eingehende E-Mails im Ticket-System</li>
+						<li>Postversand (LetterXpress) – PDFs (z. B. Abrechnungen) als physische Briefe</li>
+						<li>KI-Assistent – Chatbot in der Sidebar über einen OpenAI-kompatiblen Endpunkt</li>
+						<li>MCP-Server – lesender und schreibender Zugriff externer KI-Clients auf die Fachdaten</li>
+					</ul>
+				</div>
+				<div>
+					<p className="font-medium">Einstellungen → „Datensicherung“</p>
+					<ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
+						<li>Dropbox-Backup – automatische, optional passwortgeschützte Cloud-Sicherung</li>
+					</ul>
+				</div>
+				<p className="text-xs text-muted-foreground">
+					Ohne SMTP-Konfiguration sind alle E-Mail-Funktionen (Verifizierung, Passwort-Reset) deaktiviert – das
+					Ticket-System und alle übrigen Funktionen laufen uneingeschränkt offline.
+				</p>
+			</CardContent>
+			<CardFooter className="justify-between">
+				<Button type="button" variant="ghost" onClick={onBack}>
+					<ChevronLeft />
+					Zurück
+				</Button>
+				<Button type="button" onClick={onDone}>
+					Weiter
+					<ChevronRight />
+				</Button>
+			</CardFooter>
 		</Card>
 	);
 }
@@ -615,7 +531,7 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 	);
 }
 
-export function SetupWizard({ company, integrations }: { company: CompanySettings; integrations: SetupIntegrationSettings }) {
+export function SetupWizard({ company }: { company: CompanySettings }) {
 	const [step, setStep] = useState(0);
 
 	return (
@@ -634,7 +550,7 @@ export function SetupWizard({ company, integrations }: { company: CompanySetting
 				<CompanyStep initial={company} onDone={() => setStep(3)} onBack={() => setStep(1)} />
 			</div>
 			<div className={step === 3 ? undefined : "hidden"}>
-				<IntegrationsStep initial={integrations} onDone={() => setStep(4)} onBack={() => setStep(2)} />
+				<IntegrationsStep onDone={() => setStep(4)} onBack={() => setStep(2)} />
 			</div>
 			<div className={step === 4 ? undefined : "hidden"}>
 				<RecoveryKeyStep active={step === 4} onDone={() => setStep(5)} onBack={() => setStep(3)} />

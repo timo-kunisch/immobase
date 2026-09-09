@@ -303,10 +303,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   `isApproved=false`, bis ein Admin sie unter `/admin/users` freischaltet. Der Normalpfad für das
   erste Konto ist der **Setup-Wizard** `/setup` (Willkommen → Betriebsmodus → Absenderdaten →
   Online-Integrationen → Wiederherstellungsschlüssel → Administratorkonto; der Modus-Schritt gilt nur
-  der Desktop-App und geht per IPC an den Main-Prozess, die Schritte Absenderdaten/Integrationen sind
-  überspringbar, der Schlüssel-Schritt verlangt eine Lesebestätigung per Checkbox, das Konto wird
-  bewusst als letzter Schritt angelegt, damit der `countUsers() === 0`-Guard für alle Setup-Actions
-  gilt). Ohne
+  der Desktop-App und geht per IPC an den Main-Prozess, die Absenderdaten sind überspringbar, der
+  Integrations-Schritt ist ein reiner Hinweisschritt ohne Konfiguration – er verweist nur auf die
+  optionalen Online-Dienste in den Einstellungen, der Schlüssel-Schritt verlangt eine Lesebestätigung
+  per Checkbox, das Konto wird bewusst als letzter Schritt angelegt, damit der
+  `countUsers() === 0`-Guard für alle Setup-Actions gilt). Ohne
   SMTP meldet die letzte Setup-Action den Nutzer direkt an (Session + Redirect auf `/`); mit SMTP
   gilt der klassische Verifizierungslink-Flow über `/login`.
 - **Login-Bedingungen** (beide erforderlich): `emailVerified != null` UND `isApproved == true`.

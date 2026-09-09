@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { SetupWizard } from "@/components/setup/setup-wizard";
-import { getSetting } from "@/data/app-settings";
 import { getCompanySettings } from "@/data/company-settings";
 import { countUsers } from "@/data/users";
 
@@ -28,21 +27,6 @@ export default function SetupPage() {
 	}
 
 	const company = getCompanySettings();
-	// Gespeicherte Geheimnisse werden NICHT an den Client gegeben – nur die
-	// Information, ob sie gesetzt sind (Platzhalter im Formular), wie in
-	// /einstellungen. Relevant, wenn die Einrichtung nach einem Abbruch
-	// erneut durchlaufen wird.
-	const integrations = {
-		smtpHost: getSetting("smtp.host") ?? "",
-		smtpPort: getSetting("smtp.port") ?? "",
-		smtpSecure: getSetting("smtp.secure") === "true",
-		smtpUser: getSetting("smtp.user") ?? "",
-		smtpPassSet: Boolean(getSetting("smtp.pass")),
-		smtpFrom: getSetting("smtp.from") ?? "",
-		lxUsername: getSetting("letterxpress.username") ?? "",
-		lxApiKeySet: Boolean(getSetting("letterxpress.apikey")),
-		lxMode: (getSetting("letterxpress.mode") === "live" ? "live" : "test") as "test" | "live",
-	};
 
-	return <SetupWizard company={company} integrations={integrations} />;
+	return <SetupWizard company={company} />;
 }

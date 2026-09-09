@@ -2,7 +2,6 @@
 
 import { redirect } from "next/navigation";
 
-import { setSetting } from "@/data/app-settings";
 import { saveCompanySettings } from "@/data/company-settings";
 import { countUsers, getUserByEmail } from "@/data/users";
 import { ActionState } from "@/lib/action-state";
@@ -45,37 +44,6 @@ export async function setupCompanySettingsAction(_prevState: ActionState, formDa
 	} catch (error) {
 		console.error("setupCompanySettingsAction failed", error);
 		return { error: "Die Angaben konnten nicht gespeichert werden." };
-	}
-
-	return { success: true };
-}
-
-/**
- * Setup-Schritt „Online-Integrationen“ (SMTP, LetterXpress). Überspringbar.
- * Gleiche Semantik wie in /einstellungen: Leere Geheimnis-Felder bleiben
- * unverändert, sodass ein erneuter Durchlauf gespeicherte Werte nicht löscht.
- */
-export async function setupIntegrationSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
-	ensureSetupAllowed();
-
-	try {
-		// SMTP (leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet)
-		setSetting("smtp.host", getString(formData, "smtpHost"));
-		setSetting("smtp.port", getString(formData, "smtpPort"));
-		setSetting("smtp.secure", formData.get("smtpSecure") === "on" ? "true" : "false");
-		setSetting("smtp.user", getString(formData, "smtpUser"));
-		const smtpPass = getString(formData, "smtpPass");
-		if (smtpPass) setSetting("smtp.pass", smtpPass);
-		setSetting("smtp.from", getString(formData, "smtpFrom"));
-
-		// LetterXpress (Postversand - optionale Online-Funktion)
-		setSetting("letterxpress.username", getString(formData, "lxUsername"));
-		const lxApiKey = getString(formData, "lxApiKey");
-		if (lxApiKey) setSetting("letterxpress.apikey", lxApiKey);
-		setSetting("letterxpress.mode", getString(formData, "lxMode") === "live" ? "live" : "test");
-	} catch (error) {
-		console.error("setupIntegrationSettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
 	}
 
 	return { success: true };
