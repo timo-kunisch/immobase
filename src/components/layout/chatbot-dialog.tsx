@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils";
  * KI-Assistent (Sprechblase im Sidebar-Footer): Öffnet ein Chatfenster, das
  * gegen den in den Einstellungen konfigurierten OpenAI-kompatiblen Endpunkt
  * läuft (POST /api/chat, siehe src/app/api/chat/route.ts). Das Modell kann
- * über die Werkzeuge des MCP-Servers Daten der Anwendung lesen und ändern -
- * der Dialog steht daher nur Administratoren zur Verfügung und ist
- * deaktiviert, solange kein KI-Endpunkt konfiguriert ist.
+ * über die Werkzeuge des MCP-Servers Daten der Anwendung lesen und ändern.
+ * Der Dialog steht allen angemeldeten Nutzern offen (normale Nutzer ohne
+ * Administrations-Werkzeuge, siehe Werkzeug-Scope in src/lib/mcp/registry.ts)
+ * und ist deaktiviert, solange kein KI-Endpunkt konfiguriert ist.
  *
  * Datei-Anhänge (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen,
  * Word-/PowerPoint-Dokumente, Bilder, Text-/Code-Dateien) werden als Base64
@@ -67,7 +68,7 @@ function formatBytes(bytes: number): string {
 	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export function ChatbotDialog({ aiConfigured, isAdmin }: { aiConfigured: boolean; isAdmin: boolean }) {
+export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const [open, setOpen] = useState(false);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
@@ -79,10 +80,9 @@ export function ChatbotDialog({ aiConfigured, isAdmin }: { aiConfigured: boolean
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-	const enabled = aiConfigured && isAdmin;
-	const disabledHint = !isAdmin
-		? "Der KI-Assistent steht nur Administratoren zur Verfügung"
-		: "Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren";
+	const enabled = aiConfigured;
+	const disabledHint =
+		"Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren";
 
 	// Bei neuen Nachrichten/laufender Anfrage ans Ende scrollen.
 	useEffect(() => {

@@ -1,7 +1,7 @@
 import { AttachmentError, processAttachment } from "./attachments";
 import { AiClientError, createChatCompletion, type OpenAiMessage, type OpenAiTool } from "./client";
 import { getAiConfig } from "./config";
-import { McpToolError } from "@/lib/mcp/registry";
+import { McpToolError, type McpToolScope } from "@/lib/mcp/registry";
 
 // Registriert alle Werkzeuge der MCP-Registry als Seiteneffekt - der
 // Chatbot nutzt exakt dieselben Werkzeug-Definitionen und Handler wie der
@@ -12,9 +12,9 @@ import { callTool, listToolDefinitions } from "@/lib/mcp/tools";
 /**
  * Orchestrierung des KI-Chats (Sidebar-Sprechblase): Führt die Unterhaltung
  * gegen den konfigurierten OpenAI-kompatiblen Endpunkt und räumt dem Modell
- * dabei Zugriff auf sämtliche Fachdaten ein - die Werkzeuge der
- * MCP-Registry (src/lib/mcp/) werden als OpenAI-Function-Tools angeboten
- * und vom Modell angeforderte Aufrufe hier lokal ausgeführt (Tool-Loop).
+ * dabei Zugriff auf die Fachdaten ein - die Werkzeuge der MCP-Registry
+ * (src/lib/mcp/) werden als OpenAI-Function-Tools angeboten und vom Modell
+ * angeforderte Aufrufe hier lokal ausgeführt (Tool-Loop).
  *
  * Ablauf je Nutzernachricht:
  * 1. System-Prompt + bisheriger Verlauf + ggf. extrahierter Anhang-Text.
@@ -23,9 +23,13 @@ import { callTool, listToolDefinitions } from "@/lib/mcp/tools";
  *    erneut angefragt (max. MAX_TOOL_ROUNDS Runden als Schleifen-Schutz).
  * 3. Die erste Antwort ohne Werkzeug-Anforderung ist die finale Antwort.
  *
- * Sicherheitsmodell: Die Werkzeuge haben faktisch Admin-Rechte (gleiche
- * Lage wie beim MCP-Token). Die Chat-Route ist daher ausschließlich für
- * Administratoren freigegeben (Prüfung dort, autoritativ).
+ * Sicherheitsmodell: Der Chat steht allen angemeldeten Nutzern offen. Die
+ * Rolle des Nutzers (aus der Session, von der Chat-Route übergeben)
+ * bestimmt den Werkzeug-Scope: Administratoren erhalten alle Werkzeuge,
+ * normale Nutzer nur die fachlichen - exakt die Funktionen, die ihnen auch
+ * in der App-Oberfläche offenstehen (Administrations-Werkzeuge wie
+ * Nutzerverwaltung/Absenderdaten sind adminOnly, siehe
+ * src/lib/mcp/registry.ts).
  */
 
 /** Fachlicher Eingabe-/Ablauffehler des Chats (wird dem Nutzer gemeldet). */
@@ -62,11 +66,11 @@ const MAX_TOOL_ROUNDS = 15;
  */
 const MAX_TOOL_RESULT_CHARS = 40_000;
 
-function buildSystemPrompt(userEmail: string): string {
+function buildSystemPrompt(userEmail: string, scope: McpToolScope): string {
 	const today = new Date().toISOString().slice(0, 10);
 	return [
 		"Du bist der KI-Assistent von ImmoBase, einer Desktop-Anwendung zur Miet- und WEG-Verwaltung (deutsches Mietrecht bzw. WEG i. d. F. der Reform 2020).",
-		"Du hast über die bereitgestellten Werkzeuge vollständigen Lese- und Schreibzugriff auf die Live-Daten der Anwendung: Liegenschaften, Einheiten, Mieter, Verträge, Kautionen, Tickets, Dokumente, Finanzen, Nebenkostenabrechnungen, Dokumentvorlagen sowie die WEG-Verwaltung (Eigentümer, Eigentumsverhältnisse, Verteilerschlüssel, Wirtschaftspläne, Jahresabrechnungen, Hausgeld, Erhaltungsrücklage, Versammlungen, Beschluss-Sammlung).",
+		"Du hast über die bereitgestellten Werkzeuge Lese- und Schreibzugriff auf die Live-Daten der Anwendung: Liegenschaften, Einheiten, Mieter, Verträge, Kautionen, Tickets, Dokumente, Finanzen, Nebenkostenabrechnungen, Dokumentvorlagen sowie die WEG-Verwaltung (Eigentümer, Eigentumsverhältnisse, Verteilerschlüssel, Wirtschaftspläne, Jahresabrechnungen, Hausgeld, Erhaltungsrücklage, Versammlungen, Beschluss-Sammlung).",
 		"",
 		"Verhaltensregeln:",
 		"- Antworte auf Deutsch, sachlich und prägnant. Fasse dich kurz; bei langen Ergebnissen nutze Listen/Tabellen.",
@@ -75,14 +79,19 @@ function buildSystemPrompt(userEmail: string): string {
 		"- Vor destruktiven oder unwiderruflichen Aktionen (Löschen, Finalisieren von Abrechnungen/Wirtschaftsplänen/Jahresabrechnungen) fasse die geplante Aktion samt betroffenen Datensätzen kurz zusammen und hole die ausdrückliche Bestätigung des Nutzers ein - es sei denn, der Nutzer hat die Aktion bereits eindeutig angefordert.",
 		"- Wenn der Nutzer Dateien anhängt (z. B. Excel-Tabellen, PDFs, Office-Dokumente), wird deren Inhalt als Text in seine Nachricht eingefügt; angehängte Bilder werden dir direkt als Bild-Input übergeben. Übernimm Daten aus den Anhängen gewissenhaft über die passenden *_create-Werkzeuge. Prüfe vor dem Anlegen, welche verknüpften Datensätze (z. B. Liegenschaft, Einheit) bereits existieren, und berichte abschließend knapp, was angelegt wurde und was nicht geklappt hat.",
 		"- Melde Werkzeug-Fehler (isError/Fehlertext) ehrlich zurück und versuche nicht, sie zu verbergen.",
+		...(scope === "ADMIN"
+			? []
+			: [
+					"- Der angemeldete Nutzer ist KEIN Administrator: Administrations-Funktionen (Nutzerverwaltung, Einstellungen wie die Absenderdaten) stehen nicht als Werkzeuge zur Verfügung. Weise bei entsprechenden Anfragen freundlich darauf hin, dass dafür ein Administratorkonto nötig ist.",
+				]),
 		"",
 		`Aktuelles Datum: ${today}. Angemeldeter Nutzer: ${userEmail}.`,
 	].join("\n");
 }
 
-/** MCP-Tool-Definitionen → OpenAI-Function-Tools (JSON-Schema wird 1:1 übernommen). */
-function buildOpenAiTools(): OpenAiTool[] {
-	return listToolDefinitions().map((tool) => ({
+/** MCP-Tool-Definitionen → OpenAI-Function-Tools (JSON-Schema wird 1:1 übernommen, scope-gefiltert). */
+function buildOpenAiTools(scope: McpToolScope): OpenAiTool[] {
+	return listToolDefinitions(scope).map((tool) => ({
 		type: "function",
 		function: {
 			name: tool.name,
@@ -100,16 +109,20 @@ function truncateToolResult(text: string): string {
 /**
  * Führt eine Chat-Runde inkl. aller angeforderten Werkzeugaufrufe aus.
  * Wirft ChatError (fachlich, UI-tauglich) oder AiClientError (Endpunkt).
+ * `userRole` ist die Rolle aus der Session und bestimmt den Werkzeug-Scope
+ * (normale Nutzer erhalten keine Administrations-Werkzeuge).
  */
 export async function runChat(input: {
 	messages: ChatHistoryMessage[];
 	attachments: ChatAttachmentInput[];
 	userEmail: string;
+	userRole: "ADMIN" | "USER";
 }): Promise<ChatRunResult> {
 	const config = getAiConfig();
 	if (!config) {
 		throw new ChatError("Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent.");
 	}
+	const scope: McpToolScope = input.userRole === "ADMIN" ? "ADMIN" : "USER";
 
 	// Anhänge serverseitig aufbereiten: Text-Inhalte werden der letzten
 	// Nutzernachricht beigelegt, Bilder als eigene Vision-Content-Parts
@@ -133,7 +146,7 @@ export async function runChat(input: {
 		}
 	}
 
-	const openAiMessages: OpenAiMessage[] = [{ role: "system", content: buildSystemPrompt(input.userEmail) }];
+	const openAiMessages: OpenAiMessage[] = [{ role: "system", content: buildSystemPrompt(input.userEmail, scope) }];
 	for (let index = 0; index < input.messages.length; index++) {
 		const message = input.messages[index];
 		const isLastUserMessage = index === input.messages.length - 1 && message.role === "user";
@@ -150,7 +163,7 @@ export async function runChat(input: {
 		});
 	}
 
-	const tools = buildOpenAiTools();
+	const tools = buildOpenAiTools(scope);
 	const executed: ExecutedToolCall[] = [];
 
 	for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -185,7 +198,7 @@ export async function runChat(input: {
 				continue;
 			}
 			try {
-				const result = await callTool(call.function.name, args);
+				const result = await callTool(call.function.name, args, scope);
 				executed.push({ name: call.function.name, ok: true });
 				openAiMessages.push({
 					role: "tool",

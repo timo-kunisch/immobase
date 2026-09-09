@@ -1,4 +1,4 @@
-import { McpToolError, callTool, listToolDefinitions } from "./registry";
+import { McpToolError, callTool, listToolDefinitions, type McpToolScope } from "./registry";
 
 /**
  * MCP-Protokollschicht (Model Context Protocol) über "Streamable HTTP"
@@ -11,9 +11,13 @@ import { McpToolError, callTool, listToolDefinitions } from "./registry";
  * Unterstützte Methoden:
  * - initialize: Protokoll-Aushandlung (Capabilities, Server-Info)
  * - ping: Keepalive
- * - tools/list: alle registrierten Werkzeuge inkl. JSON-Schema
+ * - tools/list: alle im Scope sichtbaren Werkzeuge inkl. JSON-Schema
  * - tools/call: Werkzeug ausführen
  * - notifications/*: werden quittiert, ohne Antwortinhalt (HTTP 202)
+ *
+ * Der Scope ("ADMIN"/"USER") wird von der Route aus dem Zugriffs-Token
+ * aufgelöst und hier an die Registry durchgereicht: Administrations-
+ * Werkzeuge (adminOnly) sind im Scope "USER" weder gelistet noch aufrufbar.
  */
 
 /** Ausgehandelte Protokollversionen, die dieser Server versteht. */
@@ -55,7 +59,7 @@ function isValidRequest(message: JsonRpcRequest): boolean {
 }
 
 /** Antwort eines Requests; `undefined` bei Notifications (keine Antwort). */
-async function handleSingleRequest(message: JsonRpcRequest): Promise<unknown | undefined> {
+async function handleSingleRequest(message: JsonRpcRequest, scope: McpToolScope): Promise<unknown | undefined> {
 	if (!isValidRequest(message)) {
 		return errorResponse(message.id ?? null, INVALID_REQUEST, "Ungültige JSON-RPC-2.0-Nachricht.");
 	}
@@ -88,7 +92,10 @@ async function handleSingleRequest(message: JsonRpcRequest): Promise<unknown | u
 					"ImmoBase (Miet- und WEG-Verwaltung). Alle Werkzeuge arbeiten direkt auf der lokalen Datenbank. " +
 					"IDs vorhandener Datensätze über die *_list-Werkzeuge ermitteln. Geldbeträge als Dezimal-Strings " +
 					"(\"123.45\"), Datumswerte als ISO-8601-Strings angeben. Lösch- und Finalisierungs-Werkzeuge wirken " +
-					"unwiderruflich - vorher Rückfrage beim Nutzer halten.",
+					"unwiderruflich - vorher Rückfrage beim Nutzer halten." +
+					(scope === "ADMIN"
+						? ""
+						: " Dieses Zugriffs-Token hat eingeschränkte Rechte: Administrations-Werkzeuge (z. B. Nutzerverwaltung) stehen nicht zur Verfügung."),
 			});
 		}
 
@@ -96,7 +103,7 @@ async function handleSingleRequest(message: JsonRpcRequest): Promise<unknown | u
 			return successResponse(id, {});
 
 		case "tools/list":
-			return successResponse(id, { tools: listToolDefinitions() });
+			return successResponse(id, { tools: listToolDefinitions(scope) });
 
 		case "tools/call": {
 			const params = message.params as { name?: unknown; arguments?: unknown } | undefined;
@@ -104,7 +111,7 @@ async function handleSingleRequest(message: JsonRpcRequest): Promise<unknown | u
 				return errorResponse(id, INVALID_PARAMS, 'tools/call benötigt params.name (String).');
 			}
 			try {
-				const result = await callTool(params.name, params.arguments ?? {});
+				const result = await callTool(params.name, params.arguments ?? {}, scope);
 				return successResponse(id, {
 					content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
 					isError: false,
@@ -137,9 +144,11 @@ export interface McpHttpResult {
 
 /**
  * Verarbeitet den rohen Request-Body einer POST-Anfrage an /api/mcp
- * (einzelne JSON-RPC-Nachricht oder Batch-Array).
+ * (einzelne JSON-RPC-Nachricht oder Batch-Array). `scope` ist die aus dem
+ * Zugriffs-Token aufgelöste Zugriffsebene des Aufrufers (Route reicht sie
+ * durch; Default "ADMIN" nur für direkte In-Process-Aufrufe, z. B. Tests).
  */
-export async function handleMcpPost(rawBody: string): Promise<McpHttpResult> {
+export async function handleMcpPost(rawBody: string, scope: McpToolScope = "ADMIN"): Promise<McpHttpResult> {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(rawBody);
@@ -151,7 +160,7 @@ export async function handleMcpPost(rawBody: string): Promise<McpHttpResult> {
 		if (parsed.length === 0) {
 			return { status: 400, body: errorResponse(null, INVALID_REQUEST, "Leerer Batch ist nicht erlaubt.") };
 		}
-		const responses = (await Promise.all(parsed.map((message) => handleSingleRequest(message as JsonRpcRequest)))).filter(
+		const responses = (await Promise.all(parsed.map((message) => handleSingleRequest(message as JsonRpcRequest, scope)))).filter(
 			(response) => response !== undefined
 		);
 		// Bestand der Batch nur aus Notifications, gibt es keine Antwort.
@@ -163,7 +172,7 @@ export async function handleMcpPost(rawBody: string): Promise<McpHttpResult> {
 		return { status: 400, body: errorResponse(null, INVALID_REQUEST, "Erwartet wird eine JSON-RPC-Nachricht (Objekt oder Batch-Array).") };
 	}
 
-	const response = await handleSingleRequest(parsed as JsonRpcRequest);
+	const response = await handleSingleRequest(parsed as JsonRpcRequest, scope);
 	if (response === undefined) return { status: 202, body: undefined };
 	return { status: 200, body: response };
 }

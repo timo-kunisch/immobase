@@ -96,7 +96,9 @@ export default async function EinstellungenPage() {
 											configured: isAiConfigured(),
 										}}
 									/>
-									<McpCard state={{ enabled: isMcpEnabled(), tokenSet: hasMcpToken() }} />
+									<McpCard
+										state={{ enabled: isMcpEnabled(), adminTokenSet: hasMcpToken("ADMIN"), userTokenSet: hasMcpToken("USER") }}
+									/>
 								</>
 							),
 						},

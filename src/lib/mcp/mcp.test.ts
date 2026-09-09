@@ -16,14 +16,15 @@ import { getOpenUnitOwnership, listUnitsWithOwnerships } from "@/data/unit-owner
 import { createLease } from "@/data/leases";
 import { createTenant } from "@/data/tenants";
 import { listTransactions } from "@/data/transactions";
-import { generateMcpToken, isMcpEnabled, isValidMcpToken, setMcpEnabled, clearMcpToken } from "@/lib/mcp/auth";
+import { generateMcpToken, isMcpEnabled, resolveMcpTokenScope, setMcpEnabled, clearMcpToken } from "@/lib/mcp/auth";
 import { handleMcpPost } from "@/lib/mcp/protocol";
 import { callTool } from "@/lib/mcp/tools";
 
 /**
- * Tests für den MCP-Server: Token/Enabled-Konfiguration, JSON-RPC-
- * Protokollschicht (initialize, tools/list, tools/call, Batches,
- * Fehlerfälle) sowie repräsentative Werkzeug-Durchstiche gegen eine echte
+ * Tests für den MCP-Server: Token/Enabled-Konfiguration (beide Token-
+ * Stufen), JSON-RPC-Protokollschicht (initialize, tools/list, tools/call,
+ * Batches, Fehlerfälle), die Scope-Filterung der Werkzeuge (ADMIN vs.
+ * USER) sowie repräsentative Werkzeug-Durchstiche gegen eine echte
  * (temporäre) Datenbank inkl. der gespiegelten Fachregeln (Entwurfs-
  * Sperren, Beschluss-Nummerierung, Eigentümerwechsel, Aussperr-Schutz).
  */
@@ -61,30 +62,49 @@ function seedHoa() {
 describe("MCP-Konfiguration (src/lib/mcp/auth.ts)", () => {
 	it("ist standardmäßig deaktiviert und ohne Token", () => {
 		expect(isMcpEnabled()).toBe(false);
-		expect(isValidMcpToken("irgendwas")).toBe(false);
+		expect(resolveMcpTokenScope("irgendwas")).toBeNull();
 	});
 
-	it("aktiviert/deaktiviert und verwaltet das Token", () => {
+	it("aktiviert/deaktiviert und verwaltet das Admin-Token", () => {
 		setMcpEnabled(true);
 		expect(isMcpEnabled()).toBe(true);
 
 		const token = generateMcpToken();
 		expect(token.length).toBeGreaterThan(30);
-		expect(isValidMcpToken(token)).toBe(true);
-		expect(isValidMcpToken("falsches-token")).toBe(false);
-		expect(isValidMcpToken(null)).toBe(false);
-		expect(isValidMcpToken("")).toBe(false);
+		expect(resolveMcpTokenScope(token)).toBe("ADMIN");
+		expect(resolveMcpTokenScope("falsches-token")).toBeNull();
+		expect(resolveMcpTokenScope(null)).toBeNull();
+		expect(resolveMcpTokenScope("")).toBeNull();
 
 		// Rotation: altes Token ungültig, neues gültig.
 		const rotated = generateMcpToken();
-		expect(isValidMcpToken(token)).toBe(false);
-		expect(isValidMcpToken(rotated)).toBe(true);
+		expect(resolveMcpTokenScope(token)).toBeNull();
+		expect(resolveMcpTokenScope(rotated)).toBe("ADMIN");
 
 		clearMcpToken();
-		expect(isValidMcpToken(rotated)).toBe(false);
+		expect(resolveMcpTokenScope(rotated)).toBeNull();
 
 		setMcpEnabled(false);
 		expect(isMcpEnabled()).toBe(false);
+	});
+
+	it("verwaltet beide Token-Stufen getrennt und löst den Scope korrekt auf", () => {
+		const adminToken = generateMcpToken("ADMIN");
+		const userToken = generateMcpToken("USER");
+
+		expect(resolveMcpTokenScope(adminToken)).toBe("ADMIN");
+		expect(resolveMcpTokenScope(userToken)).toBe("USER");
+		expect(resolveMcpTokenScope("anderes-token")).toBeNull();
+
+		// Rotation des Nutzer-Tokens lässt das Admin-Token unberührt (und umgekehrt).
+		const rotatedUserToken = generateMcpToken("USER");
+		expect(resolveMcpTokenScope(userToken)).toBeNull();
+		expect(resolveMcpTokenScope(rotatedUserToken)).toBe("USER");
+		expect(resolveMcpTokenScope(adminToken)).toBe("ADMIN");
+
+		clearMcpToken("USER");
+		expect(resolveMcpTokenScope(rotatedUserToken)).toBeNull();
+		expect(resolveMcpTokenScope(adminToken)).toBe("ADMIN");
 	});
 });
 
@@ -161,6 +181,67 @@ describe("MCP-Protokollschicht (src/lib/mcp/protocol.ts)", () => {
 		// Die Notification erzeugt keine Antwort - nur 2 von 3 Einträgen.
 		expect(Array.isArray(result.body)).toBe(true);
 		expect((result.body as unknown[]).length).toBe(2);
+	});
+});
+
+describe("MCP-Werkzeug-Scope (ADMIN vs. USER)", () => {
+	it("tools/list blendet Admin-Werkzeuge im Scope USER aus", async () => {
+		const result = await handleMcpPost(JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }), "USER");
+		const body = result.body as { result: { tools: { name: string }[] } };
+		const names = body.result.tools.map((tool) => tool.name);
+
+		// Fachliche Werkzeuge bleiben sichtbar...
+		for (const expected of ["properties_list", "leases_update", "hoas_create", "calendar_list", "knowledge_articles_create"]) {
+			expect(names).toContain(expected);
+		}
+		// ...Administrations-Werkzeuge dagegen nicht.
+		for (const hidden of ["users_list", "users_set_approval", "company_settings_get", "company_settings_update"]) {
+			expect(names).not.toContain(hidden);
+		}
+	});
+
+	it("initialize weist im Scope USER auf die Einschränkung hin", async () => {
+		const result = await handleMcpPost(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }), "USER");
+		const body = result.body as { result: { instructions: string } };
+		expect(body.result.instructions).toContain("eingeschränkte Rechte");
+
+		const adminResult = await handleMcpPost(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }), "ADMIN");
+		const adminBody = adminResult.body as { result: { instructions: string } };
+		expect(adminBody.result.instructions).not.toContain("eingeschränkte Rechte");
+	});
+
+	it("tools/call sperrt Admin-Werkzeuge im Scope USER (isError-Result)", async () => {
+		const result = await handleMcpPost(
+			JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "users_list", arguments: {} } }),
+			"USER"
+		);
+		const body = result.body as { result: { isError: boolean; content: { text: string }[] } };
+		expect(body.result.isError).toBe(true);
+		expect(body.result.content[0].text).toContain("nur Administratoren");
+	});
+
+	it("tools/call erlaubt fachliche Werkzeuge im Scope USER", async () => {
+		const result = await handleMcpPost(
+			JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: { name: "properties_create", arguments: { name: "Haus", street: "S", zipCode: "1", city: "C", country: "D" } },
+			}),
+			"USER"
+		);
+		const body = result.body as { result: { isError: boolean; content: { text: string }[] } };
+		expect(body.result.isError).toBe(false);
+		expect(body.result.content[0].text).toContain('"id"');
+	});
+
+	it("callTool erzwingt den Scope auch bei direktem Aufruf", async () => {
+		await expect(callTool("users_set_approval", { userId: "x", isApproved: true }, "USER")).rejects.toThrow(/nur Administratoren/);
+		await expect(callTool("company_settings_update", { name: "X", street: "S", zipCode: "1", city: "C" }, "USER")).rejects.toThrow(
+			/nur Administratoren/
+		);
+		// Im Admin-Scope (Default) bleiben sie aufrufbar.
+		expect(((await callTool("users_list", {})) as unknown[]).length).toBe(0);
 	});
 });
 

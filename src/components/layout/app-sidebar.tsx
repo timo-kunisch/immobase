@@ -250,7 +250,7 @@ export function AppSidebar({ user, aiConfigured }: { user: { email: string; role
 						<span className="truncate text-xs font-medium">{user.email}</span>
 						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? "Administrator" : "Nutzer"}</span>
 					</div>
-					<ChatbotDialog aiConfigured={aiConfigured} isAdmin={user.role === "ADMIN"} />
+					<ChatbotDialog aiConfigured={aiConfigured} />
 					<form action={logoutAction}>
 						<Button type="submit" variant="ghost" size="icon-sm" title="Abmelden" aria-label="Abmelden">
 							<LogOut className="size-4" />

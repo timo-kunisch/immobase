@@ -13,7 +13,7 @@ import { resetApplicationData } from "@/data/reset";
 import { ActionState } from "@/lib/action-state";
 import { getDataKeyBase64 } from "@/lib/data-key";
 import { encryptPlaintextFilesInTree } from "@/lib/file-crypto";
-import { generateMcpToken, getMcpToken, hasMcpToken, setMcpEnabled } from "@/lib/mcp/auth";
+import { generateMcpToken, getMcpToken, hasMcpToken, setMcpEnabled, type McpTokenKind } from "@/lib/mcp/auth";
 
 import { RESET_CONFIRMATION_PHRASE } from "./reset-confirmation";
 
@@ -224,17 +224,19 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
 
 /**
  * Aktiviert/deaktiviert den MCP-Server (/api/mcp). Beim ersten Aktivieren
- * wird automatisch ein Zugriffs-Token erzeugt; beim Deaktivieren bleibt
- * das Token gespeichert (Zugriff ist dann trotzdem gesperrt), sodass eine
- * spätere Reaktivierung ohne Client-Umkonfiguration möglich ist.
- * Nur für Admins.
+ * werden automatisch beide Zugriffs-Token erzeugt (Admin-Token mit
+ * Vollzugriff, eingeschränktes Nutzer-Token - siehe src/lib/mcp/auth.ts);
+ * beim Deaktivieren bleiben die Token gespeichert (Zugriff ist dann
+ * trotzdem gesperrt), sodass eine spätere Reaktivierung ohne
+ * Client-Umkonfiguration möglich ist. Nur für Admins.
  */
 export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState> {
 	const admin = await requireAdmin();
 	try {
 		setMcpEnabled(enabled);
-		if (enabled && !hasMcpToken()) {
-			generateMcpToken();
+		if (enabled) {
+			if (!hasMcpToken("ADMIN")) generateMcpToken("ADMIN");
+			if (!hasMcpToken("USER")) generateMcpToken("USER");
 		}
 		logActivity(admin, "UPDATE", "einstellungen", enabled ? "MCP-Server aktiviert" : "MCP-Server deaktiviert");
 	} catch (error) {
@@ -245,16 +247,22 @@ export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState
 	return { success: true };
 }
 
+const TOKEN_KIND_LABELS: Record<McpTokenKind, string> = {
+	ADMIN: "Admin-Token",
+	USER: "Nutzer-Token",
+};
+
 /**
- * Liefert das MCP-Zugriffs-Token im Klartext (zum Anzeigen/Kopieren in
+ * Liefert ein MCP-Zugriffs-Token im Klartext (zum Anzeigen/Kopieren in
  * der UI). Sicherheitsrelevant: wird erst nach explizitem Klick abgerufen
  * (Muster wie getRecoveryKeyAction). Nur für Admins.
  */
-export async function getMcpTokenAction(): Promise<{ token?: string; error?: string }> {
+export async function getMcpTokenAction(kind: McpTokenKind): Promise<{ token?: string; error?: string }> {
 	await requireAdmin();
+	if (kind !== "ADMIN" && kind !== "USER") return { error: "Unbekannte Token-Stufe." };
 	try {
-		const token = getMcpToken();
-		if (!token) return { error: "Es ist noch kein MCP-Token vorhanden - MCP-Server zuerst aktivieren." };
+		const token = getMcpToken(kind);
+		if (!token) return { error: `Es ist noch kein ${TOKEN_KIND_LABELS[kind]} vorhanden - MCP-Server zuerst aktivieren.` };
 		return { token };
 	} catch (error) {
 		console.error("getMcpTokenAction failed", error);
@@ -263,15 +271,16 @@ export async function getMcpTokenAction(): Promise<{ token?: string; error?: str
 }
 
 /**
- * Erzeugt ein neues MCP-Zugriffs-Token (Rotations-Funktion). Das bisherige
- * Token ist ab sofort ungültig - verbundene KI-Clients müssen umkonfiguriert
- * werden. Nur für Admins.
+ * Erzeugt ein neues MCP-Zugriffs-Token der angegebenen Stufe
+ * (Rotations-Funktion). Das bisherige Token ist ab sofort ungültig -
+ * verbundene KI-Clients müssen umkonfiguriert werden. Nur für Admins.
  */
-export async function regenerateMcpTokenAction(): Promise<{ token?: string; error?: string }> {
+export async function regenerateMcpTokenAction(kind: McpTokenKind): Promise<{ token?: string; error?: string }> {
 	const admin = await requireAdmin();
+	if (kind !== "ADMIN" && kind !== "USER") return { error: "Unbekannte Token-Stufe." };
 	try {
-		const token = generateMcpToken();
-		logActivity(admin, "UPDATE", "einstellungen", "MCP-Zugriffs-Token neu erzeugt");
+		const token = generateMcpToken(kind);
+		logActivity(admin, "UPDATE", "einstellungen", `MCP-${TOKEN_KIND_LABELS[kind]} neu erzeugt`);
 		return { token };
 	} catch (error) {
 		console.error("regenerateMcpTokenAction failed", error);

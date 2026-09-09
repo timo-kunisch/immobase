@@ -22,6 +22,19 @@
 /** Fachlicher Fehler eines Tool-Aufrufs (wird als isError-Result gemeldet). */
 export class McpToolError extends Error {}
 
+/**
+ * Zugriffsebene eines Aufrufers der Werkzeug-Registry:
+ * - "ADMIN": alle Werkzeuge (inkl. der als adminOnly markierten
+ *   Administrations-Werkzeuge wie Nutzerverwaltung/Stammdaten-Einstellungen).
+ * - "USER": nur fachliche Werkzeuge - entspricht dem, was ein normaler Nutzer
+ *   auch in der App-Oberfläche darf (Admin-Bereich und Einstellungen sind
+ *   dort admins-only, siehe src/app/(app)/admin/ bzw. .../einstellungen/).
+ *
+ * Die Einstiegspunkte (MCP-Route über das Zugriffs-Token, Chat-Route über
+ * die Session-Rolle) bestimmen den Scope autoritativ und reichen ihn durch.
+ */
+export type McpToolScope = "ADMIN" | "USER";
+
 // ------------------------------------------------------------
 // Feld-Spezifikationen (erzeugen JSON-Schema + Validierung)
 // ------------------------------------------------------------
@@ -184,6 +197,13 @@ export interface McpTool {
 	description: string;
 	/** JSON-Schema (type "object") der Argumente. */
 	inputSchema: Record<string, unknown>;
+	/**
+	 * true = Administrations-Werkzeug: steht nur im Scope "ADMIN" zur
+	 * Verfügung (weder in tools/list sichtbar noch per tools/call aufrufbar).
+	 * Für Werkzeuge zu markieren, deren Fachfunktion auch in der App nur
+	 * Administratoren offensteht (Nutzerverwaltung, Einstellungen).
+	 */
+	adminOnly?: boolean;
 	/** Führt das Werkzeug aus; Rückgabewert wird dem Client als JSON-Text geliefert. */
 	handler: (args: Record<string, unknown>) => unknown | Promise<unknown>;
 }
@@ -199,15 +219,23 @@ export function registerTools(definitions: McpTool[]): void {
 	for (const tool of definitions) registerTool(tool);
 }
 
-/** Alle Werkzeuge ohne Handler (für tools/list). */
-export function listToolDefinitions(): Omit<McpTool, "handler">[] {
-	return [...tools.values()].map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+/** Alle im Scope sichtbaren Werkzeuge ohne Handler (für tools/list). */
+export function listToolDefinitions(scope: McpToolScope = "ADMIN"): Omit<McpTool, "handler">[] {
+	return [...tools.values()]
+		.filter((tool) => scope === "ADMIN" || !tool.adminOnly)
+		.map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
 }
 
-/** Führt ein Werkzeug aus. Wirft McpToolError bei unbekanntem Namen. */
-export async function callTool(name: string, args: unknown): Promise<unknown> {
+/**
+ * Führt ein Werkzeug aus. Wirft McpToolError bei unbekanntem Namen bzw.
+ * wenn ein Admin-Werkzeug im Scope "USER" aufgerufen wird.
+ */
+export async function callTool(name: string, args: unknown, scope: McpToolScope = "ADMIN"): Promise<unknown> {
 	const tool = tools.get(name);
 	if (!tool) throw new McpToolError(`Unbekanntes Werkzeug: "${name}".`);
+	if (tool.adminOnly && scope !== "ADMIN") {
+		throw new McpToolError(`Das Werkzeug "${name}" steht nur Administratoren zur Verfügung.`);
+	}
 	return tool.handler((args ?? {}) as Record<string, unknown>);
 }
 
@@ -237,6 +265,8 @@ export interface CrudToolConfig<TInput> {
 	delete: (id: string) => void;
 	/** Optionale Filter-Felder für das list-Werkzeug. */
 	listFilters?: Record<string, FieldSpec>;
+	/** true = alle fünf Werkzeuge der Entität stehen nur im Scope "ADMIN". */
+	adminOnly?: boolean;
 	/** Zusätzliche fachliche Prüfung vor create (Fehlertext oder null). */
 	beforeCreate?: (input: TInput) => string | null;
 	/** Zusätzliche fachliche Prüfung vor update/delete (Fehlertext oder null). */
@@ -260,12 +290,13 @@ function requireId(args: unknown): string {
  * (<entity>_list, _get, _create, _update, _delete).
  */
 export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void {
-	const { entity, entityLabel, fields } = config;
+	const { entity, entityLabel, fields, adminOnly } = config;
 
 	registerTool({
 		name: `${entity}_list`,
 		description: `Listet ${entityLabel}n auf.${config.listFilters ? " Optional filterbar." : ""}`,
 		inputSchema: buildInputSchema(config.listFilters ?? {}),
+		adminOnly,
 		handler: (args) => {
 			const filter = coerceArgs(config.listFilters ?? ({} as Record<string, FieldSpec>), args);
 			return config.list(filter);
@@ -278,6 +309,7 @@ export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void 
 			name: `${entity}_get`,
 			description: `Liefert eine ${entityLabel} per ID.`,
 			inputSchema: buildInputSchema({ id: { type: "string", description: "ID des Datensatzes" } }),
+			adminOnly,
 			handler: (args) => {
 				const id = requireId(args);
 				const record = get(id);
@@ -291,6 +323,7 @@ export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void 
 		name: `${entity}_create`,
 		description: `Legt eine ${entityLabel} an und liefert den neuen Datensatz (inkl. ID).${config.fieldsHint ? ` ${config.fieldsHint}` : ""}`,
 		inputSchema: buildInputSchema(fields),
+		adminOnly,
 		handler: (args) => {
 			const input = coerceArgs(fields, args) as unknown as TInput;
 			const guardError = config.beforeCreate?.(input);
@@ -303,6 +336,7 @@ export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void 
 		name: `${entity}_update`,
 		description: `Aktualisiert eine ${entityLabel} (vollständiger Ersatz aller Felder wie im Bearbeiten-Dialog der App).`,
 		inputSchema: buildInputSchema({ id: { type: "string", description: "ID des Datensatzes" }, ...fields }),
+		adminOnly,
 		handler: (args) => {
 			const id = requireId(args);
 			// "id" ist Transportfeld, kein Fachfeld - vor der Feldvalidierung entfernen.
@@ -320,6 +354,7 @@ export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void 
 		name: `${entity}_delete`,
 		description: `Löscht eine ${entityLabel} unwiderruflich.`,
 		inputSchema: buildInputSchema({ id: { type: "string", description: "ID des Datensatzes" } }),
+		adminOnly,
 		handler: (args) => {
 			const id = requireId(args);
 			if (config.get && !config.get(id)) throw new McpToolError(`${entityLabel} mit ID "${id}" wurde nicht gefunden.`);

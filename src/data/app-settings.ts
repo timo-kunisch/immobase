@@ -50,7 +50,9 @@ const SECRET_TAG_LENGTH = 16;
  * Dropbox: Refresh-/Access-Token des verbundenen Kontos, das zwischenge-
  * speicherte PKCE-Paar des laufenden Verbindungsvorgangs sowie das optionale
  * Passwort für die automatische Cloud-Sicherung (src/lib/dropbox-backup.ts).
- * MCP: das Zugriffs-Token des optionalen MCP-Servers (src/lib/mcp/auth.ts).
+ * MCP: die Zugriffs-Token des optionalen MCP-Servers (Admin-Token mit
+ * Vollzugriff, Nutzer-Token mit eingeschränktem Werkzeug-Scope, siehe
+ * src/lib/mcp/auth.ts).
  * KI-Assistent: der API-Schlüssel des konfigurierten OpenAI-kompatiblen
  * Endpunkts (src/lib/ai/config.ts).
  */
@@ -62,6 +64,7 @@ const SECRET_SETTING_KEYS = new Set([
 	"dropbox.oauth_pending",
 	"dropbox.backup_password",
 	"mcp.token",
+	"mcp.user_token",
 	"ai.apikey",
 ]);
 

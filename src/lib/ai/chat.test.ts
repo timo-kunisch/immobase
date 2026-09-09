@@ -20,8 +20,9 @@ import { registerTool } from "@/lib/mcp/registry";
  * Fehlerfälle) und der Chat-Tool-Loop gegen einen gemockten
  * OpenAI-kompatiblen Endpunkt (fetch wird per vi.stubGlobal gemockt - es
  * findet KEIN echter Netzwerkzugriff statt; Muster wie in
- * src/lib/dropbox.test.ts). Werkzeug-Aufrufe laufen gegen ein eigens
- * registriertes Test-Werkzeug der echten MCP-Registry.
+ * src/lib/dropbox.test.ts) inkl. der rollenbasierten Werkzeug-Einschränkung
+ * (normale Nutzer ohne Administrations-Werkzeuge). Werkzeug-Aufrufe laufen
+ * gegen ein eigens registriertes Test-Werkzeug der echten MCP-Registry.
  */
 
 let testDir: string;
@@ -244,9 +245,9 @@ describe("Anhang-Verarbeitung (src/lib/ai/attachments.ts)", () => {
 
 describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 	it("wirft ChatError, wenn kein Endpunkt konfiguriert ist", async () => {
-		await expect(runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "a@b.c" })).rejects.toThrow(
-			ChatError
-		);
+		await expect(
+			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "a@b.c", userRole: "ADMIN" })
+		).rejects.toThrow(ChatError);
 	});
 
 	it("führt vom Modell angeforderte Werkzeuge aus und liefert die Abschlussantwort", async () => {
@@ -263,7 +264,12 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 			{ role: "assistant", content: "Das Echo lautet: hallo." },
 		]);
 
-		const result = await runChat({ messages: [{ role: "user", content: "Echo bitte." }], attachments: [], userEmail: "admin@test.de" });
+		const result = await runChat({
+			messages: [{ role: "user", content: "Echo bitte." }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
 
 		expect(result.reply).toBe("Das Echo lautet: hallo.");
 		expect(result.toolCalls).toEqual([{ name: "test_echo_tool", ok: true }]);
@@ -307,7 +313,12 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 			{ role: "assistant", content: "Das Werkzeug existiert nicht." },
 		]);
 
-		const result = await runChat({ messages: [{ role: "user", content: "Test" }], attachments: [], userEmail: "admin@test.de" });
+		const result = await runChat({
+			messages: [{ role: "user", content: "Test" }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
 
 		expect(result.reply).toBe("Das Werkzeug existiert nicht.");
 		expect(result.toolCalls).toHaveLength(1);
@@ -323,6 +334,7 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 			messages: [{ role: "user", content: "Lies die Datei." }],
 			attachments: [{ name: "werte.csv", dataBase64: Buffer.from("Name;Wert\nA;1", "utf8").toString("base64") }],
 			userEmail: "admin@test.de",
+			userRole: "ADMIN",
 		});
 
 		expect(result.reply).toBe("Verstanden.");
@@ -345,6 +357,7 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 				{ name: "notizen.txt", dataBase64: Buffer.from("Begleittext zur Datei", "utf8").toString("base64") },
 			],
 			userEmail: "admin@test.de",
+			userRole: "ADMIN",
 		});
 
 		expect(result.reply).toBe("Ich sehe das Bild.");
@@ -371,7 +384,47 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 		);
 
 		await expect(
-			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "admin@test.de" })
+			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "admin@test.de", userRole: "ADMIN" })
 		).rejects.toThrow(/HTTP 401.*API-Schlüssel prüfen/);
+	});
+
+	it("schränkt die Werkzeuge für normale Nutzer ein (keine Admin-Werkzeuge)", async () => {
+		ensureTestTool();
+		configureAi();
+		const fetchMock = mockFetchSequence([
+			// Das Modell versucht trotz eingeschränktem Angebot ein Admin-Werkzeug.
+			{
+				role: "assistant",
+				content: null,
+				tool_calls: [{ id: "call_7", type: "function", function: { name: "users_list", arguments: "{}" } }],
+			},
+			{ role: "assistant", content: "Dafür ist ein Administratorkonto nötig." },
+		]);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Liste alle Benutzerkonten." }],
+			attachments: [],
+			userEmail: "user@test.de",
+			userRole: "USER",
+		});
+
+		// Dem Endpunkt werden keine Admin-Werkzeuge angeboten...
+		const body1 = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as {
+			messages: { role: string; content: string }[];
+			tools: { function: { name: string } }[];
+		};
+		const offeredToolNames = body1.tools.map((tool) => tool.function.name);
+		expect(offeredToolNames).toContain("properties_list");
+		expect(offeredToolNames).not.toContain("users_list");
+		expect(offeredToolNames).not.toContain("users_set_approval");
+		expect(offeredToolNames).not.toContain("company_settings_update");
+		// ...und der System-Prompt erklärt die Einschränkung.
+		expect(body1.messages[0].content).toContain("KEIN Administrator");
+
+		// Ein dennoch angefordertes Admin-Werkzeug wird als Fehler ans Modell gemeldet.
+		expect(result.toolCalls).toHaveLength(1);
+		expect(result.toolCalls[0].ok).toBe(false);
+		expect(result.toolCalls[0].detail).toContain("nur Administratoren");
+		expect(result.reply).toBe("Dafür ist ein Administratorkonto nötig.");
 	});
 });

@@ -842,11 +842,14 @@ registerTool({
 // ============================================================
 // Absenderdaten (Company Settings, Singleton)
 // ============================================================
+// adminOnly: Die Absenderdaten gehören zu den Einstellungen, die auch in
+// der App nur Administratoren offenstehen (src/app/(app)/einstellungen/).
 
 registerTool({
 	name: "company_settings_get",
 	description: "Liefert die Absenderdaten (Vermieter/Hausverwaltung) für Briefköpfe erzeugter PDFs.",
 	inputSchema: buildInputSchema({}),
+	adminOnly: true,
 	handler: () => getCompanySettings(),
 });
 
@@ -860,6 +863,7 @@ registerTool({
 		city: { type: "string" },
 		additional: { type: "string", nullable: true, description: "Zusatzzeile im Briefkopf (z. B. Kontaktdaten)" },
 	}),
+	adminOnly: true,
 	handler: (args) => {
 		const input = coerceArgs(
 			{

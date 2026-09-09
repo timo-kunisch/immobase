@@ -17,15 +17,17 @@ import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, register
 
 /**
  * MCP-Werkzeuge der Benutzerverwaltung und der allgemeinen Module
- * (Kalender, Wissensdatenbank). Da das MCP-Token faktisch Admin-Rechte
- * hat (nur Admins können den MCP-Server aktivieren), sind hier auch die
- * Admin-Aktionen der Nutzerverwaltung verfügbar.
+ * (Kalender, Wissensdatenbank). Die Werkzeuge der Benutzerverwaltung sind
+ * als adminOnly markiert: Sie stehen nur im Scope "ADMIN" zur Verfügung
+ * (Admin-Token bzw. Admin-Session im KI-Chat), weil die Nutzerverwaltung
+ * auch in der App nur Administratoren offensteht.
  */
 
 registerTool({
 	name: "users_list",
 	description: "Listet alle Benutzerkonten auf (ohne Passwort-Hashes).",
 	inputSchema: buildInputSchema({}),
+	adminOnly: true,
 	handler: () =>
 		listUsers().map((user) => ({
 			id: user.id,
@@ -48,6 +50,7 @@ registerTool({
 		userId: { type: "string" },
 		isApproved: { type: "boolean" },
 	}),
+	adminOnly: true,
 	handler: (args) => {
 		const input = coerceArgs({ userId: { type: "string" }, isApproved: { type: "boolean" } }, args);
 		const userId = input.userId as string;

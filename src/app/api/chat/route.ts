@@ -14,12 +14,13 @@ export const runtime = "nodejs";
  * src/components/layout/chatbot-dialog.tsx).
  *
  * Sicherheitsmodell: Session-Authentifizierung über den Auth-Proxy
- * (src/proxy.ts, Cookie-Check) + autoritative Prüfung hier: Nur
- * ADMINISTRATOREN dürfen chatten, weil das Modell über die Werkzeuge der
- * MCP-Registry faktisch Admin-Rechte auf sämtliche Fachdaten erhält
- * (gleiche Lage wie beim MCP-Zugriffs-Token, siehe src/lib/mcp/auth.ts).
- * getCurrentUser() statt requireAdmin(), damit die Ablehnung als sauberes
- * JSON (401/403) statt als HTML-Redirect an den fetch-Client geht.
+ * (src/proxy.ts, Cookie-Check) + autoritative Prüfung hier. Der Chat steht
+ * ALLEN angemeldeten Nutzern offen; die Rolle des Nutzers bestimmt den
+ * Werkzeug-Scope (src/lib/mcp/registry.ts): Normale Nutzer erhalten nur
+ * die fachlichen Werkzeuge (wie in der App-Oberfläche), Administrations-
+ * Werkzeuge (Nutzerverwaltung, Absenderdaten) bleiben Administratoren
+ * vorbehalten. getCurrentUser() statt requireUser(), damit die Ablehnung
+ * als sauberes JSON (401) statt als HTML-Redirect an den fetch-Client geht.
  */
 
 const MAX_MESSAGES = 50;
@@ -84,12 +85,6 @@ export async function POST(request: Request) {
 		if (!user) {
 			return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
 		}
-		if (user.role !== "ADMIN") {
-			return NextResponse.json(
-				{ error: "Der KI-Assistent steht nur Administratoren zur Verfügung." },
-				{ status: 403 }
-			);
-		}
 
 		if (!isAiConfigured()) {
 			return NextResponse.json(
@@ -111,7 +106,12 @@ export async function POST(request: Request) {
 		}
 
 		try {
-			const result = await runChat({ messages: parsed.messages, attachments: parsed.attachments, userEmail: user.email });
+			const result = await runChat({
+				messages: parsed.messages,
+				attachments: parsed.attachments,
+				userEmail: user.email,
+				userRole: user.role,
+			});
 			return NextResponse.json(result);
 		} catch (error) {
 			if (error instanceof ChatError || error instanceof AiClientError) {

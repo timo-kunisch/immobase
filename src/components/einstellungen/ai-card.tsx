@@ -178,10 +178,11 @@ export function AiCard({ state }: { state: AiCardState }) {
 				<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
 					<ShieldAlert className="mt-0.5 size-4 shrink-0" />
 					<span>
-						Der Assistent erhält über die MCP-Werkzeuge vollständigen Lese- UND Schreibzugriff auf alle Daten
-						(inkl. Löschen und Finalisieren) - der Chat steht daher nur Administratoren zur Verfügung. Anfragen
-						samt anfragbarem Datenbestand werden an den konfigurierten Endpunkt übertragen: Nutzen Sie einen
-						Anbieter, dem Sie Ihre Daten anvertrauen wollen (alternativ ein lokales Modell).
+						Der Assistent erhält über die MCP-Werkzeuge Lese- UND Schreibzugriff auf die Daten (inkl. Löschen
+						und Finalisieren) und steht allen angemeldeten Nutzern offen - normale Nutzer dabei ohne
+						Administrations-Funktionen (Nutzerverwaltung, Absenderdaten). Anfragen samt anfragbarem
+						Datenbestand werden an den konfigurierten Endpunkt übertragen: Nutzen Sie einen Anbieter, dem Sie
+						Ihre Daten anvertrauen wollen (alternativ ein lokales Modell).
 					</span>
 				</p>
 			</CardContent>

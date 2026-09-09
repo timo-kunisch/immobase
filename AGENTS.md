@@ -127,8 +127,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   ausschließlich über Bearer-Token (`Authorization`-Header oder `access_token`-Query-Param;
   **kein** Session-Cookie – `src/proxy.ts` lässt `/api/mcp` daher passieren, die Token-Prüfung im
   Route Handler ist die autoritative Schranke; im Host-Modus gilt zusätzlich der LAN-Token-Check
-  des Main-Prozesses). Einstellungen `mcp.enabled` (Klartext) + `mcp.token` (FELD-verschlüsselt,
-  in `SECRET_SETTING_KEYS`), Helper `src/lib/mcp/auth.ts` (timingSafeEqual). Protokollschicht
+  des Main-Prozesses). **Zwei Token-Stufen** (`src/lib/mcp/auth.ts`, timingSafeEqual;
+  `resolveMcpTokenScope` löst Token → Scope auf): `mcp.token` = Admin-Token (Vollzugriff inkl.
+  Administrations-Werkzeugen) und `mcp.user_token` = eingeschränktes Nutzer-Token (nur fachliche
+  Werkzeuge) – beide FELD-verschlüsselt in `SECRET_SETTING_KEYS`, dazu `mcp.enabled` (Klartext).
+  Der **Werkzeug-Scope** (`McpToolScope` in `src/lib/mcp/registry.ts`) spiegelt das Rollenmodell
+  der App: Als `adminOnly` markierte Werkzeuge (Nutzerverwaltung `users_*`, Absenderdaten
+  `company_settings_*` – alles, was in der App unter `/admin` bzw. `/einstellungen` liegt) sind im
+  Scope `USER` weder in `tools/list` sichtbar noch per `tools/call` aufrufbar. Protokollschicht
   `src/lib/mcp/protocol.ts` (initialize/ping/tools/list/tools/call, Batch, Notifications → 202),
   Werkzeug-Registry `src/lib/mcp/registry.ts` (Feld-Spezifikationen → JSON-Schema +
   Laufzeit-Validierung/Normalisierung: Dezimal-Komma, ISO-Daten, Enums; CRUD-Generator
@@ -138,8 +144,9 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Benutzerverwaltung auch die allgemeinen Module Kalender und Wissensdatenbank). Die Werkzeuge
   spiegeln die Fachregeln der
   Server Actions (Entwurfs-Sperren, Beschluss-Nummernvergabe, Eigentümerwechsel-Versionierung,
-  Aussperr-Schutz letzter Admin). Das Token hat faktisch Admin-Rechte (prominenter Warnhinweis
-  in der UI-Karte `src/components/einstellungen/mcp-card.tsx`).
+  Aussperr-Schutz letzter Admin). Das Admin-Token hat faktisch Admin-Rechte (prominenter
+  Warnhinweis in der UI-Karte `src/components/einstellungen/mcp-card.tsx`, die beide Token-Stufen
+  verwaltet).
 - **KI-Assistent (In-App-Chatbot)** (`src/lib/ai/` + `src/app/api/chat/route.ts` +
   `src/components/layout/chatbot-dialog.tsx`) – **optionale Online-Funktion**: Die Sprechblase im
   Sidebar-Footer (früher „Administrator kontaktieren", entfernt) öffnet einen Chat gegen einen
@@ -147,9 +154,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   KI-Assistent; `ai.base_url` + `ai.model` Klartext, `ai.apikey` FELD-verschlüsselt in
   `SECRET_SETTING_KEYS`, optional leer für lokale Server wie LM Studio/Ollama; Env-Fallbacks
   `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY`). Ohne vollständige Konfiguration ist die Sprechblase
-  deaktiviert und die Route gesperrt (`isAiConfigured()`). **Nur Admins** (Route prüft
-  `getCurrentUser()` + Rolle mit JSON-401/403 statt Redirect), weil das Modell über die Werkzeuge
-  der MCP-Registry faktisch Admin-Rechte erhält. `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge als
+  deaktiviert und die Route gesperrt (`isAiConfigured()`). Der Chat steht **allen angemeldeten
+  Nutzern** offen (Route prüft `getCurrentUser()` mit JSON-401 statt Redirect); die **Rolle aus
+  der Session bestimmt den Werkzeug-Scope** (`userRole` → `McpToolScope`): Administratoren
+  erhalten alle Werkzeuge, normale Nutzer nur die fachlichen (keine `adminOnly`-Werkzeuge wie
+  Nutzerverwaltung/Absenderdaten – exakt die Funktionen, die ihnen auch in der App-Oberfläche
+  offenstehen). `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge scope-gefiltert als
   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
   (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
   Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
@@ -293,7 +303,7 @@ src/
     api/uploads/[...path]/  # Geschützter Route Handler für Dateiauslieferung
     api/backup/export|import/  # Backup-Routen (requireAdmin())
     api/mcp/route.ts        # MCP-Endpunkt (Bearer-Token, optional aktivierbar)
-    api/chat/route.ts       # KI-Assistent-Chat (Session, nur Admins)
+    api/chat/route.ts       # KI-Assistent-Chat (Session, alle Nutzer; Rolle bestimmt Werkzeug-Scope)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
@@ -323,8 +333,8 @@ src/
     dropbox.ts              # Dropbox-API-Client (OAuth-PKCE, Chunked-Upload, List/Delete)
     dropbox-backup.ts       # Cloud-Sicherung: Verbindung, Scheduler, Upload, Aufbewahrung
     backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
-    mcp/                    # MCP-Server (KI-Zugriff): auth.ts (Token/Enabled), protocol.ts
-                            # (JSON-RPC), registry.ts (Tool-Definition + CRUD-Generator),
+    mcp/                    # MCP-Server (KI-Zugriff): auth.ts (Token-Stufen/Enabled), protocol.ts
+                            # (JSON-RPC), registry.ts (Tool-Definition, Werkzeug-Scope, CRUD-Generator),
                             # tools-rental/-hoa/-system.ts (Werkzeuge), tools.ts (Sammel-Import)
     ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
                             # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
@@ -544,10 +554,11 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
-  `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled, JSON-RPC-Protokoll, Werkzeug-Durchstiche inkl.
+  `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled beider Token-Stufen, JSON-RPC-Protokoll,
+  Scope-Filterung ADMIN vs. USER, Werkzeug-Durchstiche inkl.
   Fachregeln), `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
   Secret-Verschlüsselung, Anhang-Aufbereitung für PDF/Office/Bilder/Excel/Text, Tool-Loop gegen
-  gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts) sowie
+  gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts und rollenbasierter Werkzeug-Einschränkung) sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich) und
   `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.

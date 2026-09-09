@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isMcpEnabled, isValidMcpToken } from "@/lib/mcp/auth";
+import { isMcpEnabled, resolveMcpTokenScope } from "@/lib/mcp/auth";
 import { handleMcpPost, internalErrorBody } from "@/lib/mcp/protocol";
 
 // Registriert alle MCP-Werkzeuge (Seiteneffekt des Imports).
@@ -11,9 +11,9 @@ export const runtime = "nodejs";
 
 /**
  * MCP-Endpunkt (Model Context Protocol, "Streamable HTTP" im einfachen
- * Request/Response-Modus): Ermöglicht KI-Clients den vollständigen
- * Lese-/Schreibzugriff auf die Fachdaten der Anwendung (CRUD über den
- * Repository-Layer, siehe src/lib/mcp/).
+ * Request/Response-Modus): Ermöglicht KI-Clients den Lese-/Schreibzugriff
+ * auf die Fachdaten der Anwendung (CRUD über den Repository-Layer, siehe
+ * src/lib/mcp/).
  *
  * Sicherheitsmodell:
  * - Der Endpunkt ist standardmäßig DEAKTIVIERT und wird vom Admin unter
@@ -22,8 +22,11 @@ export const runtime = "nodejs";
  *   (Authorization-Header oder access_token-Query-Parameter), KEIN
  *   Session-Cookie. Der Auth-Proxy (src/proxy.ts) lässt /api/mcp daher
  *   ohne Cookie durch - die Token-Prüfung hier ist die autoritative
- *   Schranke. Das Token wird feldverschlüsselt in app_settings abgelegt
- *   (src/lib/mcp/auth.ts) und hat faktisch Admin-Rechte.
+ *   Schranke. Es gibt zwei Token-Stufen (feldverschlüsselt in app_settings,
+ *   src/lib/mcp/auth.ts): Das Admin-Token gewährt Vollzugriff inkl.
+ *   Administrations-Werkzeugen (Nutzerverwaltung, Absenderdaten), das
+ *   eingeschränkte Nutzer-Token nur die fachlichen Werkzeuge (Scope "USER"
+ *   in src/lib/mcp/registry.ts).
  * - Zusätzlich gilt im Host-Modus (LAN) der Token-Check des
  *   Electron-Main-Proxys (electron/main/server.ts).
  */
@@ -46,12 +49,13 @@ export async function POST(request: Request) {
 		);
 	}
 
-	if (!isValidMcpToken(extractToken(request))) {
+	const scope = resolveMcpTokenScope(extractToken(request));
+	if (!scope) {
 		return NextResponse.json({ error: "Ungültiges oder fehlendes Zugriffs-Token." }, { status: 401 });
 	}
 
 	try {
-		const result = await handleMcpPost(await request.text());
+		const result = await handleMcpPost(await request.text(), scope);
 		if (result.status === 202) {
 			return new Response(null, { status: 202 });
 		}
