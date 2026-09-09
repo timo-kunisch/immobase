@@ -90,7 +90,7 @@ const CHAT_HISTORY_WARNING_CHARS = 100_000;
  * die übrigen hinter einem Aufklapp-Button verborgen, damit der Verlauf
  * lesbar bleibt.
  */
-const MAX_VISIBLE_TOOL_CALLS = 5;
+const MAX_VISIBLE_TOOL_CALLS = 3;
 
 /**
  * Liste der in einer Antwort-Runde ausgeführten Werkzeuge (Name + Erfolg/
