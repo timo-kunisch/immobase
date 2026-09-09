@@ -82,6 +82,28 @@ describe("chat_messages: persistenter Verlauf des KI-Assistenten", () => {
 		expect(listChatMessages(userId)).toEqual([]);
 	});
 
+	it("hält fehlgeschlagene Anfragen als Fehler-Nachricht (Rolle error) im Verlauf fest", () => {
+		const userId = createTestUser("nutzer@example.com");
+
+		appendChatMessages(userId, [{ role: "user", content: "Frage 1" }]);
+		// So persistiert die Chat-Route einen Fehlschlag: Nutzerfrage +
+		// Fehlermeldung an derselben Stelle im Verlauf.
+		appendChatMessages(userId, [
+			{ role: "user", content: "Kaputte Frage" },
+			{ role: "error", content: "Der KI-Endpunkt meldet HTTP 524 (Timeout)." },
+		]);
+		appendChatMessages(userId, [
+			{ role: "user", content: "Nächste Frage" },
+			{ role: "assistant", content: "Antwort" },
+		]);
+
+		const messages = listChatMessages(userId);
+		expect(messages.map((message) => message.role)).toEqual(["user", "user", "error", "user", "assistant"]);
+		expect(messages[2].content).toContain("HTTP 524");
+		// Fehler-Nachrichten tragen keine Werkzeug-Liste.
+		expect(messages[2].toolCalls).toEqual([]);
+	});
+
 	it("übersteht defekte tool_calls-JSON-Werte mit leerer Werkzeug-Liste", () => {
 		const userId = createTestUser("nutzer@example.com");
 		appendChatMessages(userId, [{ role: "assistant", content: "Antwort" }]);

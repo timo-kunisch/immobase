@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { ACCEPTED_FILE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/ai/attachment-types";
+import { CHAT_HISTORY_HARD_LIMIT_CHARS } from "@/lib/ai/chat-limits";
 import { cn } from "@/lib/utils";
 
 /**
@@ -35,7 +36,11 @@ import { cn } from "@/lib/utils";
  * Der KI-Endpunkt bleibt zustandslos: Der gesamte Verlauf wird bei jeder
  * Anfrage mitgesendet - ab CHAT_HISTORY_WARNING_CHARS Zeichen blendet der
  * Dialog eine Warnung zum steigenden Token-Verbrauch ein und empfiehlt das
- * Löschen.
+ * Löschen; ab CHAT_HISTORY_HARD_LIMIT_CHARS Zeichen (harte Grenze, auch
+ * serverseitig in /api/chat geprüft) sperrt der Dialog die Eingabe, bis
+ * der Verlauf gelöscht wird. Fehlgeschlagene Anfragen werden als farblich
+ * markierte Fehler-Nachricht (Rolle "error") im Verlauf festgehalten und
+ * bleiben dort bis zum Löschen nachvollziehbar.
  */
 
 interface ToolCallInfo {
@@ -44,7 +49,8 @@ interface ToolCallInfo {
 }
 
 interface ChatMessage {
-	role: "user" | "assistant";
+	/** "error" = fehlgeschlagene Anfrage (wird farblich markiert dargestellt). */
+	role: "user" | "assistant" | "error";
 	content: string;
 	/** Bei Assistenten-Antworten: die in dieser Runde ausgeführten Werkzeuge. */
 	toolCalls?: ToolCallInfo[];
@@ -106,10 +112,14 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const disabledHint =
 		"Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren";
 
-	// Gesamtlänge des Verlaufs - steuert die Größen-Warnung (der komplette
-	// Verlauf fließt bei jeder Anfrage in den KI-Kontext).
+	// Gesamtlänge des Verlaufs - steuert die Größen-Warnung und die harte
+	// Grenze (der komplette Verlauf fließt bei jeder Anfrage in den
+	// KI-Kontext).
 	const totalHistoryChars = messages.reduce((sum, message) => sum + message.content.length, 0);
 	const historyTooLarge = totalHistoryChars >= CHAT_HISTORY_WARNING_CHARS;
+	// Harte Grenze erreicht: Eingabe sperren, bis der Verlauf gelöscht wird
+	// (die Chat-Route lehnt Nachrichten ab dort ebenfalls ab, HTTP 413).
+	const historyHardLimitReached = totalHistoryChars >= CHAT_HISTORY_HARD_LIMIT_CHARS;
 
 	// Gespeicherten Verlauf beim Mount laden (serverseitig pro Nutzer
 	// persistiert - bleibt bis zum manuellen Löschen erhalten).
@@ -183,7 +193,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 
 	async function handleSend(): Promise<void> {
 		const text = input.trim();
-		if (pending || (!text && attachments.length === 0)) return;
+		if (pending || historyHardLimitReached || (!text && attachments.length === 0)) return;
 
 		const userMessage: ChatMessage = { role: "user", content: text || "(Datei-Anhang ohne Begleittext)" };
 		const nextMessages = [...messages, userMessage];
@@ -223,7 +233,12 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			}
 			setMessages([...nextMessages, { role: "assistant", content: data.reply ?? "", toolCalls: data.toolCalls ?? [] }]);
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Die Anfrage ist fehlgeschlagen.");
+			// Der Fehlschlag wird Teil des Verlaufs (farblich markierte
+			// Fehler-Nachricht). Vom Server verarbeitete Fehler (ChatError/
+			// AiClientError) hat die Route bereits serverseitig persistiert;
+			// der lokale Eintrag spiegelt denselben Text.
+			const errorText = cause instanceof Error ? cause.message : "Die Anfrage ist fehlgeschlagen.";
+			setMessages([...nextMessages, { role: "error", content: errorText }]);
 		} finally {
 			setPending(false);
 			textareaRef.current?.focus();
@@ -303,16 +318,23 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 						messages.map((message, index) => (
 							<div key={index} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "justify-start")}>
 								{message.role === "assistant" ? <Bot className="mt-1 size-4 shrink-0 text-muted-foreground" /> : null}
+								{message.role === "error" ? <TriangleAlert className="mt-1 size-4 shrink-0 text-destructive" /> : null}
 								<div className={cn("max-w-[85%] space-y-1", message.role === "user" ? "text-right" : "text-left")}>
 									{/* Assistenten-Antworten kommen als Markdown und werden
 									    entsprechend gerendert (kein whitespace-pre-wrap, das würde
 									    zwischen den gerenderten Blockelementen Leerzeilen erzeugen);
 									    max-w-full begrenzt die Bubble, damit breite Tabellen/
-									    Code-Blöcke innerhalb scrollen statt herauszuragen. */}
+									    Code-Blöcke innerhalb scrollen statt herauszuragen.
+									    Fehler-Nachrichten (Rolle "error") sind reiner Text und
+									    werden farblich hervorgehoben. */}
 									<div
 										className={cn(
 											"inline-block rounded-lg px-3 py-2 text-left text-sm break-words",
-											message.role === "user" ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "max-w-full bg-muted"
+											message.role === "user"
+												? "whitespace-pre-wrap bg-primary text-primary-foreground"
+												: message.role === "error"
+													? "max-w-full border border-destructive/50 bg-destructive/10 whitespace-pre-wrap text-destructive"
+													: "max-w-full bg-muted"
 										)}
 									>
 										{message.role === "assistant" ? <MarkdownContent content={message.content} /> : message.content}
@@ -348,7 +370,29 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				</div>
 
 				<div className="space-y-2 border-t px-4 py-3">
-					{historyTooLarge ? (
+					{historyHardLimitReached ? (
+						<div className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
+							<div className="space-y-1">
+								<p className="font-medium">
+									Der Chatverlauf hat die maximale Größe von {formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen
+									erreicht ({formatCharCount(totalHistoryChars)} Zeichen).
+								</p>
+								<p>
+									Bevor Sie weitermachen können, muss der Verlauf gelöscht werden - der gesamte Verlauf wird bei
+									jeder Nachricht an die KI mitgesendet.
+								</p>
+								<button
+									type="button"
+									onClick={() => void handleClearHistory()}
+									disabled={pending || clearing}
+									className="font-medium underline underline-offset-2 hover:no-underline disabled:pointer-events-none disabled:opacity-50"
+								>
+									{clearing ? "Verlauf wird gelöscht…" : "Verlauf jetzt löschen"}
+								</button>
+							</div>
+						</div>
+					) : historyTooLarge ? (
 						<div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
 							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
 							<div className="space-y-1">
@@ -358,7 +402,8 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 								<p>
 									Da der gesamte Verlauf bei jeder Nachricht an die KI mitgesendet wird, steigt der
 									Token-Verbrauch (und damit Kosten und Antwortzeit) spürbar. Es wird empfohlen, den Verlauf
-									zu löschen und ein neues Gespräch zu beginnen.
+									zu löschen und ein neues Gespräch zu beginnen. Ab{" "}
+									{formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen wird das Fortsetzen gesperrt.
 								</p>
 								<button
 									type="button"
@@ -407,7 +452,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							size="icon-sm"
 							title="Datei anhängen (PDF, Office, Excel, Bilder, Text/Code)"
 							aria-label="Datei anhängen"
-							disabled={pending || attachments.length >= MAX_ATTACHMENTS}
+							disabled={pending || historyHardLimitReached || attachments.length >= MAX_ATTACHMENTS}
 							onClick={() => fileInputRef.current?.click()}
 						>
 							<Paperclip className="size-4" />
@@ -422,9 +467,13 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 									void handleSend();
 								}
 							}}
-							placeholder="Nachricht an die KI… (Enter sendet, Umschalt+Enter für Zeilenumbruch)"
+							placeholder={
+								historyHardLimitReached
+									? "Maximale Verlaufsgröße erreicht - bitte zuerst den Verlauf löschen."
+									: "Nachricht an die KI… (Enter sendet, Umschalt+Enter für Zeilenumbruch)"
+							}
 							rows={2}
-							disabled={pending}
+							disabled={pending || historyHardLimitReached}
 							className="min-h-10 flex-1 resize-none"
 						/>
 						<Button
@@ -432,7 +481,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							size="icon-sm"
 							title="Senden"
 							aria-label="Senden"
-							disabled={pending || (!input.trim() && attachments.length === 0)}
+							disabled={pending || historyHardLimitReached || (!input.trim() && attachments.length === 0)}
 							onClick={() => void handleSend()}
 						>
 							{pending ? <Loader2 className="size-4 animate-spin" /> : <SendHorizontal className="size-4" />}

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { MAX_ATTACHMENTS_PER_MESSAGE, MAX_ATTACHMENT_BASE64_CHARS } from "@/lib/ai/attachment-types";
+import { CHAT_HISTORY_HARD_LIMIT_CHARS } from "@/lib/ai/chat-limits";
 import { runChat, ChatError, type ChatAttachmentInput } from "@/lib/ai/chat";
 import { AiClientError } from "@/lib/ai/client";
 import { isAiConfigured } from "@/lib/ai/config";
@@ -29,9 +30,14 @@ export const runtime = "nodejs";
  * Client sendet daher nur die NEUE Nachricht; diese Route lädt den
  * bisherigen Verlauf, reicht ihn vollständig an den KI-Endpunkt weiter
  * und persistiert Nutzerfrage + Assistenten-Antwort nach erfolgreichem
- * Durchlauf. Bewusst KEINE serverseitige Längenkappung des Verlaufs -
- * der Verlauf soll vollständig erhalten bleiben; auf den damit
- * steigenden Token-Verbrauch weist eine Größen-Warnung im Dialog hin.
+ * Durchlauf. Scheitert der Durchlauf, werden stattdessen Nutzerfrage +
+ * Fehlermeldung (Rolle "error") persistiert - Fehler bleiben so als
+ * farblich markierte Nachricht im Verlauf nachvollziehbar, bis der
+ * Verlauf gelöscht wird. Bewusst KEINE serverseitige Längenkappung des
+ * Verlaufs, aber eine HARTE Obergrenze: Ab CHAT_HISTORY_HARD_LIMIT_CHARS
+ * Zeichen (Verlauf + neue Nachricht) werden weitere Nachrichten mit
+ * HTTP 413 abgelehnt, bis der Verlauf gelöscht wird; auf den steigenden
+ * Token-Verbrauch weist vorab eine Größen-Warnung im Dialog hin.
  */
 
 const MAX_MESSAGE_CHARS = 20_000;
@@ -98,10 +104,30 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: parsed }, { status: 400 });
 		}
 
+		// Harte Obergrenze des Verlaufs (Verlauf + neue Nachricht): Ab hier
+		// wird abgebrochen, bis der Verlauf gelöscht wird - der komplette
+		// Verlauf fließt bei jeder Anfrage in den KI-Kontext.
+		const storedHistory = listChatMessages(user.id);
+		const totalHistoryChars = storedHistory.reduce((sum, entry) => sum + entry.content.length, 0) + parsed.message.length;
+		if (totalHistoryChars >= CHAT_HISTORY_HARD_LIMIT_CHARS) {
+			return NextResponse.json(
+				{
+					error: `Der Chatverlauf hat die maximale Größe von ${new Intl.NumberFormat("de-DE").format(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen erreicht. Bitte löschen Sie den Verlauf im Dialog (Papierkorb-Button), bevor Sie weitermachen.`,
+				},
+				{ status: 413 }
+			);
+		}
+
 		try {
 			// Gespeicherter Verlauf + die neue Nutzernachricht bilden den
-			// Kontext für den KI-Endpunkt.
-			const history = listChatMessages(user.id).map(({ role, content }) => ({ role, content }));
+			// Kontext für den KI-Endpunkt. Fehler-Einträge (Rolle "error")
+			// werden dem Modell als markierte Assistenten-Notiz mitgegeben,
+			// damit es fehlgeschlagene Versuche kennt.
+			const history = storedHistory.map(({ role, content }) =>
+				role === "error"
+					? { role: "assistant" as const, content: `(Diese Anfrage ist fehlgeschlagen: ${content})` }
+					: { role, content }
+			);
 			const result = await runChat({
 				messages: [...history, { role: "user", content: parsed.message }],
 				attachments: parsed.attachments,
@@ -116,11 +142,25 @@ export async function POST(request: Request) {
 			]);
 			return NextResponse.json(result);
 		} catch (error) {
-			if (error instanceof ChatError || error instanceof AiClientError) {
-				return NextResponse.json({ error: error.message }, { status: 502 });
+			const isKnownError = error instanceof ChatError || error instanceof AiClientError;
+			const message = isKnownError ? error.message : "Interner Fehler bei der Verarbeitung (Details im Server-Log).";
+			if (!isKnownError) {
+				console.error("[ai] Chat-Endpunkt fehlgeschlagen:", error);
 			}
-			console.error("[ai] Chat-Endpunkt fehlgeschlagen:", error);
-			return NextResponse.json({ error: "Interner Fehler bei der Verarbeitung (Details im Server-Log)." }, { status: 500 });
+			// Den Fehlschlag im Verlauf festhalten: Nutzerfrage + Fehlermeldung
+			// (Rolle "error"), damit der Fehler im Dialog als Nachricht an
+			// dieser Stelle nachvollziehbar bleibt. Best-effort - ein
+			// Persistenzfehler darf die eigentliche Fehlermeldung nicht
+			// verdecken.
+			try {
+				appendChatMessages(user.id, [
+					{ role: "user", content: parsed.message },
+					{ role: "error", content: message },
+				]);
+			} catch (persistError) {
+				console.error("[ai] Fehlgeschlagene Chat-Runde konnte nicht im Verlauf gespeichert werden:", persistError);
+			}
+			return NextResponse.json({ error: message }, { status: isKnownError ? 502 : 500 });
 		}
 	} catch (error) {
 		console.error("[ai] Unerwarteter Fehler im Chat-Endpunkt:", error);

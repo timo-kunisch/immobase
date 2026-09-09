@@ -219,9 +219,15 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
    daher nur die neue Nachricht an `/api/chat`; die Route lädt den gespeicherten Verlauf,
    reicht ihn vollständig an den Endpunkt weiter (bewusst keine serverseitige Kappung) und
    persistiert Nutzerfrage + Assistenten-Antwort nach erfolgreichem Durchlauf (eine
-   Transaktion). Datei-Anhänge werden nicht gespeichert. Ab 100.000 Zeichen
-   Gesamt-Verlaufsgröße (`CHAT_HISTORY_WARNING_CHARS` im Dialog) blendet die UI eine
-   Warnung zum steigenden Token-Verbrauch ein und empfiehlt das Löschen.
+   Transaktion). **Fehlgeschlagene Durchläufe** werden ebenfalls persistiert – Nutzerfrage +
+   Fehlermeldung mit Rolle `error`, im Dialog als farblich markierte Fehler-Nachricht an
+   derselben Stelle; dem Modell werden sie als markierte Assistenten-Notiz mitgesendet.
+   Datei-Anhänge werden nicht gespeichert. Größen-Grenzen (Summe der
+   Nachrichten-Zeichen): Ab 100.000 Zeichen (`CHAT_HISTORY_WARNING_CHARS` im Dialog) blendet
+   die UI eine Warnung zum steigenden Token-Verbrauch ein und empfiehlt das Löschen; bei
+   250.000 Zeichen (`CHAT_HISTORY_HARD_LIMIT_CHARS` in `src/lib/ai/chat-limits.ts`, geteilt)
+   greift die **harte Grenze** – die Chat-Route lehnt weitere Nachrichten mit HTTP 413 ab und
+   der Dialog sperrt die Eingabe, bis der Verlauf gelöscht wird.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -454,8 +460,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Wissensdatenbank:** `knowledge_base_articles` (einfache Text-Artikel mit optionalem
   Kategorie-Schlagwort; Suche per LIKE über Titel/Kategorie/Inhalt)
 - **KI-Assistent:** `chat_messages` (persistenter Chat-Verlauf pro Nutzer – `user_id` ON
-  DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige; bleibt bis zum
-  manuellen Löschen im Dialog erhalten, siehe Abschnitt 2)
+  DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige, Rolle `error` =
+  fehlgeschlagene Anfrage als markierte Fehler-Nachricht; bleibt bis zum manuellen Löschen
+  im Dialog erhalten, siehe Abschnitt 2)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
   (technische Key/Value-Konfiguration: SMTP, LetterXpress, KI-Endpunkt, URL-Overrides – keine Fachdaten;
   Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
@@ -603,7 +610,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen;
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Dedup/Threading + IMAP-Sync-Stand,
-  `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen),
+  `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
+  Fehler-Rolle),
   `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Verlauf-Ablage;
   Mailer gemockt),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),

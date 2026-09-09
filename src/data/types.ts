@@ -725,8 +725,13 @@ export interface KnowledgeBaseArticle {
 // KI-Assistent (persistenter Chat-Verlauf)
 // ============================================================
 
-/** Rolle einer Chat-Nachricht des KI-Assistenten. */
-export type ChatMessageRole = "user" | "assistant";
+/**
+ * Rolle einer Chat-Nachricht des KI-Assistenten. "error" markiert eine
+ * fehlgeschlagene Anfrage: Die Fehlermeldung wird als eigene, farblich
+ * hervorgehobene Nachricht im Verlauf festgehalten (und dem KI-Endpunkt
+ * als markierte Assistenten-Notiz mitgesendet, siehe /api/chat).
+ */
+export type ChatMessageRole = "user" | "assistant" | "error";
 
 /** In einer Assistenten-Runde ausgeführter Werkzeug-Aufruf (nur Anzeige in der UI). */
 export interface ChatMessageToolCall {
