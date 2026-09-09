@@ -5,7 +5,9 @@ import { simpleParser } from "mailparser";
 
 import { getImapSyncState, resetImapSyncState, upsertImapSyncState } from "@/data/imap-sync-state";
 import { findLinkedTicketIdByMessageIds, importInboundMessage } from "@/data/ticket-messages";
+import { findTicketIdByRef } from "@/data/tickets";
 import { now } from "@/data/helpers";
+import { extractTicketRefsFromSubject } from "@/lib/ticket-ref";
 
 import { getImapConfig, type ImapConfig } from "./imap";
 
@@ -14,8 +16,10 @@ import { getImapConfig, type ImapConfig } from "./imap";
  * konfigurierten Ordner (inkrementell über UID > lastUid, Stand in
  * `imap_sync_state`), parst sie (mailparser) und legt sie als INBOUND-
  * Einträge in `ticket_messages` ab. Antworten auf bekannte Ticket-E-Mails
- * (Erkennung über In-Reply-To/References-Header) werden automatisch dem
- * vorhandenen Ticket-Verlauf zugeordnet, alles andere landet im Postfach.
+ * werden automatisch dem vorhandenen Ticket-Verlauf zugeordnet - primär
+ * über die Threading-Header (In-Reply-To/References), als Fallback über
+ * die Ticket-Kennung im Betreff („[#a3f8b2c1]", die ausgehende Ticket-
+ * E-Mails automatisch erhalten). Alles andere landet im Postfach.
  *
  * Fehler (Server nicht erreichbar, Zugangsdaten falsch, ...) werden nicht
  * weitergeworfen, sondern im Sync-Status abgelegt (Anzeige im Postfach)
@@ -115,7 +119,8 @@ async function runSync(config: ImapConfig): Promise<ImapSyncResult> {
 
 /**
  * Parst eine Roh-Nachricht und legt sie an. Gibt die Ticket-ID zurück,
- * wenn die Nachricht per Threading automatisch zugeordnet wurde.
+ * wenn die Nachricht automatisch zugeordnet wurde (Threading-Header oder
+ * Ticket-Kennung im Betreff).
  */
 async function importParsedMessage(folder: string, uid: number, source: Buffer): Promise<string | null> {
 	const parsed = await simpleParser(source);
@@ -123,7 +128,16 @@ async function importParsedMessage(folder: string, uid: number, source: Buffer):
 	// Threading-Verweise normalisieren (references kann String oder Array sein).
 	const references = Array.isArray(parsed.references) ? parsed.references : parsed.references ? [parsed.references] : [];
 	const threadIds = [parsed.inReplyTo, ...references].filter((id): id is string => Boolean(id));
-	const linkedTicketId = threadIds.length > 0 ? findLinkedTicketIdByMessageIds(threadIds) : null;
+	let linkedTicketId = threadIds.length > 0 ? findLinkedTicketIdByMessageIds(threadIds) : null;
+	if (!linkedTicketId && parsed.subject) {
+		// Fallback: Ticket-Kennung im Betreff (überlebt Clients, die keine
+		// Threading-Header setzen). Mehrdeutige Kennungen liefern bewusst
+		// keinen Treffer (findTicketIdByRef) -> solche Mails bleiben im Postfach.
+		for (const ref of extractTicketRefsFromSubject(parsed.subject)) {
+			linkedTicketId = findTicketIdByRef(ref);
+			if (linkedTicketId) break;
+		}
+	}
 
 	const toAddresses = parsed.to ? (Array.isArray(parsed.to) ? parsed.to.map((addr) => addr.text).join(", ") : parsed.to.text) : null;
 	const bodyText = parsed.text ? parsed.text.slice(0, MAX_BODY_LENGTH) : null;

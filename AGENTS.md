@@ -103,15 +103,22 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   `imapflow` ab (inkrementell über UID, Stand in `imap_sync_state`; UIDVALIDITY-Wechsel =
   Neuabgleich), parst sie mit `mailparser` und legt sie als `INBOUND`-Einträge in
   `ticket_messages` ab (Dedup über partiellen Unique-Index Ordner+UID). Antworten auf bekannte
-  Ticket-E-Mails werden über In-Reply-To/References-Header automatisch dem Ticket zugeordnet
-  (`findLinkedTicketIdByMessageIds`); alles andere bleibt im Postfach und kann dort **in ein Ticket
+  Ticket-E-Mails werden automatisch dem Ticket zugeordnet: primär über
+  In-Reply-To/References-Header (`findLinkedTicketIdByMessageIds`), als Fallback über die
+  Ticket-Kennung im Betreff (`[#a3f8b2c1]`, erste 8 UUID-Hex-Zeichen; `src/lib/ticket-ref.ts`
+  + `findTicketIdByRef()` im Tickets-Repository, nur eindeutige Treffer); alles andere bleibt
+  im Postfach und kann dort gelesen (Öffnen-Dialog), **in ein Ticket
   umgewandelt** oder **an ein Ticket angeheftet** (oder gelöscht = nur lokale Kopie) werden. Ein
   Scheduler (Start in `src/app/(app)/layout.tsx` wie der Dropbox-Scheduler; 5-Minuten-Intervall,
   `unref`'d, parallele Läufe abgelehnt) ruft automatisch ab; zusätzlich manueller „Jetzt abrufen"-
   Button. Der komplette Verlauf (E-Mails eingehend/ausgehend + interne Notizen, eine Tabelle
   `ticket_messages` mit Diskriminator `direction`) ist auf der Ticket-Detailseite `/tickets/[id]`
-  sichtbar. **E-Mail-Antworten aus dem Ticket** (`src/lib/ticket-mailer.ts`, geteilt von Action +
-  MCP) setzen eigene Message-ID + Threading-Header und legen den OUTBOUND-Eintrag ab - nur wenn
+  sichtbar. **Eingehende E-Mails lassen sich im Verlauf wieder entknüpfen** (zurück ins
+  Postfach) **oder einem anderen Ticket neu zuordnen** (`unlinkMessageFromTicket()`/
+  `linkMessageToTicket()` + Actions auf der Ticket-Detailseite). **E-Mail-Antworten aus dem
+  Ticket** (`src/lib/ticket-mailer.ts`, geteilt von Action +
+  MCP) setzen eigene Message-ID + Threading-Header, **hängen die Ticket-Kennung an den Betreff**
+  (`ensureTicketSubjectTag()`, idempotent) und legen den OUTBOUND-Eintrag ab - nur wenn
   SMTP konfiguriert ist, sonst sperrt sich das Formular mit Hinweis. **Ohne IMAP/SMTP funktioniert
   das Ticket-System uneingeschränkt mit den Basis-Funktionen** (manuell anlegen, Kanban-Status,
   interne Notizen).
@@ -619,11 +626,12 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Bei Bedarf direkt in der DB (z. B. per `sqlite3 data.dev`/`data.db`).
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen;
-  `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Dedup/Threading + IMAP-Sync-Stand,
+  `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
+  Threading + IMAP-Sync-Stand,
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
   Fehler-Rolle),
-  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Verlauf-Ablage;
-  Mailer gemockt),
+  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,
+  Verlauf-Ablage; Mailer gemockt), `src/lib/ticket-ref.test.ts` (Ticket-Kennung im Betreff),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und

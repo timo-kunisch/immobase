@@ -4,6 +4,7 @@ import { createTicketMessage, listTicketMessages } from "@/data/ticket-messages"
 import { newId } from "@/data/helpers";
 
 import { isSmtpConfigured, sendTicketReplyEmail } from "./email/mailer";
+import { ensureTicketSubjectTag } from "./ticket-ref";
 
 /**
  * Versendet eine E-Mail-Antwort aus einem Ticket heraus und legt sie als
@@ -11,6 +12,10 @@ import { isSmtpConfigured, sendTicketReplyEmail } from "./email/mailer";
  * (src/app/(app)/tickets/actions.ts) und MCP-Werkzeug (tools-rental.ts).
  * Wirft bei fehlender SMTP-Konfiguration oder Versandfehler - die Aufrufer
  * wandeln das in ihr jeweiliges Fehlerformat um.
+ *
+ * Der Betreff erhält automatisch die Ticket-Kennung (z. B. „[#a3f8b2c1]"),
+ * damit Antworten des Empfängers beim IMAP-Abruf auch ohne Threading-Header
+ * dem richtigen Ticket zugeordnet werden können (src/lib/ticket-ref.ts).
  */
 export async function sendTicketEmail(input: {
 	ticketId: string;
@@ -32,10 +37,12 @@ export async function sendTicketEmail(input: {
 		.map((message) => message.messageId as string);
 	const inReplyTo = threadMessageIds.length > 0 ? threadMessageIds[threadMessageIds.length - 1] : null;
 	const messageId = `<${newId()}@immobase.local>`;
+	// Ticket-Kennung in den Betreff (Fallback-Zuordnung beim IMAP-Import).
+	const subject = ensureTicketSubjectTag(input.subject, input.ticketId);
 
 	const { from } = await sendTicketReplyEmail({
 		to: input.to,
-		subject: input.subject,
+		subject,
 		text: input.body,
 		messageId,
 		inReplyTo,
@@ -48,7 +55,7 @@ export async function sendTicketEmail(input: {
 		messageId,
 		fromAddress: from,
 		toAddresses: input.to,
-		subject: input.subject,
+		subject,
 		bodyText: input.body,
 		authorUserId: input.authorUserId,
 		authorEmail: input.authorEmail,

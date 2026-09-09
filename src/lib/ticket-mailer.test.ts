@@ -9,6 +9,7 @@ import { createProperty } from "@/data/properties";
 import { createTicketMessage, listTicketMessages } from "@/data/ticket-messages";
 import { createTicket } from "@/data/tickets";
 import { sendTicketEmail } from "@/lib/ticket-mailer";
+import { buildTicketSubjectTag } from "@/lib/ticket-ref";
 
 // Der SMTP-Versand (nodemailer) wird gemockt - getestet wird die fachliche
 // Orchestrierung: Konfigurations-Sperre, Threading-Header und Ablage der
@@ -103,7 +104,8 @@ describe("sendTicketEmail (src/lib/ticket-mailer.ts)", () => {
 		expect(outbound.direction).toBe("OUTBOUND");
 		expect(outbound.fromAddress).toBe("verwaltung@example.com");
 		expect(outbound.toAddresses).toBe("mieter@example.com");
-		expect(outbound.subject).toBe("Re: Heizung defekt");
+		// Der Betreff erhält automatisch die Ticket-Kennung (siehe eigener Test unten).
+		expect(outbound.subject).toBe(`Re: Heizung defekt ${buildTicketSubjectTag(ticketId)}`);
 		expect(outbound.authorEmail).toBe("admin@example.com");
 		expect(outbound.messageId).toBe(sentOptions.messageId);
 	});
@@ -114,5 +116,22 @@ describe("sendTicketEmail (src/lib/ticket-mailer.ts)", () => {
 		const sentOptions = sendTicketReplyEmailMock.mock.calls[0][0] as { inReplyTo?: string | null; references?: string[] };
 		expect(sentOptions.inReplyTo).toBeNull();
 		expect(sentOptions.references).toEqual([]);
+	});
+
+	it("hängt die Ticket-Kennung an den Betreff (Versand und Verlauf), aber nicht doppelt", async () => {
+		const ticketId = createTestTicket();
+		const tag = buildTicketSubjectTag(ticketId);
+
+		// Ohne Tag im Betreff: wird angehängt.
+		await sendTicketEmail({ ticketId, to: "a@b.de", subject: "Re: Heizung", body: "Text", authorUserId: null, authorEmail: null });
+		let sentOptions = sendTicketReplyEmailMock.mock.calls[0][0] as { subject: string };
+		expect(sentOptions.subject).toBe(`Re: Heizung ${tag}`);
+		expect(listTicketMessages(ticketId)[0].subject).toBe(`Re: Heizung ${tag}`);
+
+		// Mit bereits vorhandenem Tag: unverändert (idempotent).
+		await sendTicketEmail({ ticketId, to: "a@b.de", subject: `Re: Heizung ${tag}`, body: "Text", authorUserId: null, authorEmail: null });
+		sentOptions = sendTicketReplyEmailMock.mock.calls[1][0] as { subject: string };
+		expect(sentOptions.subject).toBe(`Re: Heizung ${tag}`);
+		expect(sentOptions.subject.match(/\[#/g)).toHaveLength(1);
 	});
 });

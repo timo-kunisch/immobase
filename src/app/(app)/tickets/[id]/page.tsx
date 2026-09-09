@@ -4,17 +4,20 @@ import { ArrowLeft, Mail, MailPlus, StickyNote } from "lucide-react";
 
 import { listProperties } from "@/data/properties";
 import { listTicketMessages } from "@/data/ticket-messages";
-import { getTicket, listUnitsByLabel } from "@/data/tickets";
+import { getTicket, listTickets, listUnitsByLabel } from "@/data/tickets";
 import type { TicketMessage, TicketStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { MessageUnlinkButton } from "@/components/tickets/message-unlink-button";
+import { ReassignMessageDialog, type ReassignableTicket } from "@/components/tickets/reassign-message-dialog";
 import { TicketFormDialog } from "@/components/tickets/ticket-form-dialog";
 import { TicketNoteForm } from "@/components/tickets/ticket-note-form";
 import { TicketReplyForm } from "@/components/tickets/ticket-reply-form";
 import { TicketStatusSelect } from "@/components/tickets/ticket-status-select";
 import { isSmtpConfigured } from "@/lib/email/mailer";
+import { buildTicketSubjectTag } from "@/lib/ticket-ref";
 import { formatDate, formatDateTime } from "@/lib/format";
 
 import { deleteTicketAction } from "../actions";
@@ -34,7 +37,7 @@ const statusVariants: Record<TicketStatus, "default" | "secondary" | "outline"> 
 };
 
 /** Ein Verlauf-Eintrag (eingehende/ausgehende E-Mail oder interne Notiz). */
-function TimelineEntry({ message }: { message: TicketMessage }) {
+function TimelineEntry({ message, reassignTickets }: { message: TicketMessage; reassignTickets: ReassignableTicket[] }) {
 	const isNote = message.direction === "NOTE";
 	const isOutbound = message.direction === "OUTBOUND";
 	const Icon = isNote ? StickyNote : isOutbound ? MailPlus : Mail;
@@ -48,7 +51,17 @@ function TimelineEntry({ message }: { message: TicketMessage }) {
 						{isNote ? "Interne Notiz" : isOutbound ? "E-Mail gesendet" : "E-Mail empfangen"}
 						{isNote ? <Badge variant="secondary">Intern</Badge> : null}
 					</div>
-					<span className="text-xs text-muted-foreground">{formatDateTime(message.createdAt)}</span>
+					<div className="flex items-center gap-1">
+						{/* Eingehende E-Mails können wieder ins Postfach gelöst oder
+						    einem anderen Ticket zugeordnet werden. */}
+						{message.direction === "INBOUND" ? (
+							<>
+								<ReassignMessageDialog message={message} tickets={reassignTickets} />
+								<MessageUnlinkButton message={message} />
+							</>
+						) : null}
+						<span className="text-xs text-muted-foreground">{formatDateTime(message.createdAt)}</span>
+					</div>
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{isNote
@@ -77,6 +90,10 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 	const unitList = listUnitsByLabel();
 	const smtpConfigured = isSmtpConfigured();
+	// Andere offene Tickets als Ziel für „Anderem Ticket zuordnen".
+	const reassignTickets = listTickets()
+		.filter((other) => other.id !== ticket.id && other.status !== "DONE")
+		.map((other) => ({ id: other.id, title: other.title, propertyName: other.property.name }));
 
 	// Vorbefüllung der Antwort aus der letzten eingehenden E-Mail.
 	const lastInbound = [...messages].reverse().find((message) => message.direction === "INBOUND");
@@ -145,7 +162,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 							Noch keine Kommunikation vorhanden.
 						</div>
 					) : (
-						messages.map((message) => <TimelineEntry key={message.id} message={message} />)
+						messages.map((message) => <TimelineEntry key={message.id} message={message} reassignTickets={reassignTickets} />)
 					)}
 				</div>
 
@@ -158,6 +175,10 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 						{smtpConfigured ? (
 							<div className="border-t pt-4">
 								<TicketReplyForm ticketId={ticket.id} defaultTo={defaultTo} defaultSubject={defaultSubject} />
+								<p className="mt-2 text-xs text-muted-foreground">
+									Dem Betreff wird beim Versand automatisch die Ticket-Kennung {buildTicketSubjectTag(ticket.id)} angehängt - Antworten des
+									Empfängers werden so beim nächsten Postfach-Abruf automatisch diesem Ticket zugeordnet.
+								</p>
 							</div>
 						) : (
 							<p className="border-t pt-4 text-xs text-muted-foreground">

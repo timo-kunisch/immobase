@@ -160,6 +160,16 @@ export function linkMessageToTicket(id: string, ticketId: string): void {
 }
 
 /**
+ * Löst die Ticket-Zuordnung einer eingehenden E-Mail wieder auf - die
+ * Nachricht landet zurück im Postfach. Nur eingehende E-Mails sind
+ * entknüpfbar (ausgehende E-Mails/Notizen gehören fachlich zum Ticket
+ * und hätten ohne Zuordnung keinen Anzeigeort).
+ */
+export function unlinkMessageFromTicket(id: string): void {
+	getDb().prepare("UPDATE ticket_messages SET ticket_id = NULL WHERE id = ? AND direction = 'INBOUND'").run(id);
+}
+
+/**
  * Löscht eine Nachricht aus dem Postfach. Nur unverknüpfte eingehende
  * Nachrichten sind so löschbar - Ticket-Verläufe werden nicht entfernt
  * (sie verschwinden mit dem Ticket per ON DELETE CASCADE).

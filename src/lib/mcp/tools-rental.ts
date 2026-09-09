@@ -398,7 +398,7 @@ registerTool({
 registerTool({
 	name: "tickets_send_email",
 	description:
-		"Versendet eine E-Mail-Antwort aus einem Ticket heraus (erfordert konfiguriertes SMTP) und legt sie im Ticket-Verlauf ab. Antworten des Empfängers werden per Threading (In-Reply-To/References) beim nächsten IMAP-Abruf automatisch dem Ticket zugeordnet.",
+		"Versendet eine E-Mail-Antwort aus einem Ticket heraus (erfordert konfiguriertes SMTP) und legt sie im Ticket-Verlauf ab. Der Betreff erhält automatisch die Ticket-Kennung (z. B. [#a3f8b2c1]); Antworten des Empfängers werden per Threading (In-Reply-To/References) oder über diese Kennung beim nächsten IMAP-Abruf automatisch dem Ticket zugeordnet.",
 	inputSchema: buildInputSchema({
 		ticketId: { type: "string" },
 		to: { type: "string", description: "Empfängeradresse" },

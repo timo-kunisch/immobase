@@ -158,6 +158,22 @@ export function deleteTicket(id: string): void {
 	getDb().prepare("DELETE FROM tickets WHERE id = ?").run(id);
 }
 
+/**
+ * Löst eine Ticket-Kennung aus dem E-Mail-Betreff (z. B. „a3f8b2c1" aus
+ * „[#a3f8b2c1]", siehe src/lib/ticket-ref.ts) auf. Gibt nur bei genau
+ * einem Treffer die Ticket-ID zurück - bei keiner oder mehreren
+ * Übereinstimmungen (Präfix-Kollision) null, damit keine E-Mail versehentlich
+ * dem falschen Ticket zugeordnet wird.
+ */
+export function findTicketIdByRef(ref: string): string | null {
+	const normalized = ref.trim().replace(/^#/, "").toLowerCase();
+	if (!/^[0-9a-f]{8}$/.test(normalized)) return null;
+	const rows = getDb()
+		.prepare("SELECT id FROM tickets WHERE lower(substr(id, 1, 8)) = ?")
+		.all(normalized) as { id: string }[];
+	return rows.length === 1 ? rows[0].id : null;
+}
+
 // ------------------------------------------------------------
 // Stammdaten-Zugriffe für Auswahl/Filter der Tickets-Ansicht
 // (units besitzt noch kein eigenes Repository - daher hier)

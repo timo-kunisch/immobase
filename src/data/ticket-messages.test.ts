@@ -18,8 +18,10 @@ import {
 	listMailboxMessages,
 	listTicketMessageCounts,
 	listTicketMessages,
+	unlinkMessageFromTicket,
 } from "@/data/ticket-messages";
-import { createTicket, deleteTicket, getTicket } from "@/data/tickets";
+import { createTicket, deleteTicket, findTicketIdByRef, getTicket } from "@/data/tickets";
+import { buildTicketSubjectTag } from "@/lib/ticket-ref";
 
 /**
  * Repository-Tests für die Ticket-Kommunikation (ticket_messages) und den
@@ -140,6 +142,56 @@ describe("ticket_messages: Postfach und Verknüpfung", () => {
 		importInboundMessage({ imapFolder: "INBOX", imapUid: 21, messageId: "<free@example.com>" });
 		expect(findLinkedTicketIdByMessageIds(["<free@example.com>"])).toBeNull();
 		expect(findLinkedTicketIdByMessageIds([])).toBeNull();
+	});
+
+	it("löst die Zuordnung eingehender E-Mails wieder auf (zurück ins Postfach)", () => {
+		const ticketId = createTestTicket(createTestProperty());
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 31, subject: "Falsch zugeordnet" });
+		linkMessageToTicket(message.id, ticketId);
+		expect(listTicketMessages(ticketId)).toHaveLength(1);
+		expect(listMailboxMessages()).toHaveLength(0);
+
+		unlinkMessageFromTicket(message.id);
+
+		expect(getTicketMessage(message.id)?.ticketId).toBeNull();
+		expect(listTicketMessages(ticketId)).toHaveLength(0);
+		expect(listMailboxMessages().map((m) => m.id)).toEqual([message.id]);
+	});
+
+	it("lässt ausgehende E-Mails und Notizen beim Entknüpfen unberührt", () => {
+		const ticketId = createTestTicket(createTestProperty());
+		const outbound = createTicketMessage({ ticketId, direction: "OUTBOUND", subject: "Antwort" });
+		const note = createTicketMessage({ ticketId, direction: "NOTE", bodyText: "Intern" });
+
+		unlinkMessageFromTicket(outbound.id);
+		unlinkMessageFromTicket(note.id);
+
+		expect(getTicketMessage(outbound.id)?.ticketId).toBe(ticketId);
+		expect(getTicketMessage(note.id)?.ticketId).toBe(ticketId);
+	});
+
+	it("ordnet eine E-Mail einem anderen Ticket neu zu", () => {
+		const propertyId = createTestProperty();
+		const firstTicketId = createTestTicket(propertyId);
+		const secondTicketId = createTestTicket(propertyId);
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 32, subject: "Umziehen" });
+		linkMessageToTicket(message.id, firstTicketId);
+
+		linkMessageToTicket(message.id, secondTicketId);
+
+		expect(getTicketMessage(message.id)?.ticketId).toBe(secondTicketId);
+		expect(listTicketMessages(firstTicketId)).toHaveLength(0);
+		expect(listTicketMessages(secondTicketId)).toHaveLength(1);
+	});
+
+	it("löst Ticket-Kennungen aus dem Betreff eindeutig auf (findTicketIdByRef)", () => {
+		const ticketId = createTestTicket(createTestProperty());
+		const ref = buildTicketSubjectTag(ticketId).slice(2, 10); // „[#a3f8b2c1]" -> „a3f8b2c1"
+
+		expect(findTicketIdByRef(ref)).toBe(ticketId);
+		// Unbekannte/ungültige Kennungen liefern keinen Treffer.
+		expect(findTicketIdByRef("00000000")).toBeNull();
+		expect(findTicketIdByRef("xyz")).toBeNull();
 	});
 
 	it("ordnet den Verlauf chronologisch und zählt Einträge je Ticket", () => {

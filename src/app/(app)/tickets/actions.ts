@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createTicket, deleteTicket, getTicket, listTickets, updateTicket, updateTicketStatus } from "@/data/tickets";
-import { createTicketMessage } from "@/data/ticket-messages";
+import { createTicketMessage, getTicketMessage, linkMessageToTicket, unlinkMessageFromTicket } from "@/data/ticket-messages";
 import type { TicketStatus } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
@@ -191,5 +191,81 @@ export async function sendTicketEmailAction(_prevState: ActionState, formData: F
 
 	revalidatePath(`/tickets/${ticketId}`);
 	revalidatePath("/tickets");
+	return { success: true };
+}
+
+/**
+ * Löst die Zuordnung einer eingehenden E-Mail zum Ticket - sie landet
+ * wieder im Postfach und kann dort neu einsortiert werden.
+ */
+export async function unlinkTicketMessageAction(messageId: string): Promise<ActionState> {
+	const user = await requireUser();
+	const message = getTicketMessage(messageId);
+	if (!message || message.direction !== "INBOUND" || !message.ticketId) {
+		return { error: "Die E-Mail wurde nicht gefunden." };
+	}
+	const ticket = getTicket(message.ticketId);
+
+	try {
+		unlinkMessageFromTicket(messageId);
+		logActivity(
+			user,
+			"UPDATE",
+			"tickets",
+			`E-Mail „${message.subject ?? "(ohne Betreff)"}“ vom Ticket „${ticket ? ticket.title : message.ticketId}“ gelöst (zurück ins Postfach)`,
+			message.ticketId
+		);
+	} catch (error) {
+		console.error("unlinkTicketMessageAction failed", error);
+		return { error: "Die Zuordnung konnte nicht aufgehoben werden." };
+	}
+
+	revalidatePath(`/tickets/${message.ticketId}`);
+	revalidatePath("/tickets");
+	revalidatePath("/postfach");
+	return { success: true };
+}
+
+/** Ordnet eine bereits verknüpfte eingehende E-Mail einem anderen Ticket zu. */
+export async function reassignTicketMessageAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const messageId = getString(formData, "messageId");
+	const ticketId = getString(formData, "ticketId");
+
+	if (!messageId || !ticketId) {
+		return { error: "Bitte wählen Sie ein Ticket aus." };
+	}
+
+	const message = getTicketMessage(messageId);
+	if (!message || message.direction !== "INBOUND" || !message.ticketId) {
+		return { error: "Die E-Mail wurde nicht gefunden." };
+	}
+	if (message.ticketId === ticketId) {
+		return { error: "Die E-Mail ist bereits diesem Ticket zugeordnet." };
+	}
+	const sourceTicketId = message.ticketId;
+	const targetTicket = getTicket(ticketId);
+	if (!targetTicket) {
+		return { error: "Das ausgewählte Ticket wurde nicht gefunden." };
+	}
+
+	try {
+		linkMessageToTicket(messageId, ticketId);
+		logActivity(
+			user,
+			"UPDATE",
+			"tickets",
+			`E-Mail „${message.subject ?? "(ohne Betreff)"}“ dem Ticket „${targetTicket.title}“ neu zugeordnet`,
+			ticketId
+		);
+	} catch (error) {
+		console.error("reassignTicketMessageAction failed", error);
+		return { error: "Die E-Mail konnte nicht neu zugeordnet werden." };
+	}
+
+	revalidatePath(`/tickets/${sourceTicketId}`);
+	revalidatePath(`/tickets/${ticketId}`);
+	revalidatePath("/tickets");
+	revalidatePath("/postfach");
 	return { success: true };
 }
