@@ -49,8 +49,28 @@ export interface OpenAiTool {
 const REQUEST_TIMEOUT_MS = 180_000;
 
 /**
+ * Wiederholbare Antwort-Status: 408/429 (Timeout/Rate-Limit) und 5xx -
+ * insbesondere 524 ("A Timeout Occurred" bei Endpunkten hinter Cloudflare):
+ * Da die Anfragen nicht-streamend sind, sendet der Ursprungsserver bis zum
+ * Abschluss der Generierung keinerlei Daten - dauert sie zu lange, bricht
+ * die vorgeschaltete Schicht (Cloudflare nach ~100 s) mit 524 ab. Ein
+ * erneuter Versuch geht dann häufig durch (warmes Modell, frei gewordene
+ * Kapazität). Muster wie fetchWithRetry in src/lib/dropbox.ts.
+ */
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504, 524]);
+const MAX_ATTEMPTS = 3;
+
+function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
  * Führt einen Chat-Completions-Request aus und liefert die
  * Assistant-Nachricht der ersten Choice (mit ggf. angeforderten Tool-Calls).
+ * Vorübergehende Fehler (Netzwerkfehler, eigener Timeout, RETRYABLE_STATUS)
+ * werden mit einfachem Backoff wiederholt (Retry-After-Header wird
+ * beachtet) - Chat-Completions sind reine Anfragen ohne Seiteneffekte,
+ * Wiederholungen sind daher sicher.
  */
 export async function createChatCompletion(
 	config: AiConfig,
@@ -58,26 +78,49 @@ export async function createChatCompletion(
 	tools: OpenAiTool[]
 ): Promise<OpenAiMessage> {
 	const url = `${config.baseUrl}/chat/completions`;
+	// Header/Body einmal aufbauen: Der String-Body ist über die Versuche
+	// hinweg wiederverwendbar (kein Stream). Das AbortSignal muss dagegen
+	// pro Versuch FRISCH erzeugt werden - ein abgelaufenes Signal würde
+	// jeden Folgeversuch sofort abbrechen.
+	const init: RequestInit = {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json",
+			...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
+		},
+		body: JSON.stringify({
+			model: config.model,
+			messages,
+			tools,
+			tool_choice: "auto",
+			stream: false,
+		}),
+	};
 
-	let response: Response;
-	try {
-		response = await fetch(url, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-				...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-			},
-			body: JSON.stringify({
-				model: config.model,
-				messages,
-				tools,
-				tool_choice: "auto",
-				stream: false,
-			}),
-			signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-		});
-	} catch (error) {
-		console.error("[ai] Endpunkt nicht erreichbar:", error);
+	let response: Response | null = null;
+	let lastNetworkError: unknown = null;
+	for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+		try {
+			response = await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+		} catch (error) {
+			response = null;
+			lastNetworkError = error;
+		}
+		const retryable = response === null || RETRYABLE_STATUS.has(response.status);
+		if (!retryable || attempt === MAX_ATTEMPTS) break;
+
+		const retryAfterSeconds = response ? Number(response.headers.get("retry-after") ?? "") : Number.NaN;
+		const waitMs =
+			Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? Math.min(retryAfterSeconds * 1000, 30_000) : 1000 * attempt;
+		console.warn(
+			`[ai] Endpunkt-Aufruf fehlgeschlagen (Versuch ${attempt}/${MAX_ATTEMPTS}${response ? `, HTTP ${response.status}` : ""}) - wiederhole in ${waitMs} ms.`,
+			response === null ? lastNetworkError : ""
+		);
+		await sleep(waitMs);
+	}
+
+	if (response === null) {
+		console.error("[ai] Endpunkt nicht erreichbar:", lastNetworkError);
 		throw new AiClientError(
 			`Der KI-Endpunkt (${config.baseUrl}) ist nicht erreichbar. Bitte prüfen Sie die Konfiguration unter Einstellungen → KI-Assistent und ob der Dienst läuft.`
 		);
@@ -94,7 +137,14 @@ export async function createChatCompletion(
 			// Kein JSON-Fehlerbody - dann bleibt es bei der Statusmeldung.
 		}
 		console.error(`[ai] Endpunkt meldet HTTP ${response.status}:`, detail || "(kein Fehler-Body)");
-		const hint = response.status === 401 || response.status === 403 ? " (API-Schlüssel prüfen)" : response.status === 404 ? " (Basis-URL/Modell prüfen)" : "";
+		const hint =
+			response.status === 401 || response.status === 403
+				? " (API-Schlüssel prüfen)"
+				: response.status === 404
+					? " (Basis-URL/Modell prüfen)"
+					: response.status === 504 || response.status === 524
+						? " (Timeout: Der Endpunkt hat die Antwort auch nach mehreren Versuchen nicht rechtzeitig geliefert - bitte erneut versuchen)"
+						: "";
 		throw new AiClientError(`Der KI-Endpunkt meldet HTTP ${response.status}${hint}.${detail ? ` Antwort: ${detail}` : ""}`);
 	}
 

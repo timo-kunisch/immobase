@@ -189,7 +189,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
   (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
   Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
-  nicht-streamend). **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
+  nicht-streamend): Vorübergehende Fehler werden mit einfachem Backoff wiederholt (max. 3 Versuche,
+  Retry-After-Header wird beachtet – Muster wie `fetchWithRetry` in `src/lib/dropbox.ts`):
+  Netzwerkfehler, eigenes Timeout (180 s/Aufruf) sowie die Status 408/429/500/502/503/504/524 –
+  insbesondere **524 („A Timeout Occurred") bei Endpunkten hinter Cloudflare**: Da die Anfragen
+  nicht-streamend sind, sendet der Ursprungsserver bis zum Abschluss der Generierung keinerlei
+  Daten; dauert sie zu lange, bricht Cloudflare nach ~100 s mit 524 ab (ein erneuter Versuch geht
+  dann häufig durch). Bleibt auch der letzte Versuch ein 504/524, trägt die Fehlermeldung einen
+  Timeout-Hinweis. **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
   clientseitig als Base64 mitgesendet und serverseitig aufbereitet (`src/lib/ai/attachments.ts`,
   geteilte Konstanten in `attachment-types.ts` – client-sicher, kein Node-Import): **PDF** via
   `pdfjs-dist` (**4.x gepinnt** – ab 5.x wird `DOMMatrix` als Browser-Global beim Modul-Import

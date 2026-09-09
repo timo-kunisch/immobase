@@ -378,15 +378,54 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 
 	it("wirft AiClientError bei HTTP-Fehlern des Endpunkts", async () => {
 		configureAi();
-		vi.stubGlobal(
-			"fetch",
-			vi.fn(async () => new Response(JSON.stringify({ error: { message: "invalid api key" } }), { status: 401 }))
+		const fetchMock = vi.fn(
+			async () => new Response(JSON.stringify({ error: { message: "invalid api key" } }), { status: 401 })
 		);
+		vi.stubGlobal("fetch", fetchMock);
 
 		await expect(
 			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "admin@test.de", userRole: "ADMIN" })
 		).rejects.toThrow(/HTTP 401.*API-Schlüssel prüfen/);
+		// Fachliche Fehler (4xx außer 408/429) werden NICHT wiederholt.
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
+
+	it("wiederholt vorübergehende Upstream-Timeouts (HTTP 524) und liefert dann die Antwort", async () => {
+		configureAi();
+		let attempts = 0;
+		const fetchMock = vi.fn(async () => {
+			attempts++;
+			// Die ersten beiden Aufrufe: Cloudflare-Timeout (HTML-Fehlerseite,
+			// kein JSON); der dritte geht durch.
+			if (attempts <= 2) {
+				return new Response("<html>524: A Timeout Occurred</html>", { status: 524 });
+			}
+			return completionResponse({ role: "assistant", content: "Antwort nach Wiederholung." });
+		});
+		vi.stubGlobal("fetch", fetchMock);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Hallo" }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
+
+		expect(result.reply).toBe("Antwort nach Wiederholung.");
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+		// Echter Backoff (1 s + 2 s) - daher großzügiges Test-Timeout.
+	}, 15_000);
+
+	it("wirft AiClientError mit Timeout-Hinweis, wenn der Endpunkt dauerhaft 524 meldet", async () => {
+		configureAi();
+		const fetchMock = vi.fn(async () => new Response("<html>524: A Timeout Occurred</html>", { status: 524 }));
+		vi.stubGlobal("fetch", fetchMock);
+
+		await expect(
+			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "admin@test.de", userRole: "ADMIN" })
+		).rejects.toThrow(/HTTP 524.*Timeout/);
+		expect(fetchMock).toHaveBeenCalledTimes(3);
+	}, 15_000);
 
 	it("schränkt die Werkzeuge für normale Nutzer ein (keine Admin-Werkzeuge)", async () => {
 		ensureTestTool();
