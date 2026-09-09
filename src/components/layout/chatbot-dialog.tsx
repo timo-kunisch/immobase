@@ -41,6 +41,18 @@ import { cn } from "@/lib/utils";
  * der Verlauf gelöscht wird. Fehlgeschlagene Anfragen werden als farblich
  * markierte Fehler-Nachricht (Rolle "error") im Verlauf festgehalten und
  * bleiben dort bis zum Löschen nachvollziehbar.
+ *
+ * Schließen während einer laufenden Anfrage: Diese Komponente hängt im
+ * Sidebar-Footer des persistenten App-Layouts - der Dialog kann daher
+ * jederzeit geschlossen und die App normal weitergenutzt werden, die
+ * Anfrage (fetch in handleSend) und der komplette Zustand laufen im
+ * Hintergrund weiter; beim erneuten Öffnen ist der aktuelle Stand
+ * sichtbar. Wird eine Antwort fertig, WÄHREND der Dialog geschlossen ist,
+ * erscheint eine In-App-Benachrichtigung (Karte unten rechts) und ein
+ * Hinweispunkt auf dem Sprechblasen-Button (replyNotice) - beides gilt
+ * analog für fehlgeschlagene Anfragen und verschwindet beim Öffnen des
+ * Chats, beim manuellen Wegklicken bzw. beim Senden der nächsten
+ * Nachricht.
  */
 
 interface ToolCallInfo {
@@ -103,10 +115,31 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const [pending, setPending] = useState(false);
 	const [clearing, setClearing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// In-App-Benachrichtigung, wenn eine Antwort bei GESCHLOSSENEM Dialog
+	// fertig wird (success) bzw. fehlschlägt (error) - als Karte unten rechts
+	// plus Hinweispunkt auf dem Sprechblasen-Button.
+	const [replyNotice, setReplyNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+	// Spiegelt den Open-State für den asynchronen Abschluss von handleSend:
+	// Der dortige Closure sieht den State-Wert vom Sende-Zeitpunkt, nicht ob
+	// der Dialog bei Antwort-Eingang noch offen ist.
+	const openRef = useRef(false);
+
+	/** Öffnet/schließt den Dialog; beim Öffnen wird eine evtl. vorhandene
+	 *  Antwort-Benachrichtigung quittiert (die Antwort ist dann sichtbar). */
+	function handleOpenChange(nextOpen: boolean) {
+		setOpen(nextOpen);
+		openRef.current = nextOpen;
+		if (nextOpen) setReplyNotice(null);
+	}
+
+	/** Benachrichtigung setzen, sofern der Dialog gerade geschlossen ist. */
+	function notifyIfClosed(notice: { kind: "success" | "error"; text: string }) {
+		if (!openRef.current) setReplyNotice(notice);
+	}
 
 	const enabled = aiConfigured;
 	const disabledHint =
@@ -204,6 +237,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		setAttachments([]);
 		setPending(true);
 		setError(null);
+		// Eine evtl. noch stehende Benachrichtigung der vorherigen Runde ist
+		// ab jetzt überholt (die neue Antwort ersetzt sie in Kürze).
+		setReplyNotice(null);
 
 		try {
 			// Nur die neue Nachricht senden - der bisherige Verlauf liegt
@@ -232,6 +268,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				throw new Error(data?.error ?? `Die Anfrage ist fehlgeschlagen (HTTP ${response.status}).${serverSnippet}`);
 			}
 			setMessages([...nextMessages, { role: "assistant", content: data.reply ?? "", toolCalls: data.toolCalls ?? [] }]);
+			// Bei geschlossenem Dialog auf die fertige Antwort hinweisen
+			// (Benachrichtigungs-Karte + Hinweispunkt am Button).
+			notifyIfClosed({ kind: "success", text: "Die Antwort auf Ihre Nachricht ist fertig." });
 		} catch (cause) {
 			// Der Fehlschlag wird Teil des Verlaufs (farblich markierte
 			// Fehler-Nachricht). Vom Server verarbeitete Fehler (ChatError/
@@ -239,6 +278,10 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			// der lokale Eintrag spiegelt denselben Text.
 			const errorText = cause instanceof Error ? cause.message : "Die Anfrage ist fehlgeschlagen.";
 			setMessages([...nextMessages, { role: "error", content: errorText }]);
+			// Auch über den Fehlschlag bei geschlossenem Dialog informieren
+			// (Text gekürzt, die volle Meldung steht im Verlauf).
+			const shortError = errorText.length > 160 ? `${errorText.slice(0, 160)}…` : errorText;
+			notifyIfClosed({ kind: "error", text: `Die Anfrage ist fehlgeschlagen: ${shortError}` });
 		} finally {
 			setPending(false);
 			textareaRef.current?.focus();
@@ -272,16 +315,28 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={setOpen}>
+		<Dialog open={open} onOpenChange={handleOpenChange}>
 			{/* Der umschließende span trägt den Titel: Deaktivierte Buttons lösen
 			    in manchen Browsern keine Mouse-Events (und damit kein Tooltip)
-			    aus. */}
+			    aus. Der innere span verankert den Hinweispunkt für eine
+			    ungelesene fertige Antwort (replyNotice) positionsfest am Button. */}
 			<span title={enabled ? "KI-Assistent" : disabledHint}>
-				<DialogTrigger asChild>
-					<Button type="button" variant="ghost" size="icon-sm" disabled={!enabled} aria-label="KI-Assistent">
-						<MessageCircle className="size-4" />
-					</Button>
-				</DialogTrigger>
+				<span className="relative inline-flex">
+					<DialogTrigger asChild>
+						<Button type="button" variant="ghost" size="icon-sm" disabled={!enabled} aria-label="KI-Assistent">
+							<MessageCircle className="size-4" />
+						</Button>
+					</DialogTrigger>
+					{replyNotice ? (
+						<span
+							aria-hidden="true"
+							className={cn(
+								"pointer-events-none absolute -top-0.5 -right-0.5 size-2.5 rounded-full border-2 border-sidebar",
+								replyNotice.kind === "error" ? "bg-destructive" : "bg-primary"
+							)}
+						/>
+					) : null}
+				</span>
 			</span>
 			<DialogContent className="flex h-[80vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
 				<DialogHeader className="border-b px-4 py-3">
@@ -500,6 +555,47 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 					</div>
 				</div>
 			</DialogContent>
+
+			{/* In-App-Benachrichtigung: Eine Antwort ist fertig geworden (bzw.
+			    fehlgeschlagen), während der Dialog geschlossen war. Bleibt bis
+			    zum Öffnen des Chats, Wegklicken oder der nächsten Nachricht
+			    stehen; der Hinweispunkt am Sprechblasen-Button signalisiert
+			    denselben Zustand. Kein Toast-Auto-Timeout, damit die Info bei
+			    längerer Abwesenheit nicht verloren geht. Liegt als fixed-Karte
+			    unten rechts; gerendert als Kind der Dialog-Root (die Root selbst
+			    erzeugt kein DOM-Element). */}
+			{replyNotice ? (
+				<div
+					role={replyNotice.kind === "error" ? "alert" : "status"}
+					className="fixed right-4 bottom-4 z-50 flex w-80 items-start gap-3 rounded-lg border bg-popover p-3 text-popover-foreground shadow-lg"
+				>
+					{replyNotice.kind === "error" ? (
+						<TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" />
+					) : (
+						<Bot className="mt-0.5 size-4 shrink-0 text-primary" />
+					)}
+					<div className="min-w-0 flex-1 space-y-1">
+						<p className="text-sm font-medium">KI-Assistent</p>
+						<p className="text-xs break-words text-muted-foreground">{replyNotice.text}</p>
+						<button
+							type="button"
+							onClick={() => handleOpenChange(true)}
+							className="text-xs font-medium underline underline-offset-2 hover:no-underline"
+						>
+							Chat öffnen
+						</button>
+					</div>
+					<button
+						type="button"
+						onClick={() => setReplyNotice(null)}
+						aria-label="Benachrichtigung schließen"
+						title="Benachrichtigung schließen"
+						className="shrink-0 text-muted-foreground hover:text-foreground"
+					>
+						<X className="size-4" />
+					</button>
+				</div>
+			) : null}
 		</Dialog>
 	);
 }

@@ -225,9 +225,15 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
    Datei-Anhänge werden nicht gespeichert. Größen-Grenzen (Summe der
    Nachrichten-Zeichen): Ab 100.000 Zeichen (`CHAT_HISTORY_WARNING_CHARS` im Dialog) blendet
    die UI eine Warnung zum steigenden Token-Verbrauch ein und empfiehlt das Löschen; bei
-   250.000 Zeichen (`CHAT_HISTORY_HARD_LIMIT_CHARS` in `src/lib/ai/chat-limits.ts`, geteilt)
-   greift die **harte Grenze** – die Chat-Route lehnt weitere Nachrichten mit HTTP 413 ab und
-   der Dialog sperrt die Eingabe, bis der Verlauf gelöscht wird.
+    250.000 Zeichen (`CHAT_HISTORY_HARD_LIMIT_CHARS` in `src/lib/ai/chat-limits.ts`, geteilt)
+    greift die **harte Grenze** – die Chat-Route lehnt weitere Nachrichten mit HTTP 413 ab und
+    der Dialog sperrt die Eingabe, bis der Verlauf gelöscht wird. **Schließen während einer
+    laufenden Anfrage** ist möglich: Der `ChatbotDialog` hängt im Sidebar-Footer des
+    persistenten App-Layouts, Anfrage (fetch) und Zustand laufen im Hintergrund weiter; wird
+    die Antwort bei geschlossenem Dialog fertig (oder schlägt sie fehl), erscheint eine
+    In-App-Benachrichtigung (Karte unten rechts, `replyNotice`) plus Hinweispunkt auf dem
+    Sprechblasen-Button – quittiert durch Öffnen des Chats, Wegklicken oder die nächste
+    Nachricht.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
