@@ -84,6 +84,54 @@ const MAX_ATTACHMENTS = MAX_ATTACHMENTS_PER_MESSAGE;
  */
 const CHAT_HISTORY_WARNING_CHARS = 100_000;
 
+/**
+ * Maximale Anzahl direkt sichtbarer Werkzeug-Aufrufe unter einer
+ * Assistenten-Antwort. Bei Runden mit vielen Aufrufen (Tool-Loop) werden
+ * die übrigen hinter einem Aufklapp-Button verborgen, damit der Verlauf
+ * lesbar bleibt.
+ */
+const MAX_VISIBLE_TOOL_CALLS = 5;
+
+/**
+ * Liste der in einer Antwort-Runde ausgeführten Werkzeuge (Name + Erfolg/
+ * Fehlschlag) unter der Assistenten-Antwort. Zeigt höchstens
+ * MAX_VISIBLE_TOOL_CALLS Einträge direkt; ein Button („+N …" / „weniger")
+ * klappt die restlichen Aufrufe auf bzw. wieder zu.
+ */
+function ToolCallList({ toolCalls }: { toolCalls: ToolCallInfo[] }) {
+	const [expanded, setExpanded] = useState(false);
+	const visibleCalls = expanded ? toolCalls : toolCalls.slice(0, MAX_VISIBLE_TOOL_CALLS);
+	const hiddenCount = toolCalls.length - visibleCalls.length;
+
+	return (
+		<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+			<Wrench className="size-3" />
+			{visibleCalls.map((call, callIndex) => (
+				<span
+					key={callIndex}
+					className={cn(
+						"rounded border px-1 py-0.5 font-mono",
+						call.ok ? "border-border" : "border-destructive/50 text-destructive"
+					)}
+					title={call.ok ? "Werkzeug erfolgreich ausgeführt" : "Werkzeug-Aufruf fehlgeschlagen"}
+				>
+					{call.name}
+				</span>
+			))}
+			{toolCalls.length > MAX_VISIBLE_TOOL_CALLS ? (
+				<button
+					type="button"
+					onClick={() => setExpanded((value) => !value)}
+					title={expanded ? "Weniger Werkzeug-Aufrufe anzeigen" : `Alle ${toolCalls.length} Werkzeug-Aufrufe anzeigen`}
+					className="rounded border border-border px-1 py-0.5 font-mono hover:bg-muted"
+				>
+					{expanded ? "weniger" : `+${hiddenCount} …`}
+				</button>
+			) : null}
+		</p>
+	);
+}
+
 async function fileToBase64(file: File): Promise<string> {
 	const bytes = new Uint8Array(await file.arrayBuffer());
 	// btoa arbeitet auf Binärstrings - chunkweise wandeln (Call-Stack-Limit).
@@ -395,21 +443,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 										{message.role === "assistant" ? <MarkdownContent content={message.content} /> : message.content}
 									</div>
 									{message.toolCalls && message.toolCalls.length > 0 ? (
-										<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-											<Wrench className="size-3" />
-											{message.toolCalls.map((call, callIndex) => (
-												<span
-													key={callIndex}
-													className={cn(
-														"rounded border px-1 py-0.5 font-mono",
-														call.ok ? "border-border" : "border-destructive/50 text-destructive"
-													)}
-													title={call.ok ? "Werkzeug erfolgreich ausgeführt" : "Werkzeug-Aufruf fehlgeschlagen"}
-												>
-													{call.name}
-												</span>
-											))}
-										</p>
+										<ToolCallList toolCalls={message.toolCalls} />
 									) : null}
 								</div>
 								{message.role === "user" ? <User className="mt-1 size-4 shrink-0 text-muted-foreground" /> : null}
