@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, User, Wrench, X } from "lucide-react";
 
+import { MarkdownContent } from "@/components/layout/markdown-content";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,6 +18,9 @@ import { cn } from "@/lib/utils";
  * Der Dialog steht allen angemeldeten Nutzern offen (normale Nutzer ohne
  * Administrations-Werkzeuge, siehe Werkzeug-Scope in src/lib/mcp/registry.ts)
  * und ist deaktiviert, solange kein KI-Endpunkt konfiguriert ist.
+ * Assistenten-Antworten werden als Markdown gerendert (MarkdownContent in
+ * markdown-content.tsx; kein rohes HTML = kein XSS), Nutzer-Nachrichten
+ * bleiben reiner Text.
  *
  * Datei-Anhänge (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen,
  * Word-/PowerPoint-Dokumente, Bilder, Text-/Code-Dateien) werden als Base64
@@ -211,13 +215,18 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							<div key={index} className={cn("flex gap-2", message.role === "user" ? "justify-end" : "justify-start")}>
 								{message.role === "assistant" ? <Bot className="mt-1 size-4 shrink-0 text-muted-foreground" /> : null}
 								<div className={cn("max-w-[85%] space-y-1", message.role === "user" ? "text-right" : "text-left")}>
+									{/* Assistenten-Antworten kommen als Markdown und werden
+									    entsprechend gerendert (kein whitespace-pre-wrap, das würde
+									    zwischen den gerenderten Blockelementen Leerzeilen erzeugen);
+									    max-w-full begrenzt die Bubble, damit breite Tabellen/
+									    Code-Blöcke innerhalb scrollen statt herauszuragen. */}
 									<div
 										className={cn(
-											"inline-block whitespace-pre-wrap rounded-lg px-3 py-2 text-left text-sm",
-											message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+											"inline-block rounded-lg px-3 py-2 text-left text-sm break-words",
+											message.role === "user" ? "whitespace-pre-wrap bg-primary text-primary-foreground" : "max-w-full bg-muted"
 										)}
 									>
-										{message.content}
+										{message.role === "assistant" ? <MarkdownContent content={message.content} /> : message.content}
 									</div>
 									{message.toolCalls && message.toolCalls.length > 0 ? (
 										<p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">

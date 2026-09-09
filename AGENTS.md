@@ -175,11 +175,17 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   `SECRET_SETTING_KEYS`, optional leer für lokale Server wie LM Studio/Ollama; Env-Fallbacks
   `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY`). Ohne vollständige Konfiguration ist die Sprechblase
   deaktiviert und die Route gesperrt (`isAiConfigured()`). Der Chat steht **allen angemeldeten
-  Nutzern** offen (Route prüft `getCurrentUser()` mit JSON-401 statt Redirect); die **Rolle aus
-  der Session bestimmt den Werkzeug-Scope** (`userRole` → `McpToolScope`): Administratoren
-  erhalten alle Werkzeuge, normale Nutzer nur die fachlichen (keine `adminOnly`-Werkzeuge wie
-  Nutzerverwaltung/Absenderdaten – exakt die Funktionen, die ihnen auch in der App-Oberfläche
-  offenstehen). `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge scope-gefiltert als
+   Nutzern** offen (Route prüft `getCurrentUser()` mit JSON-401 statt Redirect); die **Rolle aus
+   der Session bestimmt den Werkzeug-Scope** (`userRole` → `McpToolScope`): Administratoren
+   erhalten alle Werkzeuge, normale Nutzer nur die fachlichen (keine `adminOnly`-Werkzeuge wie
+   Nutzerverwaltung/Absenderdaten – exakt die Funktionen, die ihnen auch in der App-Oberfläche
+   offenstehen). **Assistenten-Antworten werden als Markdown gerendert**
+   (`src/components/layout/markdown-content.tsx`: `react-markdown` + `remark-gfm` für Tabellen +
+   `remark-breaks` für Chat-übliche Zeilenumbrüche, Tailwind-Styling über die `components`-Prop;
+   bewusst **kein** `rehype-raw`, d. h. rohes HTML aus Modell-Ausgaben wird escaped = kein XSS;
+   Markdown-Bilder werden nicht geladen, externe Links öffnen über `target="_blank"` im
+   System-Browser); Nutzer-Nachrichten bleiben reiner Text.
+   `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge scope-gefiltert als
   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
   (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
   Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
