@@ -11,6 +11,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { ConvertToTicketDialog } from "@/components/postfach/convert-to-ticket-dialog";
 import { LinkToTicketDialog } from "@/components/postfach/link-to-ticket-dialog";
 import { MailboxSyncButton } from "@/components/postfach/mailbox-sync-button";
+import { ViewMessageDialog } from "@/components/postfach/view-message-dialog";
 import { getImapConfig, isImapConfigured } from "@/lib/email/imap";
 import { formatDateTime } from "@/lib/format";
 
@@ -91,6 +92,7 @@ export default async function PostfachPage() {
 										<CardContent className="flex flex-col gap-3">
 											{message.bodyText ? <p className="text-sm whitespace-pre-wrap text-muted-foreground line-clamp-4">{message.bodyText}</p> : null}
 											<div className="flex flex-wrap items-center gap-2">
+												<ViewMessageDialog message={message} />
 												<ConvertToTicketDialog message={message} properties={propertyList} units={unitList} />
 												<LinkToTicketDialog message={message} tickets={linkableTickets} />
 											</div>

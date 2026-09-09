@@ -39,7 +39,7 @@ export function ConvertToTicketDialog({ message, properties, units }: { message:
 					In Ticket umwandeln
 				</Button>
 			</DialogTrigger>
-			<DialogContent className="sm:max-w-lg">
+			<DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
 						<DialogTitle>E-Mail in Ticket umwandeln</DialogTitle>
@@ -90,7 +90,8 @@ export function ConvertToTicketDialog({ message, properties, units }: { message:
 
 						<div className="grid gap-2">
 							<Label htmlFor="description">Beschreibung</Label>
-							<Textarea id="description" name="description" rows={8} defaultValue={message.bodyText ?? ""} />
+							{/* max-h begrenzt die mitwachsende Textarea (field-sizing-content), damit bei langen E-Mails die Dialog-Buttons erreichbar bleiben. */}
+							<Textarea id="description" name="description" rows={8} defaultValue={message.bodyText ?? ""} className="max-h-64" />
 						</div>
 
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
