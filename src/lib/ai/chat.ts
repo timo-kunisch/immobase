@@ -21,7 +21,14 @@ import { callTool, listToolDefinitions } from "@/lib/mcp/tools";
  * 2. Endpunkt-Aufruf; fordert das Modell Werkzeuge an, werden sie
  *    ausgeführt, die Ergebnisse als role:"tool"-Nachrichten angehängt und
  *    erneut angefragt (max. MAX_TOOL_ROUNDS Runden als Schleifen-Schutz).
+ *    Nähert sich das Modell dem Limit, weist ein System-Hinweis auf das
+ *    verbleibende Budget hin (soll rechtzeitig zum Abschluss steuern).
  * 3. Die erste Antwort ohne Werkzeug-Anforderung ist die finale Antwort.
+ * 4. Ist das Limit erschöpft, schlägt die Anfrage NICHT fehl: In einer
+ *    Schlussrunde OHNE Werkzeugangebot fasst das Modell den erreichten
+ *    Zwischenstand zusammen und benennt, was noch offen ist (der Nutzer
+ *    kann die Fortsetzung z. B. mit "weiter" anstoßen). Erst wenn auch
+ *    diese Runde keine Antwort liefert, greift ein fester Fallback-Text.
  *
  * Sicherheitsmodell: Der Chat steht allen angemeldeten Nutzern offen. Die
  * Rolle des Nutzers (aus der Session, von der Chat-Route übergeben)
@@ -58,8 +65,20 @@ export interface ChatRunResult {
 	toolCalls: ExecutedToolCall[];
 }
 
-/** Schleifen-Schutz: maximale Werkzeug-Runden je Nutzernachricht. */
-const MAX_TOOL_ROUNDS = 15;
+/**
+ * Schleifen-Schutz: maximale Werkzeug-Runden je Nutzernachricht. Muss
+ * großzügig bemessen sein, damit Massenanlagen aus Datei-Anhängen (z. B.
+ * Mieterlisten aus Excel) in einem Durchlauf durchlaufen; das Limit ist
+ * kein harter Abbruch mehr, sondern leitet die Schlussrunde ein (siehe
+ * unten).
+ */
+const MAX_TOOL_ROUNDS = 25;
+/**
+ * Ab so vielen verbleibenden Werkzeug-Runden erhält das Modell einen
+ * System-Hinweis auf das schwindende Budget, damit es rechtzeitig zum
+ * Abschluss steuert (statt unvorbereitet im Limit zu landen).
+ */
+const BUDGET_WARNING_REMAINING = 5;
 /**
  * Werkzeug-Ergebnisse (z. B. große *_list-Ausgaben) werden gekürzt, damit
  * sie das Kontextfenster des Modells nicht sprengen.
@@ -218,9 +237,51 @@ export async function runChat(input: {
 				openAiMessages.push({ role: "tool", tool_call_id: call.id, content: `Fehler: ${detail}` });
 			}
 		}
+
+		// Budget-Frühwarnung: einmalig ans Modell melden, wenn nur noch
+		// wenige Runden übrig sind - es soll verbleibende Schritte bündeln
+		// bzw. einen geordneten Zwischenstand vorbereiten, statt
+		// unvorbereitet im Limit zu landen.
+		const remainingRounds = MAX_TOOL_ROUNDS - 1 - round;
+		if (remainingRounds === BUDGET_WARNING_REMAINING) {
+			openAiMessages.push({
+				role: "system",
+				content:
+					`System-Hinweis: Dir verbleiben nur noch ${BUDGET_WARNING_REMAINING} Werkzeug-Runden. ` +
+					"Plane effizient: Bündele verbleibende Aufrufe und bringe die Aufgabe zeitnah zum Abschluss. " +
+					"Reicht das Budget erkennbar nicht aus, bereite stattdessen eine Zwischenbilanz vor: Was ist bereits erledigt, was bleibt offen?",
+			});
+		}
 	}
 
-	throw new AiClientError(
-		`Das Modell hat die maximale Anzahl von ${MAX_TOOL_ROUNDS} Werkzeug-Runden überschritten. Bitte formulieren Sie die Anfrage kleiner oder konkreter.`
-	);
+	// Budget erschöpft: KEIN harter Abbruch mehr - der bis dahin erreichte
+	// Fortschritt (gerade bei Massenanlagen) wäre sonst komplett verloren.
+	// Stattdessen Schlussrunde OHNE Werkzeugangebot: Das Modell fasst den
+	// Zwischenstand zusammen und benennt die offenen Reste; der Nutzer kann
+	// die Fortsetzung (z. B. mit "weiter") als neue Nachricht anstoßen.
+	console.warn(`[ai] Werkzeug-Budget von ${MAX_TOOL_ROUNDS} Runden erschöpft - starte Schlussrunde ohne Werkzeuge.`);
+	openAiMessages.push({
+		role: "system",
+		content:
+			"System-Hinweis: Das Werkzeug-Budget ist erschöpft - dir stehen keine weiteren Werkzeugaufrufe zur Verfügung. " +
+			"Antworte dem Nutzer jetzt abschließend: Fasse knapp zusammen, was du bereits erledigt bzw. herausgefunden hast, " +
+			"benenne konkret, was noch offen ist, und weise darauf hin, dass der Nutzer die Fortsetzung mit \"weiter\" " +
+			"(oder einer konkreten Folgeanweisung) anstoßen kann.",
+	});
+	const finalMessage = await createChatCompletion(config, openAiMessages);
+	const finalReply = (typeof finalMessage.content === "string" ? finalMessage.content : "").trim();
+	if (finalReply) {
+		return { reply: finalReply, toolCalls: executed };
+	}
+
+	// Fallback, falls das Modell auch in der Schlussrunde nichts liefert:
+	// faktisch korrekte Bilanz aus den lokal vorliegenden Aufrufdaten.
+	const failedCount = executed.filter((call) => !call.ok).length;
+	return {
+		reply:
+			`Das Werkzeug-Budget von ${MAX_TOOL_ROUNDS} Runden ist erschöpft. ` +
+			`Es wurden ${executed.length} Werkzeugaufrufe ausgeführt (davon ${failedCount} fehlgeschlagen). ` +
+			"Schreiben Sie \"weiter\", damit der Assistent fortfährt - oder formulieren Sie die Anfrage konkreter.",
+		toolCalls: executed,
+	};
 }

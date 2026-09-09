@@ -75,9 +75,23 @@ function sleep(ms: number): Promise<void> {
 export async function createChatCompletion(
 	config: AiConfig,
 	messages: OpenAiMessage[],
-	tools: OpenAiTool[]
+	tools?: OpenAiTool[]
 ): Promise<OpenAiMessage> {
 	const url = `${config.baseUrl}/chat/completions`;
+	// Ohne übergebene Werkzeuge werden die Felder tools/tool_choice komplett
+	// weggelassen (statt tools: []) - so KANN das Modell keine Aufrufe mehr
+	// anfordern (genutzt für die Schlussrunde nach Budget-Erschöpfung, siehe
+	// chat.ts); das ist bei den kompatiblen Endpunkten portabler als ein
+	// leeres Werkzeug-Array oder tool_choice "none".
+	const body: Record<string, unknown> = {
+		model: config.model,
+		messages,
+		stream: false,
+	};
+	if (tools && tools.length > 0) {
+		body.tools = tools;
+		body.tool_choice = "auto";
+	}
 	// Header/Body einmal aufbauen: Der String-Body ist über die Versuche
 	// hinweg wiederverwendbar (kein Stream). Das AbortSignal muss dagegen
 	// pro Versuch FRISCH erzeugt werden - ein abgelaufenes Signal würde
@@ -88,13 +102,7 @@ export async function createChatCompletion(
 			"Content-Type": "application/json",
 			...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
 		},
-		body: JSON.stringify({
-			model: config.model,
-			messages,
-			tools,
-			tool_choice: "auto",
-			stream: false,
-		}),
+		body: JSON.stringify(body),
 	};
 
 	let response: Response | null = null;

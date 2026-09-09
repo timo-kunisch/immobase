@@ -466,4 +466,84 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 		expect(result.toolCalls[0].detail).toContain("nur Administratoren");
 		expect(result.reply).toBe("Dafür ist ein Administratorkonto nötig.");
 	});
+
+	it("liefert bei Budget-Erschöpfung eine Schlussrunde ohne Werkzeuge (statt hartem Fehler)", async () => {
+		ensureTestTool();
+		configureAi();
+		// Das Modell fordert das Maximum von 25 Werkzeug-Runden aus und
+		// liefert erst in der Schlussrunde (ohne Werkzeugangebot) Text.
+		const toolRoundMessages = Array.from({ length: 25 }, (_, index) => ({
+			role: "assistant",
+			content: null,
+			tool_calls: [
+				{ id: `call_${index}`, type: "function", function: { name: "test_echo_tool", arguments: '{"text":"x"}' } },
+			],
+		}));
+		const fetchMock = mockFetchSequence([
+			...toolRoundMessages,
+			{ role: "assistant", content: "Zwischenbilanz: 12 von 20 Mietern angelegt, Rest offen." },
+		]);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Lege alle Mieter aus der Tabelle an." }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
+
+		// Kein Fehler: Die Schlussrunde liefert die Zwischenbilanz als Antwort.
+		expect(result.reply).toBe("Zwischenbilanz: 12 von 20 Mietern angelegt, Rest offen.");
+		expect(result.toolCalls).toHaveLength(25);
+		expect(result.toolCalls.every((call) => call.ok)).toBe(true);
+		expect(fetchMock).toHaveBeenCalledTimes(26);
+
+		// Die Budget-Frühwarnung erscheint im Request nach der 20. Runde
+		// (ab 5 verbleibenden Runden) als system-Nachricht.
+		const warningRequest = JSON.parse(String(fetchMock.mock.calls[20][1]?.body)) as {
+			messages: { role: string; content: string }[];
+		};
+		const warning = warningRequest.messages.find(
+			(message) => message.role === "system" && message.content.includes("verbleiben nur noch 5 Werkzeug-Runden")
+		);
+		expect(warning).toBeDefined();
+
+		// Der letzte Request (Schlussrunde) enthält den Erschöpfungs-Hinweis
+		// und KEIN Werkzeugangebot mehr (weder tools noch tool_choice).
+		const finalRequest = JSON.parse(String(fetchMock.mock.calls[25][1]?.body)) as {
+			messages: { role: string; content: string }[];
+			tools?: unknown;
+			tool_choice?: unknown;
+		};
+		expect(finalRequest.tools).toBeUndefined();
+		expect(finalRequest.tool_choice).toBeUndefined();
+		const finalNote = finalRequest.messages.find(
+			(message) => message.role === "system" && message.content.includes("Werkzeug-Budget ist erschöpft")
+		);
+		expect(finalNote).toBeDefined();
+	});
+
+	it("greift auf eine eigene Bilanz zurück, wenn auch die Schlussrunde keine Antwort liefert", async () => {
+		ensureTestTool();
+		configureAi();
+		const toolRoundMessages = Array.from({ length: 25 }, (_, index) => ({
+			role: "assistant",
+			content: null,
+			tool_calls: [
+				{ id: `call_${index}`, type: "function", function: { name: "test_echo_tool", arguments: '{"text":"x"}' } },
+			],
+		}));
+		mockFetchSequence([...toolRoundMessages, { role: "assistant", content: null }]);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Lege alles an." }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
+
+		expect(result.reply).toContain("Werkzeug-Budget von 25 Runden ist erschöpft");
+		expect(result.reply).toContain("25 Werkzeugaufrufe");
+		expect(result.reply).toContain("weiter");
+		expect(result.toolCalls).toHaveLength(25);
+	});
 });

@@ -187,8 +187,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
    System-Browser); Nutzer-Nachrichten bleiben reiner Text.
    `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge scope-gefiltert als
   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
-  (Tool-Loop, max. 15 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
-  Tool-Ergebnis ans Modell). Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
+  (Tool-Loop, max. 25 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
+  Tool-Ergebnis ans Modell). Das Runden-Limit ist **kein harter Abbruch**: Ab 5 verbleibenden
+  Runden erhält das Modell eine Budget-Frühwarnung; bei Erschöpfung folgt eine Schlussrunde
+  **ohne** Werkzeugangebot, in der es Zwischenstand und offene Reste zusammenfasst (Fortsetzung
+  per „weiter"), bei leerer Antwort greift eine lokal erzeugte Bilanz der ausgeführten Aufrufe. Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
   nicht-streamend): Vorübergehende Fehler werden mit einfachem Backoff wiederholt (max. 3 Versuche,
   Retry-After-Header wird beachtet – Muster wie `fetchWithRetry` in `src/lib/dropbox.ts`):
   Netzwerkfehler, eigenes Timeout (180 s/Aufruf) sowie die Status 408/429/500/502/503/504/524 –
