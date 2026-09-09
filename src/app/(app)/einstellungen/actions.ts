@@ -89,6 +89,52 @@ export async function saveIntegrationSettingsAction(_prevState: ActionState, for
 	return { success: true };
 }
 
+/**
+ * Speichert die IMAP-Einstellungen für den E-Mail-Empfang (Ticket-Postfach,
+ * siehe src/lib/email/imap-sync.ts). Leeres Passwort-Feld = unverändert
+ * lassen (Muster wie beim SMTP-Passwort); leere Host-Adresse deaktiviert
+ * den Abruf - das Ticket-System läuft dann mit Basis-Funktionen weiter.
+ * Nur für Admins.
+ */
+export async function saveImapSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const admin = await requireAdmin();
+
+	try {
+		setSetting("imap.host", getString(formData, "imapHost"));
+		setSetting("imap.port", getString(formData, "imapPort"));
+		setSetting("imap.secure", formData.get("imapSecure") === "on" ? "true" : "false");
+		setSetting("imap.user", getString(formData, "imapUser"));
+		const imapPass = getString(formData, "imapPass");
+		if (imapPass) setSetting("imap.pass", imapPass);
+		setSetting("imap.mailbox", getString(formData, "imapMailbox") || "INBOX");
+
+		logActivity(admin, "UPDATE", "einstellungen", "IMAP-Einstellungen (E-Mail-Postfach) aktualisiert");
+	} catch (error) {
+		console.error("saveImapSettingsAction failed", error);
+		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+	}
+
+	revalidatePath("/einstellungen");
+	// Die Sidebar zeigt den Postfach-Eintrag abhängig von der Konfiguration.
+	revalidatePath("/", "layout");
+	return { success: true };
+}
+
+/**
+ * Verbindungstest für die IMAP-Einstellungen (nach dem Speichern klickbar).
+ * Nur für Admins.
+ */
+export async function testImapConnectionAction(): Promise<ActionState> {
+	await requireAdmin();
+	// Lazy import: imapflow soll nur geladen werden, wenn es auch gebraucht wird.
+	const { testImapConnection } = await import("@/lib/email/imap-sync");
+	const result = await testImapConnection();
+	if (!result.ok) {
+		return { error: `Verbindung fehlgeschlagen: ${result.error ?? "Unbekannter Fehler"}` };
+	}
+	return { success: true, message: "Die Verbindung zum IMAP-Server war erfolgreich." };
+}
+
 export interface EncryptFilesResult {
 	encrypted?: number;
 	alreadyEncrypted?: number;

@@ -1,0 +1,172 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Mail, MailPlus, StickyNote } from "lucide-react";
+
+import { listProperties } from "@/data/properties";
+import { listTicketMessages } from "@/data/ticket-messages";
+import { getTicket, listUnitsByLabel } from "@/data/tickets";
+import type { TicketMessage, TicketStatus } from "@/data/types";
+import { SiteHeader } from "@/components/layout/site-header";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { TicketFormDialog } from "@/components/tickets/ticket-form-dialog";
+import { TicketNoteForm } from "@/components/tickets/ticket-note-form";
+import { TicketReplyForm } from "@/components/tickets/ticket-reply-form";
+import { TicketStatusSelect } from "@/components/tickets/ticket-status-select";
+import { isSmtpConfigured } from "@/lib/email/mailer";
+import { formatDate, formatDateTime } from "@/lib/format";
+
+import { deleteTicketAction } from "../actions";
+
+export const dynamic = "force-dynamic";
+
+const statusLabels: Record<TicketStatus, string> = {
+	OPEN: "Offen",
+	IN_PROGRESS: "In Bearbeitung",
+	DONE: "Erledigt",
+};
+
+const statusVariants: Record<TicketStatus, "default" | "secondary" | "outline"> = {
+	OPEN: "default",
+	IN_PROGRESS: "secondary",
+	DONE: "outline",
+};
+
+/** Ein Verlauf-Eintrag (eingehende/ausgehende E-Mail oder interne Notiz). */
+function TimelineEntry({ message }: { message: TicketMessage }) {
+	const isNote = message.direction === "NOTE";
+	const isOutbound = message.direction === "OUTBOUND";
+	const Icon = isNote ? StickyNote : isOutbound ? MailPlus : Mail;
+
+	return (
+		<Card className={isNote ? "border-dashed bg-muted/40" : undefined}>
+			<CardHeader className="pb-2">
+				<div className="flex flex-wrap items-center justify-between gap-2">
+					<div className="flex items-center gap-2 text-sm font-medium">
+						<Icon className="size-4 text-muted-foreground" />
+						{isNote ? "Interne Notiz" : isOutbound ? "E-Mail gesendet" : "E-Mail empfangen"}
+						{isNote ? <Badge variant="secondary">Intern</Badge> : null}
+					</div>
+					<span className="text-xs text-muted-foreground">{formatDateTime(message.createdAt)}</span>
+				</div>
+				<p className="text-xs text-muted-foreground">
+					{isNote
+						? (message.authorEmail ?? "Unbekannt")
+						: `Von: ${message.fromAddress ?? "–"}${message.toAddresses ? ` · An: ${message.toAddresses}` : ""}`}
+					{!isNote && message.subject ? ` · ${message.subject}` : ""}
+				</p>
+			</CardHeader>
+			{message.bodyText ? (
+				<CardContent>
+					<p className="text-sm whitespace-pre-wrap">{message.bodyText}</p>
+				</CardContent>
+			) : null}
+		</Card>
+	);
+}
+
+export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+	const { id } = await params;
+	const ticket = getTicket(id);
+	if (!ticket) {
+		notFound();
+	}
+
+	const messages = listTicketMessages(ticket.id);
+	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+	const unitList = listUnitsByLabel();
+	const smtpConfigured = isSmtpConfigured();
+
+	// Vorbefüllung der Antwort aus der letzten eingehenden E-Mail.
+	const lastInbound = [...messages].reverse().find((message) => message.direction === "INBOUND");
+	const defaultTo = lastInbound?.fromAddress ?? "";
+	const baseSubject = lastInbound?.subject ?? ticket.title;
+	const defaultSubject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
+
+	return (
+		<div className="flex flex-1 flex-col">
+			<SiteHeader
+				title={ticket.title}
+				description="Ticket-Details mit komplettem Kommunikationsverlauf."
+				actions={
+					<>
+						<TicketFormDialog ticket={ticket} properties={propertyList} units={unitList} />
+						<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={`Ticket "${ticket.title}" wirklich löschen?`} />
+					</>
+				}
+			/>
+
+			<div className="flex-1 space-y-4 p-4 sm:p-6">
+				<Link href="/tickets" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline">
+					<ArrowLeft className="size-4" />
+					Zurück zur Übersicht
+				</Link>
+
+				<Card>
+					<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
+						<div className="flex items-center gap-2">
+							<Badge variant={statusVariants[ticket.status]}>{statusLabels[ticket.status]}</Badge>
+							<span className="text-xs text-muted-foreground">Erstellt am {formatDate(ticket.createdAt)}</span>
+							{ticket.resolvedAt ? <span className="text-xs text-muted-foreground">· Erledigt am {formatDate(ticket.resolvedAt)}</span> : null}
+						</div>
+						<div className="w-40">
+							<TicketStatusSelect ticketId={ticket.id} status={ticket.status} />
+						</div>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-2">
+						<p className="text-sm text-muted-foreground">
+							<Link href={`/liegenschaften#property-${ticket.propertyId}`} className="hover:text-foreground hover:underline">
+								{ticket.property.name}
+							</Link>
+							{ticket.unit ? (
+								<>
+									{" · "}
+									<Link href={`/einheiten#unit-${ticket.unit.id}`} className="hover:text-foreground hover:underline">
+										{ticket.unit.label}
+									</Link>
+								</>
+							) : null}
+						</p>
+						{ticket.description ? <p className="text-sm whitespace-pre-wrap">{ticket.description}</p> : null}
+						{ticket.contractorNotes ? (
+							<p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+								<span className="font-medium">Handwerker: </span>
+								{ticket.contractorNotes}
+							</p>
+						) : null}
+					</CardContent>
+				</Card>
+
+				<div className="flex flex-col gap-3">
+					<h2 className="text-sm font-semibold text-muted-foreground">Verlauf ({messages.length})</h2>
+					{messages.length === 0 ? (
+						<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+							Noch keine Kommunikation vorhanden.
+						</div>
+					) : (
+						messages.map((message) => <TimelineEntry key={message.id} message={message} />)
+					)}
+				</div>
+
+				<Card>
+					<CardHeader>
+						<CardTitle className="text-sm">Kommunikation hinzufügen</CardTitle>
+					</CardHeader>
+					<CardContent className="flex flex-col gap-6">
+						<TicketNoteForm ticketId={ticket.id} />
+						{smtpConfigured ? (
+							<div className="border-t pt-4">
+								<TicketReplyForm ticketId={ticket.id} defaultTo={defaultTo} defaultSubject={defaultSubject} />
+							</div>
+						) : (
+							<p className="border-t pt-4 text-xs text-muted-foreground">
+								E-Mail-Antworten sind deaktiviert, solange kein SMTP-Server konfiguriert ist (Einstellungen → Integrationen &amp; KI).
+							</p>
+						)}
+					</CardContent>
+				</Card>
+			</div>
+		</div>
+	);
+}

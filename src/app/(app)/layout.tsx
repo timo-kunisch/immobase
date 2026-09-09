@@ -4,6 +4,8 @@ import { UpdateBanner } from "@/components/layout/update-banner";
 import { requireUser } from "@/lib/auth/dal";
 import { isAiConfigured } from "@/lib/ai/config";
 import { startDropboxBackupScheduler } from "@/lib/dropbox-backup";
+import { isImapConfigured } from "@/lib/email/imap";
+import { startImapSyncScheduler } from "@/lib/email/imap-sync";
 
 // Autoritativer Auth-Check für den gesamten geschützten Bereich der App
 // (siehe src/proxy.ts für den vorgelagerten, günstigen Cookie-Check).
@@ -18,10 +20,14 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 	// (archiver/Streams) ungefiltert in den Standalone-Trace ziehen - die
 	// Route-Traces dagegen werden korrekt gefiltert (siehe next.config.ts).
 	startDropboxBackupScheduler();
+	// Scheduler für den automatischen IMAP-Abruf des Ticket-Postfachs
+	// (idempotent, no-op ohne IMAP-Konfiguration; gleicher Startpunkt-Grund
+	// wie beim Dropbox-Scheduler oben).
+	startImapSyncScheduler();
 
 	return (
 		<SidebarProvider>
-			<AppSidebar user={{ email: user.email, role: user.role }} aiConfigured={isAiConfigured()} />
+			<AppSidebar user={{ email: user.email, role: user.role }} aiConfigured={isAiConfigured()} mailboxEnabled={isImapConfigured()} />
 			<SidebarInset>
 				<UpdateBanner />
 				{children}

@@ -290,6 +290,15 @@ CREATE TABLE housing_charges (
 	FOREIGN KEY (economic_plan_id) REFERENCES economic_plans(id) ON UPDATE no action ON DELETE set null
 );
 
+CREATE TABLE imap_sync_state (
+	folder text PRIMARY KEY NOT NULL,
+	uid_validity integer DEFAULT 0 NOT NULL,
+	last_uid integer DEFAULT 0 NOT NULL,
+	last_sync_at text,
+	last_error text,
+	last_new_count integer
+);
+
 CREATE TABLE knowledge_base_articles (
 	id text PRIMARY KEY NOT NULL,
 	title text NOT NULL,
@@ -530,6 +539,24 @@ CREATE TABLE tenants (
 	updated_at text NOT NULL
 );
 
+CREATE TABLE ticket_messages (
+	id text PRIMARY KEY NOT NULL,
+	ticket_id text,
+	direction text NOT NULL,
+	message_id text,
+	imap_folder text,
+	imap_uid integer,
+	from_address text,
+	to_addresses text,
+	subject text,
+	body_text text,
+	author_user_id text,
+	author_email text,
+	created_at text NOT NULL,
+	FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (author_user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
+);
+
 CREATE TABLE tickets (
 	id text PRIMARY KEY NOT NULL,
 	property_id text NOT NULL,
@@ -725,6 +752,14 @@ CREATE INDEX tenant_statement_lines_tenant_statement_id_idx ON tenant_statement_
 CREATE UNIQUE INDEX tenant_statements_billing_period_id_lease_id_key ON tenant_statements (billing_period_id, lease_id);
 
 CREATE INDEX tenant_statements_lease_id_idx ON tenant_statements (lease_id);
+
+CREATE UNIQUE INDEX ticket_messages_imap_uq ON ticket_messages (imap_folder, imap_uid) WHERE imap_uid IS NOT NULL;
+
+CREATE INDEX ticket_messages_mailbox_idx ON ticket_messages (direction, ticket_id);
+
+CREATE INDEX ticket_messages_message_id_idx ON ticket_messages (message_id);
+
+CREATE INDEX ticket_messages_ticket_id_idx ON ticket_messages (ticket_id);
 
 CREATE INDEX tickets_property_id_idx ON tickets (property_id);
 

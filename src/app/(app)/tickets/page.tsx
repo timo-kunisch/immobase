@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { Wrench } from "lucide-react";
+import { MessagesSquare, Wrench } from "lucide-react";
 
 import { getUnitWithPropertyName, listTickets, listUnitsByLabel } from "@/data/tickets";
+import { listTicketMessageCounts } from "@/data/ticket-messages";
 import { getProperty, listProperties } from "@/data/properties";
 import type { TicketStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -26,6 +27,8 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 	const { propertyId, unitId } = await searchParams;
 
 	const ticketList = listTickets({ propertyId, unitId });
+	// Anzahl der Verlauf-Einträge (E-Mails + Notizen) je Ticket für die Badges.
+	const messageCounts = listTicketMessageCounts();
 	// Picker-Listen alphabetisch (bisher: SQL ORDER BY name/label ASC).
 	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 	const unitList = listUnitsByLabel();
@@ -75,7 +78,11 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 											columnTickets.map((ticket) => (
 												<Card key={ticket.id}>
 													<CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-														<CardTitle className="text-sm font-medium leading-snug">{ticket.title}</CardTitle>
+														<CardTitle className="text-sm font-medium leading-snug">
+															<Link href={`/tickets/${ticket.id}`} className="hover:text-primary hover:underline">
+																{ticket.title}
+															</Link>
+														</CardTitle>
 														<div className="flex items-center gap-0.5">
 															<TicketFormDialog ticket={ticket} properties={propertyList} units={unitList} />
 															<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={`Ticket "${ticket.title}" wirklich löschen?`} />
@@ -103,7 +110,19 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 															</p>
 														) : null}
 														<div className="flex items-center justify-between gap-2">
-															<span className="text-xs text-muted-foreground">{formatDate(ticket.createdAt)}</span>
+															<span className="flex items-center gap-2 text-xs text-muted-foreground">
+																{formatDate(ticket.createdAt)}
+																{(messageCounts[ticket.id] ?? 0) > 0 ? (
+																	<Link
+																		href={`/tickets/${ticket.id}`}
+																		className="inline-flex items-center gap-1 rounded-md hover:text-foreground"
+																		title="Verlauf anzeigen"
+																	>
+																		<MessagesSquare className="size-3.5" />
+																		{messageCounts[ticket.id]}
+																	</Link>
+																) : null}
+															</span>
 															<div className="w-36">
 																<TicketStatusSelect ticketId={ticket.id} status={ticket.status} />
 															</div>

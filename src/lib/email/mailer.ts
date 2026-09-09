@@ -167,3 +167,50 @@ export async function sendAccountApprovedEmail(email: string): Promise<void> {
 		text: `Ihr Konto wurde freigeschaltet. Jetzt anmelden: ${url}`,
 	});
 }
+
+/**
+ * Versendet eine E-Mail-Antwort aus dem Ticket-System (Mini-Zendesk).
+ * Im Gegensatz zu sendMail (Transaktionsmails, No-Op im Fehlerfall) wirft
+ * diese Funktion bei fehlender SMTP-Konfiguration oder Versandfehler -
+ * der Nutzer erwartet im Ticket eine explizite Rückmeldung. Gibt die
+ * verwendete Absenderadresse zurück (für den Verlauf-Eintrag).
+ */
+export async function sendTicketReplyEmail(options: {
+	to: string;
+	subject: string;
+	text: string;
+	/** Eigene RFC-822-Message-ID der ausgehenden Nachricht (Threading). */
+	messageId: string;
+	/** Message-ID der ursprünglichen eingehenden Nachricht. */
+	inReplyTo?: string | null;
+	/** Weitere Message-IDs des Threads (References-Header). */
+	references?: string[];
+}): Promise<{ from: string }> {
+	const smtp = getSmtpConfig();
+	if (!smtp) {
+		throw new Error("SMTP ist nicht konfiguriert - E-Mail-Versand ist deaktiviert.");
+	}
+	const transporter = nodemailer.createTransport({
+		host: smtp.host,
+		port: smtp.port,
+		secure: smtp.secure,
+		auth: smtp.user ? { user: smtp.user, pass: smtp.pass } : undefined,
+	});
+	// Threading-Header, damit die Antwort beim Empfänger im selben
+	// Konversationsverlauf landet (und Rückantworten bei uns erkannt werden).
+	const headers: Record<string, string> = {};
+	if (options.inReplyTo) {
+		headers["In-Reply-To"] = options.inReplyTo;
+		headers["References"] = [...(options.references ?? []), options.inReplyTo].join(" ");
+	}
+	const from = getEmailFrom();
+	await transporter.sendMail({
+		from,
+		to: options.to,
+		subject: options.subject,
+		text: options.text,
+		messageId: options.messageId,
+		headers,
+	});
+	return { from };
+}

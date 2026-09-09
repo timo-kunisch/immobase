@@ -45,6 +45,15 @@ import {
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant, type TenantInput } from "@/data/tenants";
 import { createTicket, deleteTicket, listTickets, updateTicket, updateTicketStatus, type TicketInput } from "@/data/tickets";
 import {
+	convertMessageToTicket,
+	createTicketMessage,
+	deleteMailboxMessage,
+	getTicketMessage,
+	linkMessageToTicket,
+	listMailboxMessages,
+	listTicketMessages,
+} from "@/data/ticket-messages";
+import {
 	createTransaction,
 	deleteTransaction,
 	generateDueTransactions,
@@ -60,6 +69,7 @@ import { calculateBillingResult } from "@/lib/billing";
 import { centsToDecimalString } from "@/lib/money";
 import { getTotalRentForDate } from "@/lib/rent-history";
 import { deleteUploadedFile, getUploadedFile, saveUploadedFile } from "@/lib/storage";
+import { sendTicketEmail } from "@/lib/ticket-mailer";
 
 import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, registerTool, type FieldSpec } from "./registry";
 
@@ -346,6 +356,167 @@ registerTool({
 		const status = input.status as "OPEN" | "IN_PROGRESS" | "DONE";
 		updateTicketStatus(id, status, status === "DONE" ? new Date().toISOString() : null);
 		return { success: true, id, status };
+	},
+});
+
+// ============================================================
+// Ticket-Kommunikation & Postfach (Mini-Zendesk)
+// ============================================================
+
+registerTool({
+	name: "ticket_messages_list",
+	description:
+		"Listet den Kommunikationsverlauf eines Tickets (eingehende/ausgehende E-Mails und interne Notizen, chronologisch). Mit mailboxOnly=true stattdessen die unzugeordneten E-Mails im Postfach.",
+	inputSchema: buildInputSchema({
+		ticketId: { type: "string", nullable: true },
+		mailboxOnly: { type: "boolean", nullable: true },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ ticketId: { type: "string", nullable: true }, mailboxOnly: { type: "boolean", nullable: true } }, args);
+		if (input.mailboxOnly) return listMailboxMessages();
+		if (!input.ticketId) throw new McpToolError("Bitte ticketId angeben oder mailboxOnly=true setzen.");
+		return listTicketMessages(input.ticketId as string);
+	},
+});
+
+registerTool({
+	name: "tickets_add_note",
+	description: "Fügt eine interne Notiz zum Verlauf eines Tickets hinzu (kein E-Mail-Versand).",
+	inputSchema: buildInputSchema({
+		ticketId: { type: "string" },
+		body: { type: "string", description: "Notiztext" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ ticketId: { type: "string" }, body: { type: "string" } }, args);
+		const ticketId = input.ticketId as string;
+		if (!findTicket(ticketId)) throw new McpToolError(`Ticket mit ID "${ticketId}" wurde nicht gefunden.`);
+		const message = createTicketMessage({ ticketId, direction: "NOTE", bodyText: input.body as string });
+		return { success: true, id: message.id };
+	},
+});
+
+registerTool({
+	name: "tickets_send_email",
+	description:
+		"Versendet eine E-Mail-Antwort aus einem Ticket heraus (erfordert konfiguriertes SMTP) und legt sie im Ticket-Verlauf ab. Antworten des Empfängers werden per Threading (In-Reply-To/References) beim nächsten IMAP-Abruf automatisch dem Ticket zugeordnet.",
+	inputSchema: buildInputSchema({
+		ticketId: { type: "string" },
+		to: { type: "string", description: "Empfängeradresse" },
+		subject: { type: "string" },
+		body: { type: "string", description: "Nachrichtentext (Klartext)" },
+	}),
+	handler: async (args) => {
+		const input = coerceArgs(
+			{ ticketId: { type: "string" }, to: { type: "string" }, subject: { type: "string" }, body: { type: "string" } },
+			args
+		);
+		const ticketId = input.ticketId as string;
+		if (!findTicket(ticketId)) throw new McpToolError(`Ticket mit ID "${ticketId}" wurde nicht gefunden.`);
+		try {
+			await sendTicketEmail({
+				ticketId,
+				to: input.to as string,
+				subject: input.subject as string,
+				body: input.body as string,
+				authorUserId: null,
+				authorEmail: null,
+			});
+		} catch (error) {
+			throw new McpToolError(`E-Mail-Versand fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}`);
+		}
+		return { success: true, ticketId };
+	},
+});
+
+registerTool({
+	name: "postfach_list",
+	description: "Listet die eingehenden, noch keinem Ticket zugeordneten E-Mails im Postfach (neueste zuerst).",
+	inputSchema: buildInputSchema({}),
+	handler: () => listMailboxMessages(),
+});
+
+registerTool({
+	name: "postfach_sync",
+	description: "Ruft das IMAP-Postfach jetzt ab und importiert neue E-Mails (erfordert konfiguriertes IMAP).",
+	inputSchema: buildInputSchema({}),
+	handler: async () => {
+		const { syncImapMailbox } = await import("@/lib/email/imap-sync");
+		const result = await syncImapMailbox();
+		if (result.error) throw new McpToolError(`IMAP-Abruf fehlgeschlagen: ${result.error}`);
+		return result;
+	},
+});
+
+registerTool({
+	name: "postfach_convert",
+	description: "Wandelt eine Postfach-E-Mail in ein neues Ticket um (Status OPEN) und ordnet die E-Mail dem Ticket als ersten Verlauf-Eintrag zu.",
+	inputSchema: buildInputSchema({
+		messageId: { type: "string", description: "ID der E-Mail im Postfach" },
+		propertyId: { type: "string", description: "ID der Liegenschaft" },
+		unitId: { type: "string", nullable: true, description: "ID der Einheit (optional)" },
+		title: { type: "string", description: "Titel des Tickets (z. B. Betreff der E-Mail)" },
+		description: { type: "string", nullable: true },
+	}),
+	handler: (args) => {
+		const input = coerceArgs(
+			{
+				messageId: { type: "string" },
+				propertyId: { type: "string" },
+				unitId: { type: "string", nullable: true },
+				title: { type: "string" },
+				description: { type: "string", nullable: true },
+			},
+			args
+		);
+		const message = getTicketMessage(input.messageId as string);
+		if (!message || message.direction !== "INBOUND") throw new McpToolError("Die E-Mail wurde nicht gefunden.");
+		if (message.ticketId) throw new McpToolError("Diese E-Mail ist bereits einem Ticket zugeordnet.");
+		if (!getProperty(input.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
+		if (input.unitId && !getUnit(input.unitId as string)) throw new McpToolError("Die angegebene Einheit existiert nicht.");
+		return convertMessageToTicket(message.id, {
+			propertyId: input.propertyId as string,
+			unitId: (input.unitId as string) ?? null,
+			title: input.title as string,
+			description: (input.description as string) ?? null,
+			status: "OPEN",
+			contractorNotes: null,
+			resolvedAt: null,
+		});
+	},
+});
+
+registerTool({
+	name: "postfach_link",
+	description: "Ordnet eine Postfach-E-Mail einem bestehenden Ticket zu (erscheint dann in dessen Verlauf).",
+	inputSchema: buildInputSchema({
+		messageId: { type: "string", description: "ID der E-Mail im Postfach" },
+		ticketId: { type: "string" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ messageId: { type: "string" }, ticketId: { type: "string" } }, args);
+		const message = getTicketMessage(input.messageId as string);
+		if (!message || message.direction !== "INBOUND") throw new McpToolError("Die E-Mail wurde nicht gefunden.");
+		if (message.ticketId) throw new McpToolError("Diese E-Mail ist bereits einem Ticket zugeordnet.");
+		const ticketId = input.ticketId as string;
+		if (!findTicket(ticketId)) throw new McpToolError(`Ticket mit ID "${ticketId}" wurde nicht gefunden.`);
+		linkMessageToTicket(message.id, ticketId);
+		return { success: true, id: message.id, ticketId };
+	},
+});
+
+registerTool({
+	name: "postfach_delete",
+	description:
+		"Löscht eine E-Mail aus dem Postfach (nur die lokale Kopie in der App; die Nachricht auf dem IMAP-Server bleibt erhalten). Nur für unzugeordnete eingehende E-Mails.",
+	inputSchema: buildInputSchema({
+		id: { type: "string", description: "ID der E-Mail im Postfach" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ id: { type: "string" } }, args);
+		const id = input.id as string;
+		if (!getTicketMessage(id)) throw new McpToolError("Die E-Mail wurde nicht gefunden.");
+		deleteMailboxMessage(id);
+		return { success: true, id };
 	},
 });
 

@@ -58,6 +58,7 @@ const SECRET_TAG_LENGTH = 16;
  */
 const SECRET_SETTING_KEYS = new Set([
 	"smtp.pass",
+	"imap.pass",
 	"letterxpress.apikey",
 	"dropbox.refresh_token",
 	"dropbox.access_token",

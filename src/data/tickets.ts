@@ -82,6 +82,27 @@ export function listTickets(filters: { propertyId?: string; unitId?: string } = 
 	});
 }
 
+/** Einzelnes Ticket inklusive verknüpfter Liegenschaft/Einheit (Detailseite). */
+export function getTicket(id: string): TicketWithRelations | null {
+	const row = getDb()
+		.prepare(
+			`SELECT ${TICKET_COLUMNS},
+				p.name AS propertyName, u.label AS unitLabel
+			 FROM tickets t
+			 LEFT JOIN properties p ON t.property_id = p.id
+			 LEFT JOIN units u ON t.unit_id = u.id
+			 WHERE t.id = ?`
+		)
+		.get(id) as TicketJoinRow | undefined;
+	if (!row) return null;
+	const { propertyName, unitLabel, ...ticket } = row;
+	return {
+		...ticket,
+		property: { id: row.propertyId, name: propertyName },
+		unit: row.unitId && unitLabel ? { id: row.unitId, label: unitLabel } : null,
+	};
+}
+
 export function createTicket(input: TicketInput): Ticket {
 	const id = newId();
 	const timestamp = now();

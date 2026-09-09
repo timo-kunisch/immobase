@@ -3,6 +3,7 @@ import { migration0002 } from "./0002_app_settings.ts";
 import { migration0003 } from "./0003_audit_log.ts";
 import { migration0004 } from "./0004_calendar_events.ts";
 import { migration0005 } from "./0005_knowledge_base.ts";
+import { migration0006 } from "./0006_ticket_messages.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -11,4 +12,4 @@ import type { Migration } from "../migrate.ts";
  * Version. Neue Schema-Änderungen werden als neue Datei `NNNN_name.ts`
  * angehängt (niemals bestehende Migrationen editieren).
  */
-export const migrations: Migration[] = [migration0001, migration0002, migration0003, migration0004, migration0005];
+export const migrations: Migration[] = [migration0001, migration0002, migration0003, migration0004, migration0005, migration0006];

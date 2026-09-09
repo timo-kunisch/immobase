@@ -95,6 +95,26 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   UI-/Server-Hinweis, die Freigabe-Benachrichtigung im Admin-Bereich wird übersprungen (Admin erhält
   Hinweis im Aktionsergebnis) und die E-Mail-Verifizierung gilt als automatisch erfüllt (siehe
   Abschnitt 3).
+- **Ticket-Postfach (IMAP-Empfang, „Mini-Zendesk")** – **optionale Online-Funktion**: Der Admin
+  hinterlegt einen IMAP-Server unter Einstellungen → Integrationen (`imap.host/.port/.secure/.user/
+  .mailbox` Klartext, `imap.pass` feldverschlüsselt in `SECRET_SETTING_KEYS`; Env-Fallbacks
+  `IMAP_HOST` etc.; `src/lib/email/imap.ts`, `isImapConfigured()`). Wenn konfiguriert, erscheint das
+  Modul `/postfach` in der Sidebar: `src/lib/email/imap-sync.ts` ruft neue Nachrichten per
+  `imapflow` ab (inkrementell über UID, Stand in `imap_sync_state`; UIDVALIDITY-Wechsel =
+  Neuabgleich), parst sie mit `mailparser` und legt sie als `INBOUND`-Einträge in
+  `ticket_messages` ab (Dedup über partiellen Unique-Index Ordner+UID). Antworten auf bekannte
+  Ticket-E-Mails werden über In-Reply-To/References-Header automatisch dem Ticket zugeordnet
+  (`findLinkedTicketIdByMessageIds`); alles andere bleibt im Postfach und kann dort **in ein Ticket
+  umgewandelt** oder **an ein Ticket angeheftet** (oder gelöscht = nur lokale Kopie) werden. Ein
+  Scheduler (Start in `src/app/(app)/layout.tsx` wie der Dropbox-Scheduler; 5-Minuten-Intervall,
+  `unref`'d, parallele Läufe abgelehnt) ruft automatisch ab; zusätzlich manueller „Jetzt abrufen"-
+  Button. Der komplette Verlauf (E-Mails eingehend/ausgehend + interne Notizen, eine Tabelle
+  `ticket_messages` mit Diskriminator `direction`) ist auf der Ticket-Detailseite `/tickets/[id]`
+  sichtbar. **E-Mail-Antworten aus dem Ticket** (`src/lib/ticket-mailer.ts`, geteilt von Action +
+  MCP) setzen eigene Message-ID + Threading-Header und legen den OUTBOUND-Eintrag ab - nur wenn
+  SMTP konfiguriert ist, sonst sperrt sich das Formular mit Hinweis. **Ohne IMAP/SMTP funktioniert
+  das Ticket-System uneingeschränkt mit den Basis-Funktionen** (manuell anlegen, Kanban-Status,
+  interne Notizen).
 - **Postversand von PDFs** über die externe **LetterXpress API v3** (`src/lib/letterxpress.ts`) –
   **optionale Online-Funktion, nicht Teil des Offline-Kernpfads**: ohne Zugangsdaten sind die
   Versand-Buttons deaktiviert (`isLetterXpressConfigured()`) **und** `sendPdfByPostForSource()`
@@ -119,7 +139,7 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   standardmäßig deaktivierte Online-Funktion** (Aktivierung nur durch Admins: Einstellungen →
   MCP-Server (KI-Zugriff)): MCP-Endpunkt (Model Context Protocol, „Streamable HTTP" im
   zustandslosen Request/Response-Modus, JSON-RPC 2.0; KEIN SSE, keine MCP-Sessions), über den
-  KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~140 Werkzeuge:
+  KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~150 Werkzeuge:
   CRUD aller Entitäten beider Fachbereiche inkl. der fachlichen Operationen wie
   Abrechnungs-/Wirtschaftsplan-/Jahresabrechnungs-Finalisierung, Fälligstellen von Mieten und
   Hausgeld, Dokumenten-Up-/Download als Base64, Nutzerfreigaben, Kalender-Gesamtansicht).
@@ -324,6 +344,9 @@ src/
   lib/
     auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, bootstrap.ts, actions.ts
     email/mailer.ts         # nodemailer (ohne SMTP: alle E-Mail-Funktionen deaktiviert)
+    email/imap.ts           # IMAP-Konfiguration (optionales Ticket-Postfach; isImapConfigured)
+    email/imap-sync.ts      # IMAP-Abruf (imapflow+mailparser), Threading-Zuordnung, Scheduler
+    ticket-mailer.ts        # E-Mail-Antworten aus Tickets (SMTP; geteilt von Action + MCP)
     pdf/                    # document.ts (Briefe), billing-statement.ts (Abrechnungen)
     storage.ts              # Dateisystem-Ablage (files/)
     data-key.ts             # Master-Schlüssel (Env aus Electron / Schlüsseldatei-Fallback)
@@ -392,7 +415,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Zählerstände:** `meters`, `meter_readings` (Datenmodell vorhanden, **noch keine eigene UI**)
 - **Kaution:** `deposits`
 - **Übergabeprotokolle:** `protocols` (Datenmodell vorhanden, **noch keine eigene UI**)
-- **Tickets:** `tickets`
+- **Tickets:** `tickets`, `ticket_messages` (Kommunikationsverlauf: `direction` = `INBOUND`/
+  `OUTBOUND`/`NOTE`; `ticket_id IS NULL` = unzugeordnete E-Mail im Postfach), `imap_sync_state`
+  (IMAP-Abgleichstand je Ordner: UIDVALIDITY, letzte UID, letzter Sync-Status)
 - **Dokumente (DMS):** `documents`
 - **Finanzen:** `transactions`
 - **Nebenkostenabrechnung:** `billing_periods`, `cost_items`, `consumption_values`,
@@ -550,7 +575,10 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - Kein Rollen-Wechsel (`USER` ↔ `ADMIN`) in der Admin-UI, nur der Freigabe-Toggle (`isApproved`).
   Bei Bedarf direkt in der DB (z. B. per `sqlite3 data.dev`/`data.db`).
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
-  (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen),
+  (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen;
+  `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Dedup/Threading + IMAP-Sync-Stand),
+  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Verlauf-Ablage;
+  Mailer gemockt),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und

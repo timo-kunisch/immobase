@@ -4,6 +4,7 @@ import { CompanySettingsForm } from "@/components/einstellungen/company-settings
 import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
+import { ImapCard } from "@/components/einstellungen/imap-card";
 import { IntegrationSettingsForm } from "@/components/einstellungen/integration-settings-form";
 import { McpCard } from "@/components/einstellungen/mcp-card";
 import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
@@ -35,6 +36,14 @@ export default async function EinstellungenPage() {
 		lxUsername: getSetting("letterxpress.username") ?? "",
 		lxApiKeySet: Boolean(getSetting("letterxpress.apikey")),
 		lxMode: (getSetting("letterxpress.mode") === "live" ? "live" : "test") as "test" | "live",
+	};
+	const imapSettings = {
+		imapHost: getSetting("imap.host") ?? "",
+		imapPort: getSetting("imap.port") ?? "",
+		imapSecure: getSetting("imap.secure") !== "false",
+		imapUser: getSetting("imap.user") ?? "",
+		imapPassSet: Boolean(getSetting("imap.pass")),
+		imapMailbox: getSetting("imap.mailbox") ?? "INBOX",
 	};
 
 	// Status der lokalen Datenverschlüsselung at rest (Dateien + Geheimnisse +
@@ -88,6 +97,7 @@ export default async function EinstellungenPage() {
 							content: (
 								<>
 									<IntegrationSettingsForm settings={integrations} />
+									<ImapCard settings={imapSettings} />
 									<AiCard
 										state={{
 											baseUrl: getSetting("ai.base_url") ?? "",

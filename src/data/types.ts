@@ -164,6 +164,49 @@ export interface Ticket {
 	updatedAt: string;
 }
 
+// ------------------------------------------------------------
+// Ticket-Kommunikation ("Mini-Zendesk", Tabelle ticket_messages)
+// ------------------------------------------------------------
+
+/**
+ * Richtung/Art eines Verlauf-Eintrags:
+ * - INBOUND: eingehende E-Mail (aus dem IMAP-Postfach; ticketId null =
+ *   liegt noch unzugeordnet im Postfach)
+ * - OUTBOUND: aus dem Ticket heraus per SMTP versendete E-Mail
+ * - NOTE: interne Notiz eines Nutzers (kein E-Mail-Bezug)
+ */
+export type TicketMessageDirection = "INBOUND" | "OUTBOUND" | "NOTE";
+
+export interface TicketMessage {
+	id: string;
+	ticketId: string | null;
+	direction: TicketMessageDirection;
+	/** RFC-822-Message-ID (Threading; nur bei E-Mails). */
+	messageId: string | null;
+	/** IMAP-Ordner + UID der importierten Nachricht (Dedup; nur INBOUND). */
+	imapFolder: string | null;
+	imapUid: number | null;
+	fromAddress: string | null;
+	toAddresses: string | null;
+	subject: string | null;
+	bodyText: string | null;
+	/** Verfassender Nutzer bei NOTE/OUTBOUND (email denormalisiert). */
+	authorUserId: string | null;
+	authorEmail: string | null;
+	/** Bei E-Mails das Datum aus dem Mail-Header, sonst der Erfassungszeitpunkt. */
+	createdAt: string;
+}
+
+/** Abgleichstand eines IMAP-Ordners (Tabelle imap_sync_state). */
+export interface ImapSyncState {
+	folder: string;
+	uidValidity: number;
+	lastUid: number;
+	lastSyncAt: string | null;
+	lastError: string | null;
+	lastNewCount: number | null;
+}
+
 // ============================================================
 // Dokumente (DMS)
 // ============================================================
@@ -715,6 +758,7 @@ export type AuditCategory =
 	| "admin"
 	| "einstellungen"
 	| "postversand"
+	| "postfach"
 	| "system";
 
 /**

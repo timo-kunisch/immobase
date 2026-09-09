@@ -58,6 +58,7 @@ const categoryLabels: Record<AuditCategory, string> = {
 	admin: "Nutzerverwaltung",
 	einstellungen: "Einstellungen",
 	postversand: "Postversand",
+	postfach: "Postfach",
 	system: "System",
 };
 

@@ -14,6 +14,7 @@ import {
 	FileText,
 	FolderOpen,
 	Gavel,
+	Inbox,
 	LayoutDashboard,
 	LogOut,
 	PiggyBank,
@@ -91,8 +92,22 @@ const adminNavItems = [
 	{ title: "Einstellungen", href: "/einstellungen", icon: Settings },
 ];
 
-export function AppSidebar({ user, aiConfigured }: { user: { email: string; role: string }; aiConfigured: boolean }) {
+export function AppSidebar({
+	user,
+	aiConfigured,
+	mailboxEnabled,
+}: {
+	user: { email: string; role: string };
+	aiConfigured: boolean;
+	mailboxEnabled: boolean;
+}) {
 	const pathname = usePathname();
+
+	// Das Postfach (E-Mail-Eingang per IMAP) erscheint nur, wenn der Admin
+	// einen IMAP-Server konfiguriert hat (optionale Online-Funktion).
+	const generalItems = mailboxEnabled
+		? [...generalNavItems.slice(0, 4), { title: "Postfach", href: "/postfach", icon: Inbox }, ...generalNavItems.slice(4)]
+		: generalNavItems;
 
 	// "/" und "/weg" sind exakte Matches (sonst wäre der Dashboard- bzw.
 	// "WEGs"-Eintrag fälschlich auch auf allen jeweiligen Unterseiten aktiv,
@@ -159,7 +174,7 @@ export function AppSidebar({ user, aiConfigured }: { user: { email: string; role
 						<SidebarGroupLabel>Allgemein</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<SidebarMenu>
-								{generalNavItems.map((item) => (
+								{generalItems.map((item) => (
 									<SidebarMenuItem key={item.href}>
 										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
 											<Link href={item.href}>
