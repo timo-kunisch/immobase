@@ -10,7 +10,7 @@ import { getT } from "@/lib/i18n/server";
 export async function LanguageCard() {
 	const t = await getT();
 	return (
-		<Card>
+		<Card className="max-w-xl">
 			<CardHeader>
 				<CardTitle>{t("settings.language.title")}</CardTitle>
 				<CardDescription>{t("settings.language.description")}</CardDescription>
