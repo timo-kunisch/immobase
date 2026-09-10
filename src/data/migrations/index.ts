@@ -9,6 +9,7 @@ import { migration0008 } from "./0008_prompt_templates.ts";
 import { migration0009 } from "./0009_chat_message_attachments.ts";
 import { migration0010 } from "./0010_rental_custom_allocation_keys.ts";
 import { migration0011 } from "./0011_bank_accounts.ts";
+import { migration0012 } from "./0012_calendar_event_times.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -29,4 +30,5 @@ export const migrations: Migration[] = [
 	migration0009,
 	migration0010,
 	migration0011,
+	migration0012,
 ];

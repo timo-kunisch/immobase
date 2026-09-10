@@ -25,6 +25,13 @@ export interface CalendarItem {
 	kind: CalendarItemKind;
 	/** Lokaler Tag "YYYY-MM-DD". */
 	dayKey: string;
+	/**
+	 * Anzeigbare Uhrzeit am jeweiligen Tag: "HH:MM" bzw. "HH:MM–HH:MM"
+	 * (Startzeit, eintägig mit Enduhrzeit auch als Spanne) bzw. bei
+	 * Versammlungen die lokale Uhrzeit aus dem ISO-Zeitstempel.
+	 * null = ganztägig (u. a. Ein-/Auszug, Folgetage mehrtägiger Ereignisse).
+	 */
+	time: string | null;
 	title: string;
 	/** Zusatzinfo (z. B. "Liegenschaft – Einheit" oder WEG-Name). */
 	subtitle: string | null;
@@ -63,6 +70,41 @@ function addDays(dayKey: string, days: number): string {
 	return toLocalDayKey(date);
 }
 
+/** Prüft eine Uhrzeit "HH:MM" (24h; null/leer = ganztägig). */
+function isTime(value: string | null | undefined): value is string {
+	return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+/**
+ * Extrahiert die lokale Uhrzeit "HH:MM" aus einem ISO-Zeitstempel (z. B.
+ * owner_meetings.meeting_date). Tageswerte ("YYYY-MM-DD") und ungültige
+ * Werte liefern null (ganztägig) - die Uhrzeit ist dann nicht hinterlegt.
+ */
+export function localTimeFromIso(value: string | null | undefined): string | null {
+	if (!value || !value.includes("T")) return null;
+	const date = new Date(value);
+	if (Number.isNaN(date.getTime())) return null;
+	const hours = String(date.getHours()).padStart(2, "0");
+	const minutes = String(date.getMinutes()).padStart(2, "0");
+	return `${hours}:${minutes}`;
+}
+
+/**
+ * Uhrzeit-Anzeige eines manuellen Ereignisses am jeweiligen Tag seines
+ * Zeitraums: am Starttag die Startuhrzeit (eintägig mit Enduhrzeit als
+ * Spanne "HH:MM–HH:MM"), am letzten Tag einer Spanne die Enduhrzeit,
+ * an Folgetagen ganztägig (null).
+ */
+function manualEventTime(day: string, startDay: string, endDay: string, startTime: string | null, endTime: string | null): string | null {
+	if (startDay === endDay) {
+		if (startTime && endTime) return `${startTime}–${endTime}`;
+		return startTime;
+	}
+	if (day === startDay) return startTime;
+	if (day === endDay) return endTime;
+	return null;
+}
+
 /** Sortierreihenfolge der Termin-Arten innerhalb eines Tages. */
 const KIND_ORDER: Record<CalendarItemKind, number> = {
 	MANUAL: 0,
@@ -75,7 +117,8 @@ const KIND_ORDER: Record<CalendarItemKind, number> = {
  * Baut die vollständige Anzeige-Liste: Manuelle Ereignisse werden für
  * jeden Tag ihres Zeitraums (startDate bis endDate bzw. nur startDate)
  * je einmal eingetragen; die automatischen Termine erscheinen an ihrem
- * jeweiligen Tag mit Link in das Fachmodul.
+ * jeweiligen Tag mit Link in das Fachmodul. Innerhalb eines Tages
+ * sortieren ganztägige Termine vor zeitlichen (chronologisch).
  */
 export function buildCalendarItems(input: {
 	events: CalendarEvent[];
@@ -91,10 +134,21 @@ export function buildCalendarItems(input: {
 		const startDay = normalizeDayKey(event.startDate);
 		if (!startDay) continue;
 		const endDay = normalizeDayKey(event.endDate) ?? startDay;
+		// Uhrzeiten defensiv prüfen (Bestände können beliebiges TEXT enthalten).
+		const startTime = isTime(event.startTime) ? event.startTime : null;
+		const endTime = isTime(event.endTime) ? event.endTime : null;
 		// Mehrtägige Ereignisse werden an jedem betroffenen Tag angezeigt.
 		// (Schutz vor Endlos-Schleifen bei fehlerhaften Daten: max. 400 Tage.)
 		for (let day = startDay, count = 0; day <= endDay && count < 400; day = addDays(day, 1), count += 1) {
-			items.push({ kind: "MANUAL", dayKey: day, title: event.title, subtitle: null, href: null, event });
+			items.push({
+				kind: "MANUAL",
+				dayKey: day,
+				time: manualEventTime(day, startDay, endDay, startTime, endTime),
+				title: event.title,
+				subtitle: null,
+				href: null,
+				event,
+			});
 		}
 	}
 
@@ -106,6 +160,7 @@ export function buildCalendarItems(input: {
 			items.push({
 				kind: "LEASE_START",
 				dayKey: startDay,
+				time: null,
 				title: `${labels.leaseStart}: ${tenantName}`,
 				subtitle,
 				href: `/vertraege#lease-${lease.id}`,
@@ -117,6 +172,7 @@ export function buildCalendarItems(input: {
 			items.push({
 				kind: "LEASE_END",
 				dayKey: endDay,
+				time: null,
 				title: `${labels.leaseEnd}: ${tenantName}`,
 				subtitle,
 				href: `/vertraege#lease-${lease.id}`,
@@ -133,6 +189,7 @@ export function buildCalendarItems(input: {
 		items.push({
 			kind: "MEETING",
 			dayKey: day,
+			time: localTimeFromIso(meeting.meetingDate),
 			title: `${labels.meeting}: ${meeting.title}`,
 			subtitle: meeting.hoaName,
 			href: `/weg/versammlungen#meeting-${meeting.id}`,
@@ -140,7 +197,14 @@ export function buildCalendarItems(input: {
 		});
 	}
 
-	items.sort((a, b) => a.dayKey.localeCompare(b.dayKey) || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.title.localeCompare(b.title, "de"));
+	items.sort(
+		(a, b) =>
+			a.dayKey.localeCompare(b.dayKey) ||
+			// Ganztägige Termine zuerst, danach chronologisch nach Uhrzeit.
+			(a.time ?? "").localeCompare(b.time ?? "") ||
+			KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+			a.title.localeCompare(b.title, "de")
+	);
 	return items;
 }
 

@@ -762,6 +762,8 @@ export interface PasswordResetToken {
  * eingeblendeten Termine (Einzug/Auszug, Versammlungen) werden nicht
  * gespeichert, sondern aus den Fachdaten berechnet (src/lib/calendar.ts).
  * startDate/endDate: ISO-8601-Datum "YYYY-MM-DD" (endDate null = eintägig).
+ * startTime/endTime: optionale Uhrzeit "HH:MM" (24h) am Start-/Endtag;
+ * beide null = ganztägig.
  */
 export interface CalendarEvent {
 	id: string;
@@ -769,6 +771,8 @@ export interface CalendarEvent {
 	description: string | null;
 	startDate: string;
 	endDate: string | null;
+	startTime: string | null;
+	endTime: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

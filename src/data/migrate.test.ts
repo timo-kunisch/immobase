@@ -45,6 +45,11 @@ function tableNames(db: BetterSqlite3.Database): string[] {
 	return rows.map((r) => r.name);
 }
 
+function tableColumns(db: BetterSqlite3.Database, table: string): string[] {
+	const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+	return rows.map((r) => r.name);
+}
+
 describe("migrateDatabase", () => {
 	it("migriert eine frische Datenbank auf die neueste Version", () => {
 		const db = getDb();
@@ -105,19 +110,22 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0011:
-		// Buchhaltungs-Tabellen accounts/bank_transactions).
-		const hasAccountsTable = () => tableNames(db).includes("accounts");
-		expect(hasAccountsTable()).toBe(true);
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0012:
+		// optionale Uhrzeit-Spalten der Kalender-Ereignisse).
+		const hasTimeColumns = () => {
+			const columns = tableColumns(db, "calendar_events");
+			return columns.includes("start_time") && columns.includes("end_time");
+		};
+		expect(hasTimeColumns()).toBe(true);
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(hasAccountsTable()).toBe(false);
+		expect(hasTimeColumns()).toBe(false);
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(hasAccountsTable()).toBe(true);
+		expect(hasTimeColumns()).toBe(true);
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

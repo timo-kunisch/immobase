@@ -12,6 +12,7 @@ import type { CalendarEvent } from "./types";
 
 const CALENDAR_EVENT_COLUMNS = `
 	id, title, description, start_date AS startDate, end_date AS endDate,
+	start_time AS startTime, end_time AS endTime,
 	created_at AS createdAt, updated_at AS updatedAt
 `;
 
@@ -22,6 +23,10 @@ export interface CalendarEventInput {
 	startDate: string;
 	/** ISO-8601-Datum "YYYY-MM-DD" oder null (eintägiges Ereignis). */
 	endDate: string | null;
+	/** Optionale Startuhrzeit "HH:MM" (24h); null = ganztägig. */
+	startTime: string | null;
+	/** Optionale Enduhrzeit "HH:MM" (24h) am Endtag; null = ohne Enduhrzeit. */
+	endTime: string | null;
 }
 
 /**
@@ -54,10 +59,10 @@ export function createCalendarEvent(input: CalendarEventInput): CalendarEvent {
 	const timestamp = now();
 	getDb()
 		.prepare(
-			`INSERT INTO calendar_events (id, title, description, start_date, end_date, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO calendar_events (id, title, description, start_date, end_date, start_time, end_time, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
-		.run(id, input.title, input.description, input.startDate, input.endDate, timestamp, timestamp);
+		.run(id, input.title, input.description, input.startDate, input.endDate, input.startTime, input.endTime, timestamp, timestamp);
 	return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
 }
 
@@ -65,10 +70,10 @@ export function updateCalendarEvent(id: string, input: CalendarEventInput): void
 	getDb()
 		.prepare(
 			`UPDATE calendar_events
-			 SET title = ?, description = ?, start_date = ?, end_date = ?, updated_at = ?
+			 SET title = ?, description = ?, start_date = ?, end_date = ?, start_time = ?, end_time = ?, updated_at = ?
 			 WHERE id = ?`
 		)
-		.run(input.title, input.description, input.startDate, input.endDate, now(), id);
+		.run(input.title, input.description, input.startDate, input.endDate, input.startTime, input.endTime, now(), id);
 }
 
 export function deleteCalendarEvent(id: string): void {

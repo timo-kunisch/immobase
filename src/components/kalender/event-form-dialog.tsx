@@ -18,10 +18,12 @@ import type { CalendarEvent } from "@/data/types";
 /**
  * Dialog zum Anlegen/Bearbeiten eines manuellen Kalender-Ereignisses.
  * Ohne `event`-Prop: "Neues Ereignis"-Button (Seitenkopf). Mit `event`:
- * der Trigger ist das Ereignis-Chip im Tagesraster; im Bearbeiten-Dialog
- * steht zusätzlich ein Löschen-Button bereit.
+ * der Trigger ist das Ereignis-Chip im Tagesraster (`label` = Anzeige-
+ * Text des Chips inkl. Uhrzeit-Präfix aus der Kalender-Aggregation);
+ * im Bearbeiten-Dialog steht zusätzlich ein Löschen-Button bereit.
+ * Uhrzeiten sind optional (null/leer = ganztägig).
  */
-export function EventFormDialog({ event, defaultDate, className }: { event?: CalendarEvent; defaultDate?: string; className?: string }) {
+export function EventFormDialog({ event, defaultDate, label, className }: { event?: CalendarEvent; defaultDate?: string; label?: string; className?: string }) {
 	const { t } = useI18n();
 	const isEdit = Boolean(event);
 	const [open, setOpen] = useState(false);
@@ -57,13 +59,13 @@ export function EventFormDialog({ event, defaultDate, className }: { event?: Cal
 				{isEdit ? (
 					<button
 						type="button"
-						title={event!.description ? `${event!.title}\n${event!.description}` : event!.title}
+						title={event!.description ? `${label ?? event!.title}\n${event!.description}` : label ?? event!.title}
 						className={cn(
 							"block w-full truncate rounded px-1.5 py-0.5 text-left text-xs font-medium bg-primary/15 text-primary hover:bg-primary/25",
 							className
 						)}
 					>
-						{event!.title}
+						{label ?? event!.title}
 					</button>
 				) : (
 					<Button type="button">
@@ -93,8 +95,19 @@ export function EventFormDialog({ event, defaultDate, className }: { event?: Cal
 								<Input id="startDate" name="startDate" type="date" defaultValue={event?.startDate ?? defaultDate} required />
 							</div>
 							<div className="grid gap-2">
+								<Label htmlFor="startTime">{t("calendar.fields.startTime")}</Label>
+								<Input id="startTime" name="startTime" type="time" defaultValue={event?.startTime ?? ""} />
+							</div>
+						</div>
+
+						<div className="grid grid-cols-2 gap-4">
+							<div className="grid gap-2">
 								<Label htmlFor="endDate">{t("calendar.fields.endDate")}</Label>
 								<Input id="endDate" name="endDate" type="date" defaultValue={event?.endDate ?? ""} />
+							</div>
+							<div className="grid gap-2">
+								<Label htmlFor="endTime">{t("calendar.fields.endTime")}</Label>
+								<Input id="endTime" name="endTime" type="time" defaultValue={event?.endTime ?? ""} />
 							</div>
 						</div>
 

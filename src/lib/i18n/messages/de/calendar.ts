@@ -27,11 +27,16 @@ export const calendar = {
 	"fields.titlePlaceholder": "z. B. Heizungswartung",
 	"fields.startDate": "Datum *",
 	"fields.endDate": "Enddatum (optional)",
+	"fields.startTime": "Startuhrzeit (optional)",
+	"fields.endTime": "Enduhrzeit (optional)",
 	"fields.descriptionPlaceholder": "Details zum Termin…",
 	"confirm.delete": "Ereignis \"{title}\" wirklich löschen?",
 	// Server Actions (Fehlermeldungen)
 	"errors.titleAndStartRequired": "Bitte vergeben Sie einen Titel und ein Startdatum.",
 	"errors.endBeforeStart": "Das Enddatum darf nicht vor dem Startdatum liegen.",
+	"errors.timeInvalid": "Bitte geben Sie die Uhrzeiten im Format HH:MM an.",
+	"errors.endTimeRequiresStart": "Eine Enduhrzeit erfordert eine Startuhrzeit.",
+	"errors.endTimeBeforeStartTime": "Die Enduhrzeit darf nicht vor der Startuhrzeit liegen (am selben Tag).",
 	"errors.saveFailed": "Das Ereignis konnte nicht gespeichert werden.",
 	"errors.deleteFailed": "Das Ereignis konnte nicht gelöscht werden.",
 };

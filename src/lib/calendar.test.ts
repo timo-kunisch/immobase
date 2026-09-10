@@ -5,6 +5,7 @@ import {
 	buildMonthGrid,
 	formatMonthParam,
 	groupItemsByDay,
+	localTimeFromIso,
 	normalizeDayKey,
 	parseMonthParam,
 	shiftMonth,
@@ -29,6 +30,8 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 		description: null,
 		startDate: "2026-03-10",
 		endDate: null,
+		startTime: null,
+		endTime: null,
 		createdAt: TIMESTAMP,
 		updatedAt: TIMESTAMP,
 		...overrides,
@@ -122,6 +125,17 @@ describe("normalizeDayKey", () => {
 	});
 });
 
+describe("localTimeFromIso", () => {
+	it("extrahiert die lokale Uhrzeit aus ISO-Zeitstempeln; Tageswerte bleiben ganztägig", () => {
+		// Lokale Uhrzeit vor/toISOString und zurück - unabhängig von der Laufzeit-Zeitzone.
+		const iso = new Date(2026, 2, 20, 18, 30).toISOString();
+		expect(localTimeFromIso(iso)).toBe("18:30");
+		expect(localTimeFromIso("2026-03-20")).toBeNull();
+		expect(localTimeFromIso("kein-datum")).toBeNull();
+		expect(localTimeFromIso(null)).toBeNull();
+	});
+});
+
 describe("buildCalendarItems", () => {
 	it("trägt mehrtägige manuelle Ereignisse an jedem betroffenen Tag ein", () => {
 		const items = buildCalendarItems({
@@ -131,6 +145,30 @@ describe("buildCalendarItems", () => {
 		});
 		expect(items.map((item) => item.dayKey)).toEqual(["2026-03-10", "2026-03-11", "2026-03-12"]);
 		expect(items.every((item) => item.kind === "MANUAL" && item.href === null)).toBe(true);
+	});
+
+	it("zeigt Uhrzeiten manuell gepflegter Ereignisse an (eintägig als Spanne, mehrtägig an Start-/Endtag)", () => {
+		const single = buildCalendarItems({
+			events: [makeEvent({ startDate: "2026-03-10", startTime: "18:00", endTime: "20:00" })],
+			leases: [],
+			meetings: [],
+		});
+		expect(single).toHaveLength(1);
+		expect(single[0].time).toBe("18:00–20:00");
+
+		const startOnly = buildCalendarItems({
+			events: [makeEvent({ startDate: "2026-03-10", startTime: "18:00" })],
+			leases: [],
+			meetings: [],
+		});
+		expect(startOnly[0].time).toBe("18:00");
+
+		const multi = buildCalendarItems({
+			events: [makeEvent({ startDate: "2026-03-10", endDate: "2026-03-12", startTime: "18:00", endTime: "20:00" })],
+			leases: [],
+			meetings: [],
+		});
+		expect(multi.map((item) => item.time)).toEqual(["18:00", null, "20:00"]);
 	});
 
 	it("berechnet Einzug und Auszug aus den Mietverträgen", () => {
@@ -153,7 +191,7 @@ describe("buildCalendarItems", () => {
 		expect(items.map((item) => item.kind)).toEqual(["LEASE_START"]);
 	});
 
-	it("blendet Versammlungen ein, abgesagte aber nicht", () => {
+	it("blendet Versammlungen ein, abgesagte aber nicht - mit lokaler Uhrzeit aus dem Termin", () => {
 		const items = buildCalendarItems({
 			events: [],
 			leases: [],
@@ -165,6 +203,16 @@ describe("buildCalendarItems", () => {
 		expect(items[0].title).toBe("Versammlung: Ordentliche Eigentümerversammlung");
 		expect(items[0].subtitle).toBe("WEG Muster");
 		expect(items[0].href).toBe("/weg/versammlungen#meeting-m1");
+		// Lokale Uhrzeit des ISO-Zeitstempels (unabhängig von der Laufzeit-Zeitzone).
+		expect(items[0].time).toBe(localTimeFromIso("2026-03-20T18:00:00.000Z"));
+
+		// Tageswerte (ohne Uhrzeit) bleiben ganztägig.
+		const dateOnly = buildCalendarItems({
+			events: [],
+			leases: [],
+			meetings: [makeMeeting({ id: "m4", meetingDate: "2026-03-25" })],
+		});
+		expect(dateOnly[0].time).toBeNull();
 	});
 
 	it("sortiert Einträge nach Tag und Art", () => {
@@ -174,6 +222,19 @@ describe("buildCalendarItems", () => {
 			meetings: [],
 		});
 		expect(items.map((item) => item.kind)).toEqual(["MANUAL", "LEASE_START"]);
+	});
+
+	it("sortiert innerhalb eines Tages ganztägige vor zeitlichen Terminen (chronologisch)", () => {
+		const items = buildCalendarItems({
+			events: [
+				makeEvent({ id: "evt-abend", title: "Abendtermin", startDate: "2026-03-01", startTime: "20:00" }),
+				makeEvent({ id: "evt-morgen", title: "Frühtermin", startDate: "2026-03-01", startTime: "08:00" }),
+				makeEvent({ id: "evt-ganztag", title: "Ganztägig", startDate: "2026-03-01" }),
+			],
+			leases: [],
+			meetings: [],
+		});
+		expect(items.map((item) => item.title)).toEqual(["Ganztägig", "Frühtermin", "Abendtermin"]);
 	});
 });
 

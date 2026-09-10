@@ -121,7 +121,7 @@ CREATE TABLE calendar_events (
 	end_date text,
 	created_at text NOT NULL,
 	updated_at text NOT NULL
-);
+, start_time text, end_time text);
 
 CREATE TABLE chat_messages (
 	id text PRIMARY KEY NOT NULL,

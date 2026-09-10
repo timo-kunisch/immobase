@@ -35,30 +35,39 @@ afterEach(() => {
 
 describe("Kalender-Ereignisse (src/data/calendar-events.ts)", () => {
 	it("legt Ereignisse an, liest, aktualisiert und löscht sie", () => {
-		const event = createCalendarEvent({ title: "Heizungswartung", description: "Keller", startDate: "2026-03-10", endDate: null });
+		const event = createCalendarEvent({ title: "Heizungswartung", description: "Keller", startDate: "2026-03-10", endDate: null, startTime: null, endTime: null });
 		expect(event.id).toBeTruthy();
 		expect(event.endDate).toBeNull();
+		expect(event.startTime).toBeNull();
+		expect(event.endTime).toBeNull();
 
 		const loaded = getCalendarEvent(event.id);
 		expect(loaded?.title).toBe("Heizungswartung");
 		expect(loaded?.description).toBe("Keller");
 
-		updateCalendarEvent(event.id, { title: "Wartung Heizung", description: null, startDate: "2026-03-11", endDate: "2026-03-12" });
+		updateCalendarEvent(event.id, { title: "Wartung Heizung", description: null, startDate: "2026-03-11", endDate: "2026-03-12", startTime: "09:30", endTime: "12:00" });
 		const updated = getCalendarEvent(event.id);
 		expect(updated?.title).toBe("Wartung Heizung");
 		expect(updated?.startDate).toBe("2026-03-11");
 		expect(updated?.endDate).toBe("2026-03-12");
+		expect(updated?.startTime).toBe("09:30");
+		expect(updated?.endTime).toBe("12:00");
+
+		// Uhrzeiten lassen sich auch wieder entfernen (null = ganztägig).
+		updateCalendarEvent(event.id, { title: "Wartung Heizung", description: null, startDate: "2026-03-11", endDate: "2026-03-12", startTime: null, endTime: null });
+		expect(getCalendarEvent(event.id)?.startTime).toBeNull();
+		expect(getCalendarEvent(event.id)?.endTime).toBeNull();
 
 		deleteCalendarEvent(event.id);
 		expect(getCalendarEvent(event.id)).toBeNull();
 	});
 
 	it("filtert den sichtbaren Zeitraum inklusive überlappender mehrtägiger Ereignisse", () => {
-		createCalendarEvent({ title: "Vorher", description: null, startDate: "2026-02-01", endDate: null });
-		createCalendarEvent({ title: "Im Monat", description: null, startDate: "2026-03-15", endDate: null });
+		createCalendarEvent({ title: "Vorher", description: null, startDate: "2026-02-01", endDate: null, startTime: null, endTime: null });
+		createCalendarEvent({ title: "Im Monat", description: null, startDate: "2026-03-15", endDate: null, startTime: null, endTime: null });
 		// Startet vor dem Zeitraum, läuft aber hinein -> sichtbar.
-		createCalendarEvent({ title: "Überspannend", description: null, startDate: "2026-02-25", endDate: "2026-03-03" });
-		createCalendarEvent({ title: "Danach", description: null, startDate: "2026-04-01", endDate: null });
+		createCalendarEvent({ title: "Überspannend", description: null, startDate: "2026-02-25", endDate: "2026-03-03", startTime: null, endTime: null });
+		createCalendarEvent({ title: "Danach", description: null, startDate: "2026-04-01", endDate: null, startTime: null, endTime: null });
 
 		const march = listCalendarEvents({ from: "2026-03-01", to: "2026-03-31" });
 		expect(march.map((event) => event.title)).toEqual(["Überspannend", "Im Monat"]);

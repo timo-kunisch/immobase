@@ -14,6 +14,9 @@ function getString(formData: FormData, key: string): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
+/** Gültige Uhrzeit "HH:MM" (24h) aus dem <input type="time">-Feld. */
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export async function saveCalendarEventAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
@@ -21,6 +24,8 @@ export async function saveCalendarEventAction(_prevState: ActionState, formData:
 	const title = getString(formData, "title");
 	const startDate = getString(formData, "startDate");
 	const endDateRaw = getString(formData, "endDate");
+	const startTimeRaw = getString(formData, "startTime");
+	const endTimeRaw = getString(formData, "endTime");
 	const description = getString(formData, "description");
 
 	if (!title || !startDate) {
@@ -32,15 +37,31 @@ export async function saveCalendarEventAction(_prevState: ActionState, formData:
 		return { error: t("calendar.errors.endBeforeStart") };
 	}
 
-	const data = { title, description: description || null, startDate, endDate };
+	const startTime = startTimeRaw || null;
+	const endTime = endTimeRaw || null;
+	if ((startTime && !TIME_PATTERN.test(startTime)) || (endTime && !TIME_PATTERN.test(endTime))) {
+		return { error: t("calendar.errors.timeInvalid") };
+	}
+	if (endTime && !startTime) {
+		return { error: t("calendar.errors.endTimeRequiresStart") };
+	}
+	// Am selben Tag darf die Enduhrzeit nicht vor der Startuhrzeit liegen
+	// (über mehrtägige Zeiträume hinweg ist eine Spanne über Mitternacht zulässig).
+	if (startTime && endTime && endTime < startTime && (!endDate || endDate === startDate)) {
+		return { error: t("calendar.errors.endTimeBeforeStartTime") };
+	}
+
+	const data = { title, description: description || null, startDate, endDate, startTime, endTime };
+	// Datum (+ Startuhrzeit) für den Log-Eintrag aufbereiten.
+	const dateLabel = startTime ? `${formatDate(startDate)}, ${startTime} Uhr` : formatDate(startDate);
 
 	try {
 		if (id) {
 			updateCalendarEvent(id, data);
-			logActivity(user, "UPDATE", "kalender", `Kalender-Ereignis „${title}“ (${formatDate(startDate)}) bearbeitet`, id);
+			logActivity(user, "UPDATE", "kalender", `Kalender-Ereignis „${title}“ (${dateLabel}) bearbeitet`, id);
 		} else {
 			const event = createCalendarEvent(data);
-			logActivity(user, "CREATE", "kalender", `Kalender-Ereignis „${title}“ (${formatDate(startDate)}) angelegt`, event.id);
+			logActivity(user, "CREATE", "kalender", `Kalender-Ereignis „${title}“ (${dateLabel}) angelegt`, event.id);
 		}
 	} catch (error) {
 		console.error("saveCalendarEventAction failed", error);

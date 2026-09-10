@@ -84,15 +84,36 @@ const calendarEventFields: Record<string, FieldSpec> = {
 	description: { type: "string", nullable: true },
 	startDate: { type: "date", description: "Datum (bzw. erster Tag) des Ereignisses" },
 	endDate: { type: "date", nullable: true, description: "Letzter Tag bei mehrtägigen Ereignissen (null = eintägig)" },
+	startTime: { type: "string", nullable: true, description: 'Optionale Startuhrzeit "HH:MM" (24h; null = ganztägig)' },
+	endTime: { type: "string", nullable: true, description: 'Optionale Enduhrzeit "HH:MM" (24h) am Endtag (erfordert Startuhrzeit)' },
 };
+
+/** Fachliche Prüfung eines Kalender-Ereignisses (Datums- und Uhrzeit-Logik wie in der App-Action). */
+function validateCalendarEvent(input: Pick<CalendarEventInput, "startDate" | "endDate" | "startTime" | "endTime">): string | null {
+	if (input.endDate && input.endDate < input.startDate) return "Das Enddatum darf nicht vor dem Startdatum liegen.";
+	if (input.endTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.endTime)) return 'Die Enduhrzeit muss im Format "HH:MM" (24h) angegeben werden.';
+	if (input.startTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.startTime)) return 'Die Startuhrzeit muss im Format "HH:MM" (24h) angegeben werden.';
+	if (input.endTime && !input.startTime) return "Eine Enduhrzeit setzt eine Startuhrzeit voraus.";
+	// Am selben Tag darf die Enduhrzeit nicht vor der Startuhrzeit liegen
+	// (über mehrtägige Zeiträume hinweg ist eine Spanne über Mitternacht zulässig).
+	if (
+		input.startTime &&
+		input.endTime &&
+		input.endTime < input.startTime &&
+		(!input.endDate || input.endDate === input.startDate)
+	) {
+		return "Die Enduhrzeit darf nicht vor der Startuhrzeit liegen (am selben Tag).";
+	}
+	return null;
+}
 
 registerCrudTools<CalendarEventInput>({
 	entity: "calendar_events",
 	entityLabel: "Kalender-Ereignis",
 	fields: calendarEventFields,
 	fieldsHint: "Nur manuell gepflegte Ereignisse - die automatischen Termine (Einzug/Auszug, Versammlungen) liefert calendar_list.",
-	beforeUpdate: (_id, input) => (input.endDate && input.endDate < input.startDate ? "Das Enddatum darf nicht vor dem Startdatum liegen." : null),
-	beforeCreate: (input) => (input.endDate && input.endDate < input.startDate ? "Das Enddatum darf nicht vor dem Startdatum liegen." : null),
+	beforeUpdate: (_id, input) => validateCalendarEvent(input),
+	beforeCreate: (input) => validateCalendarEvent(input),
 	list: () => listCalendarEvents(),
 	get: (id) => getCalendarEvent(id),
 	create: (input) => createCalendarEvent(input),
@@ -105,7 +126,8 @@ registerTool({
 	description:
 		"Listet alle Kalender-Termine eines Zeitraums: manuell gepflegte Ereignisse (kind MANUAL) und automatisch " +
 		"berechnete Termine aus den Fachdaten - Einzug/Mietbeginn (LEASE_START), Auszug/Mietende (LEASE_END) und " +
-		"Eigentümerversammlungen (MEETING). Optional filterbar über from/to (jeweils inklusive).",
+		"Eigentümerversammlungen (MEETING). Ein-/Auszug sind ganztägig (time null), Versammlungen und Ereignisse " +
+		"mit Uhrzeit tragen diese in time (HH:MM bzw. HH:MM-HH:MM). Optional filterbar über from/to (jeweils inklusive).",
 	inputSchema: buildInputSchema({
 		from: { type: "date", nullable: true, description: "Zeitraum-Beginn (inklusive)" },
 		to: { type: "date", nullable: true, description: "Zeitraum-Ende (inklusive)" },

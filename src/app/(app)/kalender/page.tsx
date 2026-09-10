@@ -122,15 +122,19 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
 								<div className="flex max-h-24 flex-col gap-0.5 overflow-y-auto">
 									{dayItems.map((item, index) =>
 										item.kind === "MANUAL" && item.event ? (
-											<EventFormDialog key={`${item.event.id}-${index}`} event={item.event} />
+											<EventFormDialog
+												key={`${item.event.id}-${index}`}
+												event={item.event}
+												label={item.time ? `${item.time} ${item.title}` : item.title}
+											/>
 										) : (
 											<Link
 												key={`${item.kind}-${item.href}-${index}`}
 												href={item.href ?? "/kalender"}
-												title={item.subtitle ? `${item.title}\n${item.subtitle}` : item.title}
+												title={[item.time ? `${item.time} Uhr` : null, item.title, item.subtitle].filter(Boolean).join("\n")}
 												className={cn("block truncate rounded px-1.5 py-0.5 text-xs font-medium", KIND_STYLES[item.kind as Exclude<CalendarItemKind, "MANUAL">])}
 											>
-												{item.title}
+												{item.time ? `${item.time} ${item.title}` : item.title}
 											</Link>
 										)
 									)}

@@ -875,17 +875,25 @@ describe("MCP-Werkzeuge: Benutzerverwaltung", () => {
 });
 
 describe("MCP-Werkzeuge: Kalender und Wissensdatenbank", () => {
-	it("calendar_events: CRUD-Roundtrip inkl. Datums-Guard", async () => {
+	it("calendar_events: CRUD-Roundtrip inkl. Datums- und Uhrzeit-Guards", async () => {
 		const created = (await callTool("calendar_events_create", { title: "Wartung", startDate: "2026-03-10" })) as { id: string };
 		expect(created.id).toBeTruthy();
 
-		await callTool("calendar_events_update", { id: created.id, title: "Wartung Heizung", startDate: "2026-03-11", endDate: "2026-03-12" });
-		const loaded = (await callTool("calendar_events_get", { id: created.id })) as { title: string; endDate: string };
+		await callTool("calendar_events_update", { id: created.id, title: "Wartung Heizung", startDate: "2026-03-11", endDate: "2026-03-12", startTime: "09:30", endTime: "12:00" });
+		const loaded = (await callTool("calendar_events_get", { id: created.id })) as { title: string; endDate: string; startTime: string | null; endTime: string | null };
 		expect(loaded.title).toBe("Wartung Heizung");
+		expect(loaded.startTime).toBe("09:30");
+		expect(loaded.endTime).toBe("12:00");
 
 		// Enddatum vor Startdatum wird abgelehnt.
 		await expect(callTool("calendar_events_create", { title: "X", startDate: "2026-03-10", endDate: "2026-03-01" })).rejects.toThrow(
 			/Enddatum/
+		);
+		// Uhrzeit-Guards: ungültiges Format, Enduhrzeit ohne bzw. vor Startuhrzeit (am selben Tag).
+		await expect(callTool("calendar_events_create", { title: "X", startDate: "2026-03-10", startTime: "9:30" })).rejects.toThrow(/HH:MM/);
+		await expect(callTool("calendar_events_create", { title: "X", startDate: "2026-03-10", endTime: "20:00" })).rejects.toThrow(/Startuhrzeit/);
+		await expect(callTool("calendar_events_create", { title: "X", startDate: "2026-03-10", startTime: "18:00", endTime: "17:00" })).rejects.toThrow(
+			/Enduhrzeit/
 		);
 
 		await callTool("calendar_events_delete", { id: created.id });
