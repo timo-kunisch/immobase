@@ -82,6 +82,82 @@ function setConnectionState(patch: Partial<ConnectionState>): void {
 // Fenster
 // ------------------------------------------------------------
 
+/**
+ * Prüft, ob eine URL zum Ursprung der App gehört (eingebetteter lokaler
+ * Server bzw. verbundener Host im Client-Modus).
+ */
+function isAppUrl(url: string): boolean {
+	let parsed: URL;
+	try {
+		parsed = new URL(url);
+	} catch {
+		return false;
+	}
+	return ([connectionState.localUrl, connectionState.hostUrl].filter(Boolean) as string[]).some((origin) => {
+		try {
+			return new URL(origin).origin === parsed.origin;
+		} catch {
+			return false;
+		}
+	});
+}
+
+/**
+ * Öffnet eine App-interne URL (z. B. PDF-/Bild-Vorschau über /api/uploads)
+ * in einem eigenen App-Fenster. Das Fenster nutzt dieselbe Session wie das
+ * Hauptfenster - der eingeloggte Zustand bleibt damit erhalten und die
+ * Datei zeigt sich sofort (der System-Browser hätte keine Session und
+ * verlangte einen erneuten Login).
+ */
+function openViewerWindow(url: string): void {
+	const preload = path.join(__dirname, "../preload/index.js");
+	const win = new BrowserWindow({
+		width: 1100,
+		height: 800,
+		title: "ImmoBase",
+		autoHideMenuBar: true,
+		webPreferences: {
+			preload,
+			contextIsolation: true,
+			nodeIntegration: false,
+			sandbox: true,
+			webSecurity: true,
+			allowRunningInsecureContent: false,
+		},
+	});
+	attachNavigationPolicy(win);
+	win.loadURL(url).catch((error) => {
+		log.error(`Laden von ${url} im Vorschau-Fenster fehlgeschlagen`, error);
+		if (!win.isDestroyed()) win.close();
+	});
+}
+
+/**
+ * Fenster-Politik für alle App-Fenster: App-interne target="_blank"-Links
+ * (z. B. Dokumente-/PDF-Vorschau) öffnen in einem eigenen App-Fenster
+ * derselben Session. Externe Links landen dagegen wie bisher im
+ * System-Browser, niemals im App-Fenster (Sicherheit + Konsistenz).
+ */
+function attachNavigationPolicy(win: BrowserWindow): void {
+	win.webContents.setWindowOpenHandler(({ url }) => {
+		if (isAppUrl(url)) {
+			openViewerWindow(url);
+			return { action: "deny" };
+		}
+		if (url.startsWith("http://") || url.startsWith("https://")) void shell.openExternal(url);
+		return { action: "deny" };
+	});
+	win.webContents.on("will-navigate", (event, url) => {
+		// Navigation nur innerhalb der erlaubten Ursprünge (lokaler Server,
+		// konfigurierter Host, Shell-Datei).
+		const allowed = [connectionState.localUrl, connectionState.hostUrl, "file://"].filter(Boolean) as string[];
+		if (!allowed.some((origin) => url.startsWith(origin))) {
+			event.preventDefault();
+			void shell.openExternal(url);
+		}
+	});
+}
+
 function createMainWindow(): BrowserWindow {
 	const preload = path.join(__dirname, "../preload/index.js");
 	const win = new BrowserWindow({
@@ -101,21 +177,7 @@ function createMainWindow(): BrowserWindow {
 		},
 	});
 
-	// Externe Links/new-window immer im System-Browser öffnen, niemals im
-	// App-Fenster (Sicherheit + Konsistenz).
-	win.webContents.setWindowOpenHandler(({ url }) => {
-		if (url.startsWith("http://") || url.startsWith("https://")) void shell.openExternal(url);
-		return { action: "deny" };
-	});
-	win.webContents.on("will-navigate", (event, url) => {
-		// Navigation nur innerhalb der erlaubten Ursprünge (lokaler Server,
-		// konfigurierter Host, Shell-Datei).
-		const allowed = [connectionState.localUrl, connectionState.hostUrl, "file://"].filter(Boolean) as string[];
-		if (!allowed.some((origin) => url.startsWith(origin))) {
-			event.preventDefault();
-			void shell.openExternal(url);
-		}
-	});
+	attachNavigationPolicy(win);
 
 	win.on("closed", () => {
 		if (mainWindow === win) mainWindow = null;

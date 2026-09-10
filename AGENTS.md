@@ -314,7 +314,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
   - `main/index.ts` – Lifecycle, `requestSingleInstanceLock()`, Netzlaufwerk-Abbruch-Check,
     Modus-Orchestrierung (local/host/client), IPC, Fenster-Sicherheit (`contextIsolation: true`,
-    `nodeIntegration: false`, `sandbox: true`).
+    `nodeIntegration: false`, `sandbox: true`). Fenster-Politik: App-interne `target="_blank"`-Links
+    (z. B. PDF-/Dokumentenvorschau über `/api/uploads`) öffnen in einem eigenen App-Fenster
+    **derselben Session** (eingeloggter Zustand bleibt erhalten, kein erneuter Login); externe
+    Links weiterhin im System-Browser.
   - `main/server.ts` – Next-Standalone-Bootstrap + Token-geschützter LAN-Proxy (Host-Modus).
   - `main/network-check.ts` – Netzlaufwerk-Erkennung (Windows UNC/gemappt via PowerShell, macOS
     `/Volumes`+`mount`, Linux `/proc/mounts`). **Die SQLite-DB liegt niemals auf einem
