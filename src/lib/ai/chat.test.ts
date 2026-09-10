@@ -21,8 +21,10 @@ import { registerTool } from "@/lib/mcp/registry";
  * OpenAI-kompatiblen Endpunkt (fetch wird per vi.stubGlobal gemockt - es
  * findet KEIN echter Netzwerkzugriff statt; Muster wie in
  * src/lib/dropbox.test.ts) inkl. der rollenbasierten Werkzeug-Einschränkung
- * (normale Nutzer ohne Administrations-Werkzeuge). Werkzeug-Aufrufe laufen
- * gegen ein eigens registriertes Test-Werkzeug der echten MCP-Registry.
+ * (normale Nutzer ohne Administrations-Werkzeuge) und der Batch-Ausführung
+ * (batch_execute: Einzelaufrufe werden in der UI-Liste flach ausgewiesen).
+ * Werkzeug-Aufrufe laufen gegen ein eigens registriertes Test-Werkzeug bzw.
+ * die echten Werkzeuge der MCP-Registry.
  */
 
 let testDir: string;
@@ -465,6 +467,62 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 		expect(result.toolCalls[0].ok).toBe(false);
 		expect(result.toolCalls[0].detail).toContain("nur Administratoren");
 		expect(result.reply).toBe("Dafür ist ein Administratorkonto nötig.");
+	});
+
+	it("führt batch_execute aus und schlüsselt die Einzelaufrufe in der UI-Liste auf", async () => {
+		configureAi();
+		const fetchMock = mockFetchSequence([
+			{
+				role: "assistant",
+				content: null,
+				tool_calls: [
+					{
+						id: "call_batch",
+						type: "function",
+						function: {
+							name: "batch_execute",
+							arguments: JSON.stringify({
+								calls: [
+									{ name: "properties_create", arguments: { name: "Haus A", street: "S", zipCode: "1", city: "C", country: "D" } },
+									// Bewusst fehlerhafter Unteraufruf (Pflichtfeld fehlt).
+									{ name: "properties_create", arguments: { street: "S" } },
+								],
+							}),
+						},
+					},
+				],
+			},
+			{ role: "assistant", content: "Haus A wurde angelegt, der zweite Eintrag war fehlerhaft." },
+		]);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Lege zwei Liegenschaften an." }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
+
+		expect(result.reply).toContain("Haus A wurde angelegt");
+		// Statt eines pauschalen batch_execute-Eintrags werden die beiden
+		// Unteraufrufe mit ihrem eigenen Status ausgewiesen.
+		expect(result.toolCalls).toHaveLength(2);
+		expect(result.toolCalls[0]).toEqual({ name: "properties_create", ok: true });
+		expect(result.toolCalls[1].name).toBe("properties_create");
+		expect(result.toolCalls[1].ok).toBe(false);
+		expect(result.toolCalls[1].detail).toContain('Pflichtfeld "name"');
+
+		// Das Batch-Werkzeug wird dem Modell angeboten...
+		const body1 = JSON.parse(String(fetchMock.mock.calls[0][1]?.body)) as { tools: { function: { name: string } }[] };
+		expect(body1.tools.some((tool) => tool.function.name === "batch_execute")).toBe(true);
+
+		// ...und das Batch-Ergebnis geht als Tool-Antwort zurück ans Modell.
+		const body2 = JSON.parse(String(fetchMock.mock.calls[1][1]?.body)) as {
+			messages: { role: string; content: string | null; tool_call_id?: string }[];
+		};
+		const toolMessage = body2.messages.find((message) => message.role === "tool");
+		expect(toolMessage?.tool_call_id).toBe("call_batch");
+		expect(toolMessage?.content).toContain('"succeeded": 1');
+		expect(toolMessage?.content).toContain('"failed": 1');
 	});
 
 	it("liefert bei Budget-Erschöpfung eine Schlussrunde ohne Werkzeuge (statt hartem Fehler)", async () => {

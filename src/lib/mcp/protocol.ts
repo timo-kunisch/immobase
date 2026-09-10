@@ -92,7 +92,9 @@ async function handleSingleRequest(message: JsonRpcRequest, scope: McpToolScope)
 					"ImmoBase (Miet- und WEG-Verwaltung). Alle Werkzeuge arbeiten direkt auf der lokalen Datenbank. " +
 					"IDs vorhandener Datensätze über die *_list-Werkzeuge ermitteln. Geldbeträge als Dezimal-Strings " +
 					"(\"123.45\"), Datumswerte als ISO-8601-Strings angeben. Lösch- und Finalisierungs-Werkzeuge wirken " +
-					"unwiderruflich - vorher Rückfrage beim Nutzer halten." +
+					"unwiderruflich - vorher Rückfrage beim Nutzer halten. Mehrere voneinander unabhängige Operationen " +
+					"(z. B. Massenanlagen oder mehrere Abfragen) können gebündelt über das Werkzeug batch_execute in " +
+					"einem einzigen Aufruf ausgeführt werden (Ergebnis je Einzeloperation)." +
 					(scope === "ADMIN"
 						? ""
 						: " Dieses Zugriffs-Token hat eingeschränkte Rechte: Administrations-Werkzeuge (z. B. Nutzerverwaltung) stehen nicht zur Verfügung."),

@@ -10,7 +10,7 @@ import { McpToolError, type McpToolScope } from "@/lib/mcp/registry";
 // Chatbot nutzt exakt dieselben Werkzeug-Definitionen und Handler wie der
 // MCP-Endpunkt (/api/mcp), nur in-process (ohne HTTP-/Token-Umweg, die
 // autoritative Prüfung liegt in der Chat-Route über die Nutzer-Session).
-import { callTool, listToolDefinitions } from "@/lib/mcp/tools";
+import { BATCH_TOOL_NAME, callTool, listToolDefinitions } from "@/lib/mcp/tools";
 
 /**
  * Orchestrierung des KI-Chats (Sidebar-Sprechblase): Führt die Unterhaltung
@@ -97,6 +97,7 @@ function buildSystemPrompt(t: TranslateFn, userEmail: string, scope: McpToolScop
 		t("chat.system.rulesHeader"),
 		t("chat.system.ruleLanguage"),
 		t("chat.system.ruleTools"),
+		t("chat.system.ruleBatch"),
 		t("chat.system.ruleFormats"),
 		t("chat.system.ruleDestructive"),
 		t("chat.system.ruleAttachments"),
@@ -122,6 +123,30 @@ function buildOpenAiTools(scope: McpToolScope): OpenAiTool[] {
 function truncateToolResult(t: TranslateFn, text: string): string {
 	if (text.length <= MAX_TOOL_RESULT_CHARS) return text;
 	return `${text.slice(0, MAX_TOOL_RESULT_CHARS)}\n${t("chat.system.toolResultTruncated", { max: MAX_TOOL_RESULT_CHARS })}`;
+}
+
+/**
+ * Ermittelt die UI-Einträge eines erfolgreich ausgeführten Werkzeugs.
+ * Beim Batch-Werkzeug werden die Einzelaufrufe flach ausgewiesen, damit
+ * im Dialog sichtbar ist, welche Operationen tatsächlich gelaufen sind -
+ * inklusive der fehlgeschlagenen (sonst stünde dort nur ein pauschal
+ * "erfolgreiches" batch_execute).
+ */
+function summarizeToolExecution(name: string, result: unknown): ExecutedToolCall[] {
+	if (name !== BATCH_TOOL_NAME || typeof result !== "object" || result === null) {
+		return [{ name, ok: true }];
+	}
+	const batchResults = (result as { results?: unknown }).results;
+	if (!Array.isArray(batchResults)) return [{ name, ok: true }];
+	return batchResults.map((entry) => {
+		const item = entry as { name?: unknown; ok?: unknown; error?: unknown };
+		const ok = item.ok === true;
+		return {
+			name: typeof item.name === "string" && item.name !== "" ? item.name : name,
+			ok,
+			...(ok ? {} : { detail: typeof item.error === "string" ? item.error : undefined }),
+		};
+	});
 }
 
 /**
@@ -224,7 +249,7 @@ export async function runChat(input: {
 			}
 			try {
 				const result = await callTool(call.function.name, args, scope);
-				executed.push({ name: call.function.name, ok: true });
+				executed.push(...summarizeToolExecution(call.function.name, result));
 				openAiMessages.push({
 					role: "tool",
 					tool_call_id: call.id,

@@ -35,6 +35,26 @@ export class McpToolError extends Error {}
  */
 export type McpToolScope = "ADMIN" | "USER";
 
+/**
+ * Name des Meta-Werkzeugs zum gebündelten Ausführen mehrerer Werkzeug-
+ * aufrufe (Definition in tools-batch.ts). Liegt in der Registry, damit
+ * sowohl das Batch-Werkzeug selbst (Verschachtelungs-Sperre) als auch
+ * Aufrufer wie der KI-Chat (Anzeige-Aufschlüsselung) die Konstante nutzen
+ * können, ohne das Werkzeug-Modul importieren zu müssen.
+ */
+export const BATCH_TOOL_NAME = "batch_execute";
+
+/**
+ * Ausführungs-Kontext eines Werkzeug-Aufrufs, den callTool an jeden
+ * Handler durchreicht (zweiter Parameter - bestehende Handler mit nur
+ * einem Parameter bleiben kompatibel). Ermöglicht Meta-Werkzeugen wie
+ * batch_execute, Unteraufrufe mit dem Scope des Aufrufers auszuführen.
+ */
+export interface McpToolContext {
+	/** Zugriffsebene des Aufrufers (Token-Stufe bzw. Session-Rolle). */
+	scope: McpToolScope;
+}
+
 // ------------------------------------------------------------
 // Feld-Spezifikationen (erzeugen JSON-Schema + Validierung)
 // ------------------------------------------------------------
@@ -205,7 +225,7 @@ export interface McpTool {
 	 */
 	adminOnly?: boolean;
 	/** Führt das Werkzeug aus; Rückgabewert wird dem Client als JSON-Text geliefert. */
-	handler: (args: Record<string, unknown>) => unknown | Promise<unknown>;
+	handler: (args: Record<string, unknown>, context: McpToolContext) => unknown | Promise<unknown>;
 }
 
 const tools = new Map<string, McpTool>();
@@ -236,7 +256,7 @@ export async function callTool(name: string, args: unknown, scope: McpToolScope 
 	if (tool.adminOnly && scope !== "ADMIN") {
 		throw new McpToolError(`Das Werkzeug "${name}" steht nur Administratoren zur Verfügung.`);
 	}
-	return tool.handler((args ?? {}) as Record<string, unknown>);
+	return tool.handler((args ?? {}) as Record<string, unknown>, { scope });
 }
 
 // ------------------------------------------------------------

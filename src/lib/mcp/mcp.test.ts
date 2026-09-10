@@ -245,6 +245,136 @@ describe("MCP-Werkzeug-Scope (ADMIN vs. USER)", () => {
 	});
 });
 
+describe("MCP-Meta-Werkzeug batch_execute", () => {
+	interface BatchResult {
+		total: number;
+		executed: number;
+		succeeded: number;
+		failed: number;
+		stoppedEarly: boolean;
+		results: { index: number; name: string | null; ok: boolean; result?: unknown; error?: string }[];
+	}
+
+	it("führt mehrere Aufrufe gebündelt aus und meldet Erfolg/Fehler je Eintrag", async () => {
+		const batch = (await callTool("batch_execute", {
+			calls: [
+				{ name: "properties_create", arguments: { name: "Haus A", street: "S", zipCode: "1", city: "C", country: "D" } },
+				{ name: "properties_create", arguments: { name: "Haus B", street: "S", zipCode: "1", city: "C", country: "D" } },
+				// Pflichtfeld fehlt -> fachlicher Fehler dieses einen Aufrufs.
+				{ name: "properties_create", arguments: { street: "S" } },
+				{ name: "properties_list" },
+			],
+		})) as BatchResult;
+
+		expect(batch.total).toBe(4);
+		expect(batch.executed).toBe(4);
+		expect(batch.succeeded).toBe(3);
+		expect(batch.failed).toBe(1);
+		expect(batch.stoppedEarly).toBe(false);
+
+		// Fehler bricht den Batch NICHT ab: die Liste danach liefert beide Anlagen.
+		expect(batch.results[2].ok).toBe(false);
+		expect(batch.results[2].error).toContain('Pflichtfeld "name"');
+		const listResult = batch.results[3].result as { name: string }[];
+		expect(listResult.map((property) => property.name).sort()).toEqual(["Haus A", "Haus B"]);
+
+		// Erfolgreiche Unteraufrufe liefern ihr reguläres Ergebnis (inkl. ID).
+		const created = batch.results[0].result as { id: string };
+		expect(created.id).toBeTruthy();
+	});
+
+	it("bricht mit stopOnError nach dem ersten Fehler ab und überspringt den Rest", async () => {
+		const batch = (await callTool("batch_execute", {
+			stopOnError: true,
+			calls: [
+				{ name: "properties_create", arguments: { name: "Haus A", street: "S", zipCode: "1", city: "C", country: "D" } },
+				{ name: "properties_create", arguments: { street: "S" } },
+				{ name: "properties_create", arguments: { name: "Haus C", street: "S", zipCode: "1", city: "C", country: "D" } },
+			],
+		})) as BatchResult;
+
+		expect(batch.total).toBe(3);
+		expect(batch.executed).toBe(2);
+		expect(batch.succeeded).toBe(1);
+		expect(batch.failed).toBe(1);
+		expect(batch.stoppedEarly).toBe(true);
+		// Der dritte Aufruf wurde nie ausgeführt.
+		expect(listProperties().map((property) => property.name)).toEqual(["Haus A"]);
+	});
+
+	it("sperrt Verschachtelung (batch_execute im Batch) je Eintrag", async () => {
+		const batch = (await callTool("batch_execute", {
+			calls: [
+				{ name: "batch_execute", arguments: { calls: [{ name: "properties_list" }] } },
+				{ name: "properties_list" },
+			],
+		})) as BatchResult;
+
+		expect(batch.results[0].ok).toBe(false);
+		expect(batch.results[0].error).toContain("Verschachtelte Batches");
+		expect(batch.results[1].ok).toBe(true);
+	});
+
+	it("erzwingt den Scope je Unteraufruf (Admin-Werkzeug im USER-Scope scheitert einzeln)", async () => {
+		const batch = (await callTool(
+			"batch_execute",
+			{
+				calls: [
+					{ name: "users_list" },
+					{ name: "properties_create", arguments: { name: "Haus", street: "S", zipCode: "1", city: "C", country: "D" } },
+				],
+			},
+			"USER"
+		)) as BatchResult;
+
+		expect(batch.results[0].ok).toBe(false);
+		expect(batch.results[0].error).toContain("nur Administratoren");
+		expect(batch.results[1].ok).toBe(true);
+	});
+
+	it("meldet unbekannte Werkzeuge und formal ungültige Einträge je Eintrag", async () => {
+		const batch = (await callTool("batch_execute", {
+			calls: [
+				{ name: "gibt_es_nicht" },
+				{ keinName: true },
+				{ name: "properties_list", arguments: "kein-objekt" },
+			],
+		})) as BatchResult;
+
+		expect(batch.failed).toBe(3);
+		expect(batch.results[0].error).toContain("Unbekanntes Werkzeug");
+		expect(batch.results[1].name).toBeNull();
+		expect(batch.results[1].error).toContain('"name"');
+		expect(batch.results[2].error).toContain('"arguments" muss ein JSON-Objekt');
+	});
+
+	it("lehnt formal ungültige Batch-Argumente als Ganzes ab (McpToolError)", async () => {
+		await expect(callTool("batch_execute", {})).rejects.toThrow(/"calls" muss ein nicht-leeres Array/);
+		await expect(callTool("batch_execute", { calls: [] })).rejects.toThrow(/nicht-leeres Array/);
+		await expect(callTool("batch_execute", { calls: "kein-array" })).rejects.toThrow(/nicht-leeres Array/);
+		await expect(callTool("batch_execute", { calls: [{ name: "properties_list" }], schmarn: 1 })).rejects.toThrow(/Unbekannte Feld/);
+		await expect(callTool("batch_execute", { calls: [{ name: "properties_list" }], stopOnError: "ja" })).rejects.toThrow(
+			/"stopOnError" muss ein Boolean/
+		);
+		// Mehr als 50 Aufrufe werden abgelehnt.
+		const tooMany = Array.from({ length: 51 }, () => ({ name: "properties_list" }));
+		await expect(callTool("batch_execute", { calls: tooMany })).rejects.toThrow(/höchstens 50/);
+	});
+
+	it("ist über das Protokoll aufrufbar und in tools/list sichtbar (auch im Scope USER)", async () => {
+		const list = await handleMcpPost(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }), "USER");
+		const names = (list.body as { result: { tools: { name: string }[] } }).result.tools.map((tool) => tool.name);
+		expect(names).toContain("batch_execute");
+
+		const body = await callToolViaProtocol("batch_execute", {
+			calls: [{ name: "properties_create", arguments: { name: "Haus", street: "S", zipCode: "1", city: "C", country: "D" } }],
+		});
+		expect(body.result?.isError).toBe(false);
+		expect(toolResultText(body)).toContain('"succeeded": 1');
+		expect(listProperties()).toHaveLength(1);
+	});
+});
+
 describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 	it("properties: kompletter CRUD-Roundtrip über callTool", async () => {
 		const created = (await callTool("properties_create", {

@@ -76,6 +76,8 @@ export const chat = {
 	"system.ruleLanguage": "- Antworte auf Deutsch, sachlich und prägnant. Fasse dich kurz; bei langen Ergebnissen nutze Listen/Tabellen.",
 	"system.ruleTools":
 		"- Nutze die Werkzeuge, um aktuelle Daten abzufragen, statt zu raten oder zu erfinden. IDs vorhandener Datensätze ermittelst du über die *_list-Werkzeuge (mit Filtern), Details über die *_get-Werkzeuge.",
+	"system.ruleBatch":
+		"- Stehen mehrere voneinander unabhängige Werkzeugaufrufe an (z. B. das Anlegen vieler Datensätze oder mehrere Abfragen), bündele sie: Fordere mehrere Werkzeuge in einer einzigen Antwort gleichzeitig an oder nutze das Werkzeug batch_execute, das eine Liste von Aufrufen in einem Schritt ausführt und je Aufruf über Erfolg/Fehler berichtet. Das spart Werkzeug-Runden und Zeit. Hänge Aufrufe aneinander, wenn einer das Ergebnis eines anderen braucht (z. B. eine frisch erzeugte ID).",
 	"system.ruleFormats":
 		"- Geldbeträge sind Dezimal-Strings (\"123.45\"), Datumswerte ISO-8601 (\"2026-09-08\"). Die Werkzeuge akzeptieren bei Beträgen auch Komma-Schreibweise.",
 	"system.ruleDestructive":

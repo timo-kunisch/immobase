@@ -166,7 +166,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Werkzeug-Registry `src/lib/mcp/registry.ts` (Feld-Spezifikationen → JSON-Schema +
   Laufzeit-Validierung/Normalisierung: Dezimal-Komma, ISO-Daten, Enums; CRUD-Generator
   `registerCrudTools`; fachliche Fehler als `McpToolError` → Tool-Result mit `isError: true`).
-  Werkzeuge aufgeteilt nach `tools-rental.ts`/`tools-hoa.ts`/`tools-system.ts` (Registrierung per
+  **Batch-Funktion:** Neben JSON-RPC-Batches auf Protokollebene gibt es das Meta-Werkzeug
+  `batch_execute` (`src/lib/mcp/tools-batch.ts`): führt bis zu 50 Werkzeugaufrufe sequentiell in
+  einem Aufruf aus und meldet Erfolg/Fehler je Eintrag (Teilerfolg ohne Gesamt-Rollback; Abbruch
+  nach dem ersten Fehler optional per `stopOnError`; Verschachtelung gesperrt; Scope-Prüfung je
+  Unteraufruf über den `McpToolContext`, den `callTool` an jeden Handler durchreicht). Steht dem
+  internen KI-Assistenten automatisch mit zur Verfügung.
+  Werkzeuge aufgeteilt nach `tools-rental.ts`/`tools-hoa.ts`/`tools-system.ts`/`tools-batch.ts`
+  (Registrierung per
   Import-Seiteneffekt, Sammel-Import `tools.ts`; `tools-system.ts` enthält neben der
   Benutzerverwaltung auch die allgemeinen Module Kalender und Wissensdatenbank). Die Werkzeuge
   spiegeln die Fachregeln der
@@ -193,12 +200,15 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
    Markdown-Bilder werden nicht geladen, externe Links öffnen über `target="_blank"` im
    System-Browser); Nutzer-Nachrichten bleiben reiner Text.
    `src/lib/ai/chat.ts` bietet die MCP-Werkzeuge scope-gefiltert als
-  OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
-  (Tool-Loop, max. 25 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
-  Tool-Ergebnis ans Modell). Das Runden-Limit ist **kein harter Abbruch**: Ab 5 verbleibenden
-  Runden erhält das Modell eine Budget-Frühwarnung; bei Erschöpfung folgt eine Schlussrunde
-  **ohne** Werkzeugangebot, in der es Zwischenstand und offene Reste zusammenfasst (Fortsetzung
-  per „weiter"), bei leerer Antwort greift eine lokal erzeugte Bilanz der ausgeführten Aufrufe. Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
+   OpenAI-Function-Tools an und führt angeforderte Aufrufe **in-process** über die Registry aus
+   (Tool-Loop, max. 25 Runden, Tool-Ergebnisse auf 40k Zeichen gekürzt, fachliche Fehler als
+   Tool-Ergebnis ans Modell). Der System-Prompt steuert das Modell bei mehreren unabhängigen
+   Aufrufen zum Bündeln (parallele Werkzeug-Anforderung in einer Antwort oder das Meta-Werkzeug
+   `batch_execute`); Batch-Einzelaufrufe werden in der UI-Aufrufliste flach mit eigenem
+   Erfolgsstatus ausgewiesen (`summarizeToolExecution`). Das Runden-Limit ist **kein harter Abbruch**: Ab 5 verbleibenden
+   Runden erhält das Modell eine Budget-Frühwarnung; bei Erschöpfung folgt eine Schlussrunde
+   **ohne** Werkzeugangebot, in der es Zwischenstand und offene Reste zusammenfasst (Fortsetzung
+   per „weiter"), bei leerer Antwort greift eine lokal erzeugte Bilanz der ausgeführten Aufrufe. Endpunkt-Zugriff `src/lib/ai/client.ts` (nur natives fetch,
   nicht-streamend): Vorübergehende Fehler werden mit einfachem Backoff wiederholt (max. 3 Versuche,
   Retry-After-Header wird beachtet – Muster wie `fetchWithRetry` in `src/lib/dropbox.ts`):
   Netzwerkfehler, eigenes Timeout (180 s/Aufruf) sowie die Status 408/429/500/502/503/504/524 –
@@ -418,7 +428,8 @@ src/
     backup-crypto.ts        # Passwort-Verschlüsselung für Backups (AES-256-GCM + scrypt, .imbak)
     mcp/                    # MCP-Server (KI-Zugriff): auth.ts (Token-Stufen/Enabled), protocol.ts
                             # (JSON-RPC), registry.ts (Tool-Definition, Werkzeug-Scope, CRUD-Generator),
-                            # tools-rental/-hoa/-system.ts (Werkzeuge), tools.ts (Sammel-Import)
+                            # tools-rental/-hoa/-system.ts (Werkzeuge), tools-batch.ts (Meta-
+                            # Werkzeug batch_execute), tools.ts (Sammel-Import)
     ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
                             # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
@@ -678,9 +689,12 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled beider Token-Stufen, JSON-RPC-Protokoll,
   Scope-Filterung ADMIN vs. USER, Werkzeug-Durchstiche inkl.
-  Fachregeln), `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
+  Fachregeln, Meta-Werkzeug `batch_execute`: Teilerfolg/Fortsetzung nach Fehlern, `stopOnError`-
+  Abbruch, Verschachtelungs-Sperre, Scope je Unteraufruf, Batch-Validierung, Obergrenze),
+  `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
   Secret-Verschlüsselung, Anhang-Aufbereitung für PDF/Office/Bilder/Excel/Text, Tool-Loop gegen
-  gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts und rollenbasierter Werkzeug-Einschränkung) sowie
+  gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts, rollenbasierter Werkzeug-Einschränkung und
+  Batch-Ausführung mit UI-Aufschlüsselung der Einzelaufrufe) sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich) und
   `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.

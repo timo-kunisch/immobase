@@ -73,6 +73,8 @@ export const chat: typeof deChat = {
 	"system.ruleLanguage": "- Reply in English, factual and concise. Keep it short; use lists/tables for long results.",
 	"system.ruleTools":
 		"- Use the tools to query current data instead of guessing or making things up. Determine the IDs of existing records via the *_list tools (with filters), details via the *_get tools.",
+	"system.ruleBatch":
+		"- When several independent tool calls are due (e.g. creating many records or several queries), bundle them: request multiple tools in a single response or use the batch_execute tool, which executes a list of calls in one step and reports success/failure per call. This saves tool rounds and time. Chain calls across rounds when one depends on another's result (e.g. a freshly created ID).",
 	"system.ruleFormats":
 		"- Monetary amounts are decimal strings (\"123.45\"), dates are ISO-8601 (\"2026-09-08\"). The tools also accept comma notation for amounts.",
 	"system.ruleDestructive":
