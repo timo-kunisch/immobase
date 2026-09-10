@@ -1,6 +1,6 @@
 {
   "name": "immobase",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "private": true,
   "description": "ImmoBase – Miet- + WEG-Verwaltung als offline lauffähige Desktop-App (Electron, Windows, macOS, Linux)",
   "author": "Timo Kunisch",
