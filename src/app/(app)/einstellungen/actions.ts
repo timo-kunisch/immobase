@@ -9,14 +9,14 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { saveCompanySettings } from "@/data/company-settings";
 import { setSetting } from "@/data/app-settings";
 import { getFilesDir } from "@/data/paths";
-import { resetApplicationData } from "@/data/reset";
+import { resetApplicationContent, resetApplicationData } from "@/data/reset";
 import { ActionState } from "@/lib/action-state";
 import { getDataKeyBase64 } from "@/lib/data-key";
 import { encryptPlaintextFilesInTree } from "@/lib/file-crypto";
 import { getT } from "@/lib/i18n/server";
 import { generateMcpToken, getMcpToken, hasMcpToken, setMcpEnabled, type McpTokenKind } from "@/lib/mcp/auth";
 
-import { RESET_CONFIRMATION_PHRASE } from "./reset-confirmation";
+import { RESET_CONFIRMATION_PHRASE, RESET_CONTENT_CONFIRMATION_PHRASE } from "./reset-confirmation";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -210,11 +210,11 @@ export async function getRecoveryKeyAction(): Promise<{ key?: string; error?: st
 }
 
 /**
- * Setzt die komplette Anwendung zurück: löscht unwiderruflich die gesamte
- * Datenbank (sämtliche Fachdaten, Benutzerkonten, Sessions und
- * Einstellungen), alle abgelegten Dateien und lokal gespeicherte
- * Sicherungen (Details: src/data/reset.ts). Nur für Admins.
- * Schutz vor versehentlicher Auslösung: Tipp-Bestätigung
+ * Vollständiger Reset (Variante "Inhalte und Einstellungen zurücksetzen"):
+ * löscht unwiderruflich die gesamte Datenbank (sämtliche
+ * Fachdaten, Benutzerkonten, Sessions und Einstellungen), alle abgelegten
+ * Dateien und lokal gespeicherte Sicherungen (Details: src/data/reset.ts).
+ * Nur für Admins. Schutz vor versehentlicher Auslösung: Tipp-Bestätigung
  * (RESET_CONFIRMATION_PHRASE), client- UND serverseitig geprüft.
  *
  * Nach dem Reset wird das Session-Cookie gelöscht (die Session existiert
@@ -238,13 +238,47 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
 		resetApplicationData();
 	} catch (error) {
 		console.error("resetApplicationAction failed", error);
-		return { error: t("settings.cards.reset.failed") };
+		return { error: t("settings.cards.reset.full.failed") };
 	}
 
 	const cookieStore = await cookies();
 	cookieStore.delete(SESSION_COOKIE_NAME);
 
-	return { success: true, message: t("settings.cards.reset.success") };
+	return { success: true, message: t("settings.cards.reset.full.success") };
+}
+
+/**
+ * Inhalts-Reset (Variante "Inhalte zurücksetzen"): löscht unwiderruflich
+ * sämtliche Fachdaten und Dateien, behält aber Benutzerkonten, Sitzungen
+ * und Einstellungen (inkl. gespeicherter Zugangsdaten) - die Nutzer
+ * bleiben angemeldet, die Anwendung läuft ohne Unterbrechung weiter
+ * (Details: resetApplicationContent in src/data/reset.ts). Nur für Admins.
+ * Schutz vor versehentlicher Auslösung: Tipp-Bestätigung
+ * (RESET_CONTENT_CONFIRMATION_PHRASE), client- UND serverseitig geprüft.
+ */
+export async function resetApplicationContentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const admin = await requireAdmin();
+	const t = await getT();
+
+	if (getString(formData, "confirmation") !== RESET_CONTENT_CONFIRMATION_PHRASE) {
+		return { error: t("settings.cards.reset.confirmMismatch", { phrase: RESET_CONTENT_CONFIRMATION_PHRASE }) };
+	}
+
+	try {
+		resetApplicationContent();
+		// Bewusst NACH dem Reset protokollieren: Der Wipe leert auch das
+		// Aktivitätsprotokoll - dieser Eintrag bleibt als einziger zurück
+		// und dokumentiert, wer wann die Inhalte zurückgesetzt hat.
+		logActivity(admin, "DELETE", "einstellungen", "Inhalte zurückgesetzt (Fachdaten und Dateien gelöscht, Benutzerkonten und Einstellungen erhalten)");
+	} catch (error) {
+		console.error("resetApplicationContentAction failed", error);
+		return { error: t("settings.cards.reset.content.failed") };
+	}
+
+	// Sämtliche Fachdaten-Listen und Dashboards sind von der Löschung
+	// betroffen - breit revalidieren, der Client lädt die Seite ohnehin neu.
+	revalidatePath("/", "layout");
+	return { success: true, message: t("settings.cards.reset.content.success") };
 }
 
 // ============================================================

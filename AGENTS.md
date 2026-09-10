@@ -292,13 +292,24 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Download-Fallback via GET `/api/backup/export`, dort nur unverschlüsselt). Die automatische
   Vor-Import-Sicherung wird mit dem lokalen Datenschlüssel verschlüsselt abgelegt
   (`backups/pre-import-*.zip.enc`, Container-Format; der Import erkennt sie am Magic).
-- **Anwendungs-Reset** (Einstellungen → Anwendung zurücksetzen, nur Admins, Tipp-Bestätigung
-  `ZURÜCKSETZEN`): `src/data/reset.ts` löscht die DB in allen Formen (Klartext, WAL,
-  `data.db.enc`, `data.db.pre-migrate-*.enc`), `files/`, `backups/`, ein evtl. vorhandenes
-  `logs/outbox.log` (Altlast aus Versionen mit E-Mail-Outbox-Fallback) und verwaiste
-  Import-Temp-Verzeichnisse; `settings.json`/`.data-key`/`main.log` bleiben als
-  Geräte-/Installationsdateien erhalten. Danach wird die DB sofort frisch migriert angelegt,
-  das Session-Cookie serverseitig entfernt und der Client lädt `/setup` vollständig neu.
+- **Zurücksetzen** (Einstellungen → Sicherheit, nur Admins, je mit Tipp-Bestätigung): Zwei
+  Varianten in `src/data/reset.ts`:
+  - **Inhalte zurücksetzen** (`resetApplicationContent`, Phrase `INHALTE`): leert alle
+    Fachdaten-Tabellen (dynamisch via `sqlite_master`, inkl. KI-Chat-Verlauf, eigener
+    Prompt-Vorlagen, Aktivitätsprotokoll und IMAP-Abgleichstand - die auslösende Action
+    protokolliert den Reset danach als einzigen Log-Eintrag) sowie `files/` komplett
+    (Outbox-Log/Import-Temps wie beim Voll-Reset); `VACUUM` gibt den Speicherplatz zurück.
+    Erhalten bleiben Benutzerkonten samt Sitzungen/Token, `app_settings`/`company_settings`
+    (inkl. feldverschlüsselter Geheimnisse), `backups/` (Archive als Rettungspfad) und die
+    Geräte-/Installationsdateien. Alle Nutzer bleiben angemeldet; der Client lädt die Seite
+    nur neu.
+  - **Inhalte und Einstellungen zurücksetzen** (`resetApplicationData`, Phrase `ZURÜCKSETZEN`):
+    vollständiger Factory-Reset - löscht die DB in allen Formen (Klartext, WAL, `data.db.enc`,
+    `data.db.pre-migrate-*.enc`), `files/`, `backups/`, ein evtl. vorhandenes
+    `logs/outbox.log` (Altlast aus Versionen mit E-Mail-Outbox-Fallback) und verwaiste
+    Import-Temp-Verzeichnisse; `settings.json`/`.data-key`/`main.log` bleiben als
+    Geräte-/Installationsdateien erhalten. Danach wird die DB sofort frisch migriert angelegt,
+    das Session-Cookie serverseitig entfernt und der Client lädt `/setup` vollständig neu.
 - **Electron-Shell** unter `electron/` (electron-vite, nur main+preload, TS strict):
   - `main/index.ts` – Lifecycle, `requestSingleInstanceLock()`, Netzlaufwerk-Abbruch-Check,
     Modus-Orchestrierung (local/host/client), IPC, Fenster-Sicherheit (`contextIsolation: true`,
@@ -427,7 +438,7 @@ src/
     migrations/             # versionierte Migrationsschritte (TS-Module mit SQL-Strings)
     schema.sql              # generierte Referenz (npm run schema:dump)
     backup.ts               # Export/Import (ZIP, Manifest, SHA-256, db.backup)
-    reset.ts                # Vollständiger Anwendungs-Reset (Einstellungen, nur Admins)
+    reset.ts                # Zurücksetzen: Inhalts-Reset + vollständiger App-Reset (nur Admins)
     audit-log.ts            # Aktivitätsprotokoll (append-only, Aufrufe via src/lib/audit.ts)
     app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, KI-Endpunkt, URL-Overrides)
     <domain>.ts             # Repositories (createX/listY/...)
@@ -564,8 +575,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
   `user_id` ON DELETE SET NULL). Geschrieben aus Server Actions über `logActivity()`
   (`src/lib/audit.ts`, best-effort, bricht die Fachoperation nie); Einsicht nur für Admins
   unter `/admin/logs` (Filter nach Nutzer/Bereich + Pagination). Ausnahmen ohne Log-Eintrag:
-  Anwendungs-Reset (löscht die Log-Tabelle mit), reine Lese-/Vorschau-Aktionen, MCP-Zugriffe
-  (Token ohne Nutzerkontext).
+  vollständiger App-Reset (löscht die Log-Tabelle mit), reine Lese-/Vorschau-Aktionen,
+  MCP-Zugriffe (Token ohne Nutzerkontext). Sonderfall Inhalts-Reset: wiped die Log-Tabelle
+  und protokolliert sich danach selbst als einzigen neuen Eintrag.
 
 ### 6.1 WEG-Verwaltung (Wohnungseigentümergemeinschaften)
 

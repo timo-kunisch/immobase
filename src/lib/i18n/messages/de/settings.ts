@@ -226,26 +226,44 @@ export const settings = {
 	"cards.mcp.errors.unknownTokenKind": "Unbekannte Token-Stufe.",
 	"cards.mcp.errors.tokenMissing": "Es ist noch kein {kind} vorhanden - MCP-Server zuerst aktivieren.",
 
-	// Karte: Anwendung zurücksetzen
-	"cards.reset.title": "Anwendung zurücksetzen",
+	// Karte: Zurücksetzen (Gefahrenbereich, Sicherheit-Tab)
+	"cards.reset.title": "Zurücksetzen",
 	"cards.reset.description":
-		"Löscht die komplette Datenbank (inkl. Benutzerkonten und Einstellungen), alle abgelegten Dateien und die lokal gespeicherten Sicherungen unwiderruflich und versetzt die Anwendung in den Auslieferungszustand. Falls Sie die Daten später noch benötigen, exportieren Sie vorher ein Backup über die Datensicherung.",
-	"cards.reset.button": "Anwendung zurücksetzen …",
-	"cards.reset.dialogTitle": "Anwendung endgültig zurücksetzen?",
+		"Löscht Daten unwiderruflich: „Inhalte zurücksetzen“ entfernt alle Fachdaten und Dateien, behält aber Benutzerkonten und Einstellungen. „Inhalte und Einstellungen zurücksetzen“ stellt darüber hinaus den Auslieferungszustand wieder her. Falls Sie die Daten später noch benötigen, exportieren Sie vorher ein Backup über die Datensicherung.",
 	"cards.reset.dialogDescription": "Diese Aktion kann nicht rückgängig gemacht werden.",
-	"cards.reset.doneTitle": "Anwendung zurückgesetzt",
-	"cards.reset.redirecting": "Sie werden zur Ersteinrichtung weitergeleitet …",
 	"cards.reset.deletedIntro": "Folgende Daten werden unwiderruflich gelöscht:",
-	"cards.reset.deletedDatabase": "die gesamte Datenbank: Liegenschaften, Einheiten, Mieter, Verträge, Tickets, Finanzen, Abrechnungen, WEG-Verwaltung, Dokumente, Vorlagen",
-	"cards.reset.deletedAccounts": "alle Benutzerkonten, Freigaben und Sitzungen (alle Nutzer werden abgemeldet)",
-	"cards.reset.deletedSettings": "alle Einstellungen inkl. gespeicherter Zugangsdaten (SMTP, LetterXpress, Dropbox)",
 	"cards.reset.deletedFiles": "alle abgelegten Dateien (Uploads und erzeugte Dokumente)",
-	"cards.reset.deletedBackups": "die lokal gespeicherten Sicherungen (backups/)",
 	"cards.reset.confirmLabel": "Zur Bestätigung bitte exakt „{phrase}“ eingeben",
 	"cards.reset.confirmMismatch": "Bitte geben Sie zur Bestätigung exakt „{phrase}“ ein.",
-	"cards.reset.confirmButton": "Endgültig löschen",
-	"cards.reset.failed": "Die Anwendung konnte nicht vollständig zurückgesetzt werden (Details im Server-Log).",
-	"cards.reset.success": "Die Anwendung wurde zurückgesetzt.",
+
+	// Variante: Inhalte zurücksetzen (Konten und Einstellungen bleiben erhalten)
+	"cards.reset.content.button": "Inhalte zurücksetzen …",
+	"cards.reset.content.dialogTitle": "Inhalte endgültig zurücksetzen?",
+	"cards.reset.content.deletedData":
+		"alle Fachdaten: Liegenschaften, Einheiten, Mieter, Verträge, Tickets, Finanzen, Abrechnungen, WEG-Verwaltung, Dokumente, Vorlagen, Kalender, Wissensdatenbank, KI-Chat-Verlauf, Aktivitätsprotokoll",
+	"cards.reset.content.keptIntro": "Folgende Daten bleiben erhalten:",
+	"cards.reset.content.keptAccounts": "Ihre Benutzerkonten und Sitzungen (niemand wird abgemeldet)",
+	"cards.reset.content.keptSettings": "alle Einstellungen inkl. gespeicherter Zugangsdaten (SMTP, IMAP, LetterXpress, Dropbox, KI-Assistent, MCP)",
+	"cards.reset.content.keptBackups": "die lokal gespeicherten Sicherungen (backups/)",
+	"cards.reset.content.doneTitle": "Inhalte zurückgesetzt",
+	"cards.reset.content.reloading": "Die Seite wird neu geladen …",
+	"cards.reset.content.confirmButton": "Inhalte endgültig löschen",
+	"cards.reset.content.failed": "Die Inhalte konnten nicht vollständig zurückgesetzt werden (Details im Server-Log).",
+	"cards.reset.content.success": "Die Inhalte wurden zurückgesetzt. Ihre Konten und Einstellungen sind erhalten geblieben.",
+
+	// Variante: Inhalte und Einstellungen zurücksetzen (Auslieferungszustand)
+	"cards.reset.full.button": "Inhalte und Einstellungen zurücksetzen …",
+	"cards.reset.full.dialogTitle": "Inhalte und Einstellungen endgültig zurücksetzen?",
+	"cards.reset.full.doneTitle": "Anwendung zurückgesetzt",
+	"cards.reset.full.redirecting": "Sie werden zur Ersteinrichtung weitergeleitet …",
+	"cards.reset.full.deletedDatabase":
+		"die gesamte Datenbank: Liegenschaften, Einheiten, Mieter, Verträge, Tickets, Finanzen, Abrechnungen, WEG-Verwaltung, Dokumente, Vorlagen",
+	"cards.reset.full.deletedAccounts": "alle Benutzerkonten, Freigaben und Sitzungen (alle Nutzer werden abgemeldet)",
+	"cards.reset.full.deletedSettings": "alle Einstellungen inkl. gespeicherter Zugangsdaten (SMTP, LetterXpress, Dropbox)",
+	"cards.reset.full.deletedBackups": "die lokal gespeicherten Sicherungen (backups/)",
+	"cards.reset.full.confirmButton": "Endgültig löschen",
+	"cards.reset.full.failed": "Die Anwendung konnte nicht vollständig zurückgesetzt werden (Details im Server-Log).",
+	"cards.reset.full.success": "Die Anwendung wurde zurückgesetzt.",
 
 	// Karte: Lokale Datenverschlüsselung
 	"cards.security.title": "Lokale Datenverschlüsselung",

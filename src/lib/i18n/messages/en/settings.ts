@@ -220,26 +220,44 @@ export const settings: typeof deSettings = {
 	"cards.mcp.errors.unknownTokenKind": "Unknown token level.",
 	"cards.mcp.errors.tokenMissing": "There is no {kind} yet - enable the MCP server first.",
 
-	// Card: Reset application
-	"cards.reset.title": "Reset application",
+	// Card: Reset (danger zone, security tab)
+	"cards.reset.title": "Reset",
 	"cards.reset.description":
-		"Irrevocably deletes the entire database (incl. user accounts and settings), all stored files, and the locally stored backups, and returns the application to its factory state. If you still need the data later, export a backup via the data backup first.",
-	"cards.reset.button": "Reset application …",
-	"cards.reset.dialogTitle": "Reset the application permanently?",
+		"Irrevocably deletes data: \"Reset contents\" removes all business data and files while keeping user accounts and settings. \"Reset contents and settings\" additionally restores the factory state. If you still need the data later, export a backup via the data backup first.",
 	"cards.reset.dialogDescription": "This action cannot be undone.",
-	"cards.reset.doneTitle": "Application reset",
-	"cards.reset.redirecting": "You are being redirected to the initial setup …",
 	"cards.reset.deletedIntro": "The following data will be irrevocably deleted:",
-	"cards.reset.deletedDatabase": "the entire database: properties, units, tenants, leases, tickets, finances, statements, HOA management, documents, templates",
-	"cards.reset.deletedAccounts": "all user accounts, approvals, and sessions (all users are logged out)",
-	"cards.reset.deletedSettings": "all settings incl. stored credentials (SMTP, LetterXpress, Dropbox)",
 	"cards.reset.deletedFiles": "all stored files (uploads and generated documents)",
-	"cards.reset.deletedBackups": "the locally stored backups (backups/)",
 	"cards.reset.confirmLabel": "To confirm, please enter exactly \"{phrase}\"",
 	"cards.reset.confirmMismatch": "Please enter exactly \"{phrase}\" to confirm.",
-	"cards.reset.confirmButton": "Delete permanently",
-	"cards.reset.failed": "The application could not be fully reset (details in the server log).",
-	"cards.reset.success": "The application has been reset.",
+
+	// Variant: Reset contents (accounts and settings are kept)
+	"cards.reset.content.button": "Reset contents …",
+	"cards.reset.content.dialogTitle": "Reset the contents permanently?",
+	"cards.reset.content.deletedData":
+		"all business data: properties, units, tenants, leases, tickets, finances, statements, HOA management, documents, templates, calendar, knowledge base, AI chat history, activity log",
+	"cards.reset.content.keptIntro": "The following data is retained:",
+	"cards.reset.content.keptAccounts": "your user accounts and sessions (nobody is logged out)",
+	"cards.reset.content.keptSettings": "all settings incl. stored credentials (SMTP, IMAP, LetterXpress, Dropbox, AI assistant, MCP)",
+	"cards.reset.content.keptBackups": "the locally stored backups (backups/)",
+	"cards.reset.content.doneTitle": "Contents reset",
+	"cards.reset.content.reloading": "The page is being reloaded …",
+	"cards.reset.content.confirmButton": "Delete contents permanently",
+	"cards.reset.content.failed": "The contents could not be fully reset (details in the server log).",
+	"cards.reset.content.success": "The contents have been reset. Your accounts and settings have been kept.",
+
+	// Variant: Reset contents and settings (factory state)
+	"cards.reset.full.button": "Reset contents and settings …",
+	"cards.reset.full.dialogTitle": "Reset contents and settings permanently?",
+	"cards.reset.full.doneTitle": "Application reset",
+	"cards.reset.full.redirecting": "You are being redirected to the initial setup …",
+	"cards.reset.full.deletedDatabase":
+		"the entire database: properties, units, tenants, leases, tickets, finances, statements, HOA management, documents, templates",
+	"cards.reset.full.deletedAccounts": "all user accounts, approvals, and sessions (all users are logged out)",
+	"cards.reset.full.deletedSettings": "all settings incl. stored credentials (SMTP, LetterXpress, Dropbox)",
+	"cards.reset.full.deletedBackups": "the locally stored backups (backups/)",
+	"cards.reset.full.confirmButton": "Delete permanently",
+	"cards.reset.full.failed": "The application could not be fully reset (details in the server log).",
+	"cards.reset.full.success": "The application has been reset.",
 
 	// Card: Local data encryption
 	"cards.security.title": "Local data encryption",
