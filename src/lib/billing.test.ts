@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateBillingResult, computePaidPrepaymentsCents } from "@/lib/billing";
+import { calculateBillingResult, buildCostItemsFromAccountBookingSums, computePaidPrepaymentsCents } from "@/lib/billing";
 
 /**
  * Tests für die reine Berechnungslogik der Nebenkostenabrechnung
@@ -9,6 +9,8 @@ import { calculateBillingResult, computePaidPrepaymentsCents } from "@/lib/billi
  *   markierte) Vorauszahlungen zählen, taggenau anteilig.
  * - calculateBillingResult: Verteilung über individuell definierte
  *   Umlageschlüssel (allocationKey "CUSTOM").
+ * - buildCostItemsFromAccountBookingSums: Import der Buchhaltungs-
+ *   Kontobewegungen als Kostenpositionen (Vorzeichen/Saldo-0-Filter).
  */
 
 type AdjustmentLike = { id: string; validFrom: string; coldRent: string; serviceCharges: string; notes: string | null };
@@ -144,5 +146,37 @@ describe("calculateBillingResult mit individuellem Umlageschlüssel (CUSTOM)", (
 		expect(result.leaseResults[0].lines).toHaveLength(0);
 		expect(result.leaseResults[0].totalPrepaymentsCents).toBe(0);
 		expect(result.leaseResults[0].paidPrepaymentCount).toBe(0);
+	});
+});
+
+describe("buildCostItemsFromAccountBookingSums (Import aus der Buchhaltung)", () => {
+	it("übernimmt Aufwand als positive und Erstattungsüberschuss als negative Kostenposition", () => {
+		const items = buildCostItemsFromAccountBookingSums(
+			[
+				{ id: "a1", label: "Gebäudeversicherung", totalCents: -40_000, bookingCount: 2 },
+				{ id: "a2", label: "Mieter-Erstattung", totalCents: 1_250, bookingCount: 1 },
+			],
+			"UNITS"
+		);
+
+		expect(items).toHaveLength(2);
+		expect(items[0]).toMatchObject({ label: "Gebäudeversicherung", amount: "400.00", allocationKey: "UNITS", sourceAccountId: "a1" });
+		expect(items[0].notes).toBe("Übernommen aus der Buchhaltung (2 Buchungen im Abrechnungszeitraum).");
+		expect(items[1]).toMatchObject({ label: "Mieter-Erstattung", amount: "-12.50", allocationKey: "UNITS", sourceAccountId: "a2" });
+	});
+
+	it("überspringt Konten mit Saldo 0 und dokumentiert die Buchungsanzahl in der Notiz", () => {
+		const items = buildCostItemsFromAccountBookingSums(
+			[
+				{ id: "a1", label: "Heizung", totalCents: 0, bookingCount: 2 },
+				{ id: "a2", label: "Wasserversorgung", totalCents: -25_050, bookingCount: 1 },
+			],
+			"LIVING_SPACE"
+		);
+
+		expect(items).toHaveLength(1);
+		expect(items[0].label).toBe("Wasserversorgung");
+		expect(items[0].amount).toBe("250.50");
+		expect(items[0].notes).toBe("Übernommen aus der Buchhaltung (1 Buchung im Abrechnungszeitraum).");
 	});
 });

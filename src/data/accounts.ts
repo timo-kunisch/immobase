@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { newId, now } from "./helpers";
+import { toCents } from "@/lib/money";
 import type { Account } from "./types";
 
 /**
@@ -49,6 +50,56 @@ export function listAccountsWithStats(propertyId: string): AccountWithStats[] {
 		allocatedAmount: Number(row.allocatedAmount).toFixed(2),
 		bookingCount: Number(row.bookingCount),
 	}));
+}
+
+/**
+ * Netto-Buchungssumme eines Kontos in einem Zeitraum - Grundlage des
+ * Imports der Kontobewegungen als Kostenpositionen in die
+ * Nebenkostenabrechnung (siehe buildCostItemsFromAccountBookingSums in
+ * src/lib/billing.ts und importCostItemsFromBankingAction).
+ */
+export interface AccountBookingSum {
+	id: string;
+	label: string;
+	/**
+	 * Nettosumme der Buchungszeilen in Cent, signed wie die Buchungszeilen:
+	 * negativ = Aufwand (Ausgangsbuchung), positiv = Erstattungsüberschuss
+	 * (Eingangsbuchung, z. B. Versicherungsrückerstattung).
+	 */
+	totalCents: number;
+	/** Anzahl der im Zeitraum berücksichtigten Buchungszeilen. */
+	bookingCount: number;
+}
+
+/**
+ * Summiert die Buchungszeilen auf KONTEN einer Liegenschaft, deren
+ * Banktransaktion im Abrechnungszeitraum liegt, je Konto (Nettosumme in
+ * Cent, exakt über Integer-Addition - kein SQLite-SUM über TEXT-
+ * Geldspalten). Buchungszeilen gegen Sollstellungen (transactionId statt
+ * accountId) sind per Join auf account_id automatisch ausgenommen - sie
+ * fließen über die bezahlt-Logik als geleistete Vorauszahlungen in die
+ * Abrechnung (computePaidPrepaymentsCents in src/lib/billing.ts).
+ */
+export function listAccountBookingSumsForPeriod(propertyId: string, periodFrom: string, periodTo: string): AccountBookingSum[] {
+	const rows = getDb()
+		.prepare(
+			`SELECT a.id, a.label, bta.amount AS amount
+			 FROM accounts a
+			 JOIN bank_transaction_allocations bta ON bta.account_id = a.id
+			 JOIN bank_transactions bt ON bt.id = bta.bank_transaction_id
+			 WHERE a.property_id = ? AND date(bt.booking_date) >= date(?) AND date(bt.booking_date) <= date(?)
+			 ORDER BY a.label, bta.created_at`
+		)
+		.all(propertyId, periodFrom, periodTo) as { id: string; label: string; amount: string }[];
+
+	const sums = new Map<string, AccountBookingSum>();
+	for (const row of rows) {
+		const sum = sums.get(row.id) ?? { id: row.id, label: row.label, totalCents: 0, bookingCount: 0 };
+		sum.totalCents += toCents(row.amount);
+		sum.bookingCount += 1;
+		sums.set(row.id, sum);
+	}
+	return [...sums.values()].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 export function getAccount(id: string): Account | null {

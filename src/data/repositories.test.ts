@@ -8,6 +8,7 @@ import { closeDb, getDb } from "@/data/db";
 import {
 	createBillingPeriod,
 	createCostItem,
+	createCostItems,
 	deleteBillingPeriodWithArtifacts,
 	finalizeBillingPeriod,
 	getBillingPeriod,
@@ -21,7 +22,7 @@ import {
 	listCustomAllocationKeysWithWeights,
 	upsertCustomAllocationKeyWeight,
 } from "@/data/custom-allocation-keys";
-import { countAllocationsForAccount, createAccount, deleteAccount, getAccount, listAccountsWithStats } from "@/data/accounts";
+import { countAllocationsForAccount, createAccount, deleteAccount, getAccount, listAccountBookingSumsForPeriod, listAccountsWithStats } from "@/data/accounts";
 import {
 	createBankTransaction,
 	deleteBankTransaction,
@@ -38,6 +39,7 @@ import { listRentArrearAmounts } from "@/data/dashboard";
 import { createTransaction, generateDueTransactions, listOpenTransactionArrearAmounts, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
 import { createUnit } from "@/data/units";
 import { countUsers, createUser, getUserByEmail, listAdminEmails, updateUserApproval } from "@/data/users";
+import { buildCostItemsFromAccountBookingSums } from "@/lib/billing";
 
 /**
  * Repository-Layer-Tests gegen eine echte (temporäre) better-sqlite3-
@@ -420,6 +422,88 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 		const now = new Date("2026-02-15T00:00:00.000Z");
 		expect(listOpenTransactionArrearAmounts(now)).toEqual(["450.00"]);
 		expect(listRentArrearAmounts(now)).toEqual(["450.00"]);
+	});
+
+	it("bündelt Kontobewegungen je Konto im Abrechnungszeitraum als Kostenpositionen (Import in die Abrechnung)", () => {
+		const { property, lease } = seedPropertyUnitTenantLease();
+		const insurance = createAccount({ propertyId: property.id, label: "Gebäudeversicherung", notes: null });
+		const water = createAccount({ propertyId: property.id, label: "Wasserversorgung", notes: null });
+		const heating = createAccount({ propertyId: property.id, label: "Heizung", notes: null });
+
+		const booking = (bookingDate: string, amount: string, description: string) =>
+			createBankTransaction({ propertyId: property.id, bookingDate, amount, description, partner: null, notes: null });
+
+		// Buchungen im Abrechnungszeitraum: Aufwand, Erstattung (wird
+		// verrechnet), eine gegen die Sollstellung (bleibt beim Import
+		// unberücksichtigt - sie zählt als geleistete Vorauszahlung) ...
+		const insurancePayment = booking("2026-03-05T00:00:00.000Z", "-480.00", "Versicherung Jahresprämie");
+		const insuranceRefund = booking("2026-09-05T00:00:00.000Z", "80.00", "Erstattung Versicherung");
+		const waterPayment = booking("2026-06-05T00:00:00.000Z", "-250.50", "Wasser Jahresabrechnung");
+		const heatingPayment = booking("2026-04-05T00:00:00.000Z", "-100.00", "Heizung Vorauszahlung");
+		const heatingRefund = booking("2026-11-05T00:00:00.000Z", "100.00", "Heizung Abrechnungsguthaben");
+		const rent = createTransaction({
+			leaseId: lease.id,
+			amount: "950.00",
+			dueDate: "2026-03-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Miete März",
+			status: "OPEN",
+		});
+		const rentPayment = booking("2026-03-05T00:00:00.000Z", "950.00", "Miete März");
+		// ... und eine Buchung AUSSERHALB des Abrechnungszeitraums.
+		const nextYearPayment = booking("2027-02-05T00:00:00.000Z", "-480.00", "Versicherung Folgejahr");
+
+		setBankTransactionAllocations(insurancePayment.id, [{ accountId: insurance.id, transactionId: null, amount: "-480.00" }]);
+		setBankTransactionAllocations(insuranceRefund.id, [{ accountId: insurance.id, transactionId: null, amount: "80.00" }]);
+		setBankTransactionAllocations(waterPayment.id, [{ accountId: water.id, transactionId: null, amount: "-250.50" }]);
+		setBankTransactionAllocations(heatingPayment.id, [{ accountId: heating.id, transactionId: null, amount: "-100.00" }]);
+		setBankTransactionAllocations(heatingRefund.id, [{ accountId: heating.id, transactionId: null, amount: "100.00" }]);
+		setBankTransactionAllocations(rentPayment.id, [{ accountId: null, transactionId: rent.id, amount: "950.00" }]);
+		setBankTransactionAllocations(nextYearPayment.id, [{ accountId: insurance.id, transactionId: null, amount: "-480.00" }]);
+
+		const period = createBillingPeriod({
+			propertyId: property.id,
+			periodFrom: "2026-01-01T00:00:00.000Z",
+			periodTo: "2026-12-31T23:59:59.999Z",
+			notes: null,
+		});
+
+		// Nettosummen je Konto, alphabetisch sortiert: Erstattungen
+		// verrechnet, Sollstellungs-Buchung ausgenommen, Buchung außerhalb
+		// des Zeitraums ignoriert.
+		const sums = listAccountBookingSumsForPeriod(property.id, period.periodFrom, period.periodTo);
+		expect(sums).toEqual([
+			{ id: insurance.id, label: "Gebäudeversicherung", totalCents: -40_000, bookingCount: 2 },
+			{ id: heating.id, label: "Heizung", totalCents: 0, bookingCount: 2 },
+			{ id: water.id, label: "Wasserversorgung", totalCents: -25_050, bookingCount: 1 },
+		]);
+
+		// Import: Konto mit Saldo 0 (Heizung) erzeugt keine Position; die
+		// Sollstellung bleibt über die bezahlt-Logik Vorauszahlung (nicht
+		// Kostenposition).
+		const items = buildCostItemsFromAccountBookingSums(sums, "LIVING_SPACE");
+		expect(items.map((item) => item.label)).toEqual(["Gebäudeversicherung", "Wasserversorgung"]);
+
+		const created = createCostItems(
+			items.map((item) => ({
+				billingPeriodId: period.id,
+				label: item.label,
+				amount: item.amount,
+				allocationKey: item.allocationKey,
+				directUnitId: null,
+				customAllocationKeyId: null,
+				notes: item.notes,
+			}))
+		);
+		expect(created).toHaveLength(2);
+
+		const detail = getBillingPeriodDetail(period.id);
+		expect(detail?.costItems.map((costItem) => costItem.label)).toEqual(["Gebäudeversicherung", "Wasserversorgung"]);
+		const importedInsurance = detail?.costItems.find((costItem) => costItem.label === "Gebäudeversicherung");
+		expect(importedInsurance?.amount).toBe("400.00");
+		expect(importedInsurance?.allocationKey).toBe("LIVING_SPACE");
+		expect(importedInsurance?.notes).toBe("Übernommen aus der Buchhaltung (2 Buchungen im Abrechnungszeitraum).");
+		expect(listTransactions({ leaseId: lease.id })[0].status).toBe("PAID");
 	});
 
 	it("deleteBillingPeriodWithArtifacts entfernt auch finalisierte Perioden samt Statements und Protokollen", async () => {

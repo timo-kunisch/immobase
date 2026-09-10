@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
 	createBillingPeriod,
 	createCostItem,
+	createCostItems,
 	deleteBillingPeriodWithArtifacts,
 	deleteCostItem,
 	finalizeBillingPeriod,
@@ -19,6 +20,7 @@ import {
 	updateTenantStatementPdf,
 	type TenantStatementPdfData,
 } from "@/data/billing";
+import { listAccountBookingSumsForPeriod } from "@/data/accounts";
 import { buildCustomAllocationWeightsByKey, createCustomAllocationKey, deleteCustomAllocationKey as deleteCustomAllocationKeyRow, getCustomAllocationKey, updateCustomAllocationKey, upsertCustomAllocationKeyWeight } from "@/data/custom-allocation-keys";
 import { companySettingsToAddressLines, getCompanySettings } from "@/data/company-settings";
 import type { AllocationKey } from "@/data/types";
@@ -26,7 +28,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
-import { allocationKeyLabels, calculateBillingResult } from "@/lib/billing";
+import { allocationKeyLabels, buildCostItemsFromAccountBookingSums, calculateBillingResult } from "@/lib/billing";
 import { centsToDecimalString } from "@/lib/money";
 import { generateBillingStatementPdf } from "@/lib/pdf/billing-statement";
 import { deleteUploadedFile, saveGeneratedFile } from "@/lib/storage";
@@ -296,6 +298,89 @@ export async function deleteCostItemAction(id: string): Promise<ActionState> {
 
 	revalidatePath("/abrechnung");
 	return { success: true };
+}
+
+/**
+ * Für den Sammel-Import sinnvolle Umlageschlüssel: DIRECT (je Position eine
+ * Einheit) und CUSTOM (je Position ein individueller Schlüssel) erfordern
+ * Einzelentscheidungen und bleiben dem Anlegen/Bearbeiten einzelner
+ * Kostenpositionen vorbehalten.
+ */
+const BANKING_IMPORT_ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION"];
+
+/**
+ * Übernimmt die Buchungszeilen der Buchhaltung (siehe /buchhaltung) als
+ * Kostenpositionen der Abrechnungsperiode: Je KONTO eine Position in Höhe
+ * der Nettosumme seiner Buchungen im Abrechnungszeitraum (Gutschriften/
+ * Erstattungen werden mit den Aufwendungen des Kontos verrechnet). Die
+ * reine Umwandlungslogik liegt in src/lib/billing.ts
+ * (buildCostItemsFromAccountBookingSums), das atomare Einfügen im
+ * Repository (createCostItems).
+ *
+ * Buchungszeilen gegen Sollstellungen (Mieteingänge) sind ausgenommen: Sie
+ * fließen über die bezahlt-Logik als geleistete Vorauszahlungen in die
+ * Abrechnung (computePaidPrepaymentsCents in src/lib/billing.ts) und
+ * dürfen nicht zusätzlich als Kosten auftauchen.
+ */
+export async function importCostItemsFromBankingAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const billingPeriodId = getString(formData, "billingPeriodId");
+	const allocationKeyRaw = getString(formData, "allocationKey") as AllocationKey;
+
+	if (!billingPeriodId) {
+		return { error: t("billing.errors.periodNotFound") };
+	}
+	if (!BANKING_IMPORT_ALLOCATION_KEYS.includes(allocationKeyRaw)) {
+		return { error: t("billing.errors.invalidAllocationKey") };
+	}
+
+	const existing = await requireDraftBillingPeriod(billingPeriodId);
+	if ("error" in existing) return { error: existing.error };
+
+	// Konto-Summen bewusst SERVERSEITIG neu ermitteln (autoritativ,
+	// unabhängig von der ggf. veralteten Vorschau im Dialog).
+	const accountSums = listAccountBookingSumsForPeriod(
+		existing.billingPeriod.propertyId,
+		existing.billingPeriod.periodFrom,
+		existing.billingPeriod.periodTo
+	);
+	const items = buildCostItemsFromAccountBookingSums(accountSums, allocationKeyRaw);
+	if (items.length === 0) {
+		return { error: t("billing.errors.bankingImportNothingFound") };
+	}
+
+	try {
+		createCostItems(
+			items.map((item) => ({
+				billingPeriodId,
+				label: item.label,
+				amount: item.amount,
+				allocationKey: item.allocationKey,
+				directUnitId: null,
+				customAllocationKeyId: null,
+				notes: item.notes,
+			}))
+		);
+	} catch (error) {
+		console.error("importCostItemsFromBankingAction failed", error);
+		return { error: t("billing.errors.bankingImportFailed") };
+	}
+
+	logActivity(
+		user,
+		"CREATE",
+		"abrechnung",
+		`Kontobewegungen aus der Buchhaltung als ${items.length} Kostenposition${items.length === 1 ? "" : "en"} in den Abrechnungszeitraum „${billingPeriodLabel(existing.billingPeriod)}“ übernommen`,
+		billingPeriodId
+	);
+
+	revalidatePath("/abrechnung");
+	revalidatePath(`/abrechnung/${billingPeriodId}`);
+	return {
+		success: true,
+		message: t(items.length === 1 ? "billing.success.bankingImport.one" : "billing.success.bankingImport.other", { count: items.length }),
+	};
 }
 
 // ============================================================

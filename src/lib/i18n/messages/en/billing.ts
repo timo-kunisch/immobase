@@ -63,6 +63,16 @@ export const billing: typeof deBilling = {
 	"consumption.title": "Consumption values: {label}",
 	"consumption.description": "Consumption per unit for the billing period (e.g. m³ of water or heating consumption units).",
 	"consumption.noUnits": "This property has no units yet.",
+	"bankingImport.trigger": "Import from accounting",
+	"bankingImport.title": "Import account postings",
+	"bankingImport.description":
+		"Creates one cost item per account from the booking lines of the accounting module within the billing period (refunds are netted against the account's expenses). Bookings against rent installments count as paid advance payments and are not imported.",
+	"bankingImport.emptyTrigger": "No account postings found in the billing period.",
+	"bankingImport.table.account": "Account",
+	"bankingImport.table.bookings": "Bookings",
+	"bankingImport.table.costItem": "Cost item",
+	"bankingImport.hint.editable": "The allocation key and amount can be edited per item after the import.",
+	"bankingImport.submit": "Import",
 	"allocationKeys.info":
 		"Custom allocation keys distribute cost items according to freely defined weights per unit (e.g. number of parking spaces). They are selected for cost items with allocation key \"Custom\".",
 	"allocationKeys.management": "Custom allocation keys of this property",
@@ -127,4 +137,8 @@ export const billing: typeof deBilling = {
 	"errors.pdfRequiresFinalized": "PDFs can only be generated once the billing period has been finalized.",
 	"errors.somePdfsFailed": "{failed} of {total} PDFs could not be generated.",
 	"errors.pdfRequiredBeforePost": "Please generate the PDF first before sending it by post.",
+	"errors.bankingImportNothingFound": "No bookings on accounts of the accounting module were found in the billing period.",
+	"errors.bankingImportFailed": "The cost items could not be imported from accounting.",
+	"success.bankingImport.one": "1 cost item imported from accounting.",
+	"success.bankingImport.other": "{count} cost items imported from accounting.",
 };

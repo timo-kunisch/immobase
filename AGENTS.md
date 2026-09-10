@@ -575,7 +575,14 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
   bearbeitbar, ihre Löschung bleibt möglich (räumt Abrechnungs-PDFs aus der Dateiablage und
   Postversand-Protokolle mit weg, `deleteBillingPeriodWithArtifacts`). Die Vorauszahlungen
   in der Abrechnung werden nur aus TATSÄCHLICH geleisteten Zahlungen berechnet (bezahlte
-  Monats-Sollstellungen, `computePaidPrepaymentsCents` in `src/lib/billing.ts`).
+  Monats-Sollstellungen, `computePaidPrepaymentsCents` in `src/lib/billing.ts`). Die
+  Kostenseite kann je Entwurfs-Periode per Dialog „Aus Buchhaltung übernehmen" aus der
+  Buchhaltung importiert werden (`importCostItemsFromBankingAction`): je Konto EINE
+  Position in Höhe der Nettosumme seiner Buchungszeilen im Zeitraum (Erstattungen
+  verrechnet, Konten mit Saldo 0 übersprungen; Buchungen gegen Sollstellungen bleiben
+  ausgenommen); Summierung `listAccountBookingSumsForPeriod` (src/data/accounts.ts),
+  reine Umwandlung `buildCostItemsFromAccountBookingSums` (src/lib/billing.ts), atomares
+  Einfügen `createCostItems` (src/data/billing.ts).
 - **Dokumentvorlagen:** `document_templates`, `generated_documents`
 - **WEG-Verwaltung:** siehe Abschnitt 6.1
 - **Postversand:** `postal_shipments` (polymorph über `sourceType`/`sourceId`)

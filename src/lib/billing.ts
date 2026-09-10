@@ -1,6 +1,6 @@
 import type { AllocationKey, BillingPeriodStatus } from "@/data/types";
 import { getRentForDate } from "@/lib/rent-history";
-import { toCents, distributeCents } from "@/lib/money";
+import { toCents, distributeCents, centsToDecimalString } from "@/lib/money";
 import { atMidnight, daysBetweenInclusive, daysInMonth, overlapRange } from "@/lib/date-range";
 
 /**
@@ -103,6 +103,63 @@ export function computePaidPrepaymentsCents(
 	}
 
 	return { totalCents: Math.round(totalEuros * 100), paidPaymentsCount: countedMonths };
+}
+
+// ============================================================
+// Import aus der Buchhaltung (Kontobewegungen -> Kostenpositionen)
+// ============================================================
+
+/**
+ * Netto-Buchungssumme eines Kontos im Abrechnungszeitraum (structuralkompatibel
+ * zu AccountBookingSum aus src/data/accounts.ts - bewusst ohne Import
+ * definiert, damit diese reine Logik auch ohne Repository-Schicht testbar
+ * bleibt).
+ */
+export type AccountBookingSumForImport = {
+	id: string;
+	label: string;
+	/** Signed in Cent: negativ = Aufwand (Ausgang), positiv = Erstattungsüberschuss (Eingang). */
+	totalCents: number;
+	bookingCount: number;
+};
+
+/** Aus einer Kontobewegungs-Summe erzeugte Kostenposition (vor dem Einfügen via createCostItems). */
+export type BankingImportCostItem = {
+	label: string;
+	amount: string;
+	allocationKey: AllocationKey;
+	notes: string;
+	/** Referenz auf das Quellkonto (Nachvollziehbarkeit; wird nicht persistiert). */
+	sourceAccountId: string;
+};
+
+/**
+ * Wandelt die Konto-Buchungssummen eines Abrechnungszeitraums in
+ * Kostenpositionen um: je Konto EINE Position mit der Nettosumme seiner
+ * Buchungszeilen. Konten mit Saldo 0 werden übersprungen (sie erzeugen
+ * keine Position).
+ *
+ * Vorzeichen: Banktransaktionen sind signed (negativ = Ausgang/Aufwand,
+ * positiv = Eingang/Erstattung) - die Kostenposition übernimmt den Betrag
+ * aus Kostensicht (Aufwand positiv). Ein Erstattungsüberschuss eines Kontos
+ * (z. B. Versicherungsrückerstattung) wird daher als NEGATIVE Position
+ * übernommen und mindert die umzulegenden Kosten - Erstattungen werden
+ * fachlich mit den Aufwendungen des Kontos verrechnet.
+ *
+ * Der Umlageschlüssel wird als einheitlicher Default für alle Positionen
+ * gesetzt (Konten tragen keinen eigenen Schlüssel) und kann je Position
+ * nach dem Import bearbeitet werden.
+ */
+export function buildCostItemsFromAccountBookingSums(sums: AccountBookingSumForImport[], allocationKey: AllocationKey): BankingImportCostItem[] {
+	return sums
+		.filter((sum) => sum.totalCents !== 0)
+		.map((sum) => ({
+			label: sum.label,
+			amount: centsToDecimalString(-sum.totalCents),
+			allocationKey,
+			notes: `Übernommen aus der Buchhaltung (${sum.bookingCount} Buchung${sum.bookingCount === 1 ? "" : "en"} im Abrechnungszeitraum).`,
+			sourceAccountId: sum.id,
+		}));
 }
 
 // ============================================================

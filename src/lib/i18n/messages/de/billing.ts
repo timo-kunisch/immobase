@@ -84,6 +84,17 @@ export const billing = {
 	"consumption.title": "Verbrauchswerte: {label}",
 	"consumption.description": "Verbrauch je Einheit für den Abrechnungszeitraum (z. B. m³ Wasser oder Verbrauchseinheiten Heizung).",
 	"consumption.noUnits": "Diese Liegenschaft hat noch keine Einheiten.",
+	// Dialog "Aus Buchhaltung übernehmen" (Import der Kontobewegungen als Kostenpositionen)
+	"bankingImport.trigger": "Aus Buchhaltung übernehmen",
+	"bankingImport.title": "Kontobewegungen übernehmen",
+	"bankingImport.description":
+		"Erzeugt je Konto eine Kostenposition aus den Buchungszeilen der Buchhaltung im Abrechnungszeitraum (Erstattungen werden mit den Aufwendungen des Kontos verrechnet). Buchungen gegen Sollstellungen zählen als geleistete Vorauszahlungen und werden nicht importiert.",
+	"bankingImport.emptyTrigger": "Keine Kontobewegungen im Abrechnungszeitraum gefunden.",
+	"bankingImport.table.account": "Konto",
+	"bankingImport.table.bookings": "Buchungen",
+	"bankingImport.table.costItem": "Kostenposition",
+	"bankingImport.hint.editable": "Umlageschlüssel und Betrag können je Position nach dem Übernehmen bearbeitet werden.",
+	"bankingImport.submit": "Übernehmen",
 	// Frei definierbare Umlageschlüssel (Reiter der Übersicht)
 	"allocationKeys.info":
 		"Individuelle Umlageschlüssel verteilen Kostenpositionen nach frei hinterlegten Gewichten je Einheit (z. B. Anzahl Stellplätze). Sie werden bei Kostenpositionen mit Umlageschlüssel \"Individuell\" ausgewählt.",
@@ -152,4 +163,9 @@ export const billing = {
 	"errors.pdfRequiresFinalized": "PDFs können erst erzeugt werden, wenn die Abrechnungsperiode finalisiert wurde.",
 	"errors.somePdfsFailed": "{failed} von {total} PDFs konnten nicht erzeugt werden.",
 	"errors.pdfRequiredBeforePost": "Bitte erzeugen Sie zunächst das PDF, bevor Sie es per Post versenden.",
+	"errors.bankingImportNothingFound": "Im Abrechnungszeitraum wurden keine Buchungen auf Konten der Buchhaltung gefunden.",
+	"errors.bankingImportFailed": "Die Kostenpositionen konnten nicht aus der Buchhaltung übernommen werden.",
+	// Erfolgsmeldungen (Server Actions)
+	"success.bankingImport.one": "1 Kostenposition aus der Buchhaltung übernommen.",
+	"success.bankingImport.other": "{count} Kostenpositionen aus der Buchhaltung übernommen.",
 };

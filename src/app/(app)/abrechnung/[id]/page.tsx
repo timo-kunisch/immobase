@@ -3,12 +3,14 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, Calculator, ChevronLeft } from "lucide-react";
 
 import { getBillingPeriodDetail } from "@/data/billing";
+import { listAccountBookingSumsForPeriod } from "@/data/accounts";
 import { buildCustomAllocationWeightsByKey } from "@/data/custom-allocation-keys";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { BankingImportDialog } from "@/components/abrechnung/banking-import-dialog";
 import { CostItemFormDialog } from "@/components/abrechnung/cost-item-form-dialog";
 import { ConsumptionValuesDialog } from "@/components/abrechnung/consumption-values-dialog";
 import { FinalizeBillingPeriodButton } from "@/components/abrechnung/finalize-billing-period-button";
@@ -69,6 +71,14 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 
 	const leaseById = new Map(units.flatMap((unit) => unit.leases.map((lease) => [lease.id, { ...lease, unit }])));
 
+	// Vorschau des Buchhaltungs-Imports: Nettosumme der Buchungszeilen je
+	// Konto im Abrechnungszeitraum. Konten mit Saldo 0 erzeugen keine
+	// Kostenposition (Filter identisch zur Server Action) und werden nicht
+	// angezeigt.
+	const bankingImportSums = isDraft
+		? listAccountBookingSumsForPeriod(property.id, billingPeriod.periodFrom, billingPeriod.periodTo).filter((sum) => sum.totalCents !== 0)
+		: [];
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
@@ -102,7 +112,12 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 
 				<div className="flex items-center justify-between">
 					<h2 className="text-base font-semibold">{t("billing.detail.costItems")}</h2>
-					{isDraft ? <CostItemFormDialog billingPeriodId={billingPeriod.id} units={units} customAllocationKeys={customAllocationKeys} /> : null}
+					{isDraft ? (
+						<div className="flex items-center gap-2">
+							<BankingImportDialog billingPeriodId={billingPeriod.id} accountSums={bankingImportSums} />
+							<CostItemFormDialog billingPeriodId={billingPeriod.id} units={units} customAllocationKeys={customAllocationKeys} />
+						</div>
+					) : null}
 				</div>
 
 				<Card>

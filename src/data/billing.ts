@@ -259,14 +259,16 @@ export function getCostItem(id: string): CostItem | null {
 	return row ?? null;
 }
 
+const COST_ITEM_INSERT_SQL = `
+	INSERT INTO cost_items (id, billing_period_id, label, amount, allocation_key, direct_unit_id, custom_allocation_key_id, notes, created_at, updated_at)
+	VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
 export function createCostItem(input: CostItemInput): CostItem {
 	const id = newId();
 	const timestamp = now();
 	getDb()
-		.prepare(
-			`INSERT INTO cost_items (id, billing_period_id, label, amount, allocation_key, direct_unit_id, custom_allocation_key_id, notes, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		)
+		.prepare(COST_ITEM_INSERT_SQL)
 		.run(
 			id,
 			input.billingPeriodId,
@@ -280,6 +282,36 @@ export function createCostItem(input: CostItemInput): CostItem {
 			timestamp
 		);
 	return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
+}
+
+/**
+ * Legt mehrere Kostenpositionen in EINER better-sqlite3-Transaktion an
+ * (atomar: schlägt eine Zeile fehl, wird gar nichts angelegt) - z. B. für
+ * den Import der Kontobewegungen aus der Buchhaltung
+ * (importCostItemsFromBankingAction) oder die WEG-BetrKV-Brücke.
+ */
+export function createCostItems(inputs: CostItemInput[]): CostItem[] {
+	const db = getDb();
+	const timestamp = now();
+	const insert = db.prepare(COST_ITEM_INSERT_SQL);
+	return db.transaction(() =>
+		inputs.map((input) => {
+			const id = newId();
+			insert.run(
+				id,
+				input.billingPeriodId,
+				input.label,
+				input.amount,
+				input.allocationKey,
+				input.directUnitId,
+				input.customAllocationKeyId,
+				input.notes,
+				timestamp,
+				timestamp
+			);
+			return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
+		})
+	)();
 }
 
 export function updateCostItem(id: string, input: CostItemInput): void {
