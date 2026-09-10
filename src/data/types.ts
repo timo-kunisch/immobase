@@ -740,12 +740,23 @@ export interface ChatMessageToolCall {
 }
 
 /**
+ * Metadaten eines Datei-Anhangs einer Chat-Nachricht (nur Anzeige in der
+ * UI): Name + Größe in Bytes. Der Datei-INHALT wird bewusst nicht
+ * gespeichert - er fließt nur aufbereitet in den aktuellen KI-Request
+ * (src/lib/ai/attachments.ts).
+ */
+export interface ChatMessageAttachment {
+	name: string;
+	size: number;
+}
+
+/**
  * Eine Nachricht im persistenten Chat-Verlauf des KI-Assistenten
  * (Tabelle `chat_messages`, pro Nutzer). Der Verlauf bleibt bis zum
  * manuellen Löschen im Dialog erhalten und wird bei jeder Anfrage
- * vollständig an den KI-Endpunkt mitgesendet. `toolCalls` ist eine
- * JSON-TEXT-Spalte - das Mapping erfolgt ausschließlich im Repository
- * (src/data/chat-messages.ts).
+ * vollständig an den KI-Endpunkt mitgesendet. `toolCalls` und
+ * `attachments` sind JSON-TEXT-Spalten - das Mapping erfolgt
+ * ausschließlich im Repository (src/data/chat-messages.ts).
  */
 export interface ChatMessage {
 	id: string;
@@ -753,6 +764,7 @@ export interface ChatMessage {
 	role: ChatMessageRole;
 	content: string;
 	toolCalls: ChatMessageToolCall[];
+	attachments: ChatMessageAttachment[];
 	createdAt: string;
 }
 

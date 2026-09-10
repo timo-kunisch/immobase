@@ -113,4 +113,39 @@ describe("chat_messages: persistenter Verlauf des KI-Assistenten", () => {
 		expect(messages).toHaveLength(1);
 		expect(messages[0].toolCalls).toEqual([]);
 	});
+
+	it("speichert Anhang-Metadaten (Name + Größe) mit der Nutzer-Nachricht", () => {
+		const userId = createTestUser("nutzer@example.com");
+
+		appendChatMessages(userId, [
+			{
+				role: "user",
+				content: "Bitte auswerten.",
+				attachments: [
+					{ name: "abrechnung.pdf", size: 102_400 },
+					{ name: "mieter.xlsx", size: 5_120 },
+				],
+			},
+			{ role: "assistant", content: "Antwort" },
+		]);
+
+		const messages = listChatMessages(userId);
+		// Anhänge werden als JSON gespeichert und beim Lesen gemappt;
+		// Nachrichten ohne Anhänge liefern ein leeres Array.
+		expect(messages[0].attachments).toEqual([
+			{ name: "abrechnung.pdf", size: 102_400 },
+			{ name: "mieter.xlsx", size: 5_120 },
+		]);
+		expect(messages[1].attachments).toEqual([]);
+	});
+
+	it("übersteht defekte attachments-JSON-Werte mit leerer Anhang-Liste", () => {
+		const userId = createTestUser("nutzer@example.com");
+		appendChatMessages(userId, [{ role: "user", content: "Frage" }]);
+		getDb().prepare("UPDATE chat_messages SET attachments = ? WHERE user_id = ?").run("{kein-json", userId);
+
+		const messages = listChatMessages(userId);
+		expect(messages).toHaveLength(1);
+		expect(messages[0].attachments).toEqual([]);
+	});
 });

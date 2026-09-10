@@ -14,6 +14,7 @@ import {
 	PDF_ATTACHMENT_EXTENSIONS,
 	TEXT_ATTACHMENT_EXTENSIONS,
 } from "./attachment-types";
+import { OcrEngineError, ocrPdfPages } from "./ocr";
 
 /**
  * Standard-Übersetzer (Deutsch) für Aufrufe ohne eigenen t()-Parameter -
@@ -34,7 +35,10 @@ const defaultT = createTranslator(deMessages);
  *   Modell voraus (OpenAI-kompatible "vision"-fähige Modelle). Hinweis auf
  *   diese Voraussetzung steht in den Einstellungen.
  * - PDF: Textextraktion je Seite via pdfjs-dist (Node-geeigneter
- *   legacy-Build). Gescannte PDFs ohne Textebene liefern einen Hinweis.
+ *   legacy-Build). Seiten ohne (nennenswerte) Textebene - typischerweise
+ *   Scans - werden automatisch per OCR nachverarbeitet (src/lib/ai/ocr.ts:
+ *   pdfjs-Rasterung + tesseract.js mit gebündeltem deutschen Sprachmodell,
+ *   vollständig offline); OCR-Seiten sind im Text als solche markiert.
  * - Excel (.xlsx/.xlsm/.xltx/.xltm) via exceljs: Jedes Tabellenblatt wird
  *   als CSV-Text (Semikolon-getrennt, deutsche Excel-Konvention) abgelegt.
  *   Legacy-.xls wird von exceljs nicht gelesen - Hinweis "Als .xlsx
@@ -64,6 +68,14 @@ const MAX_ROWS_PER_SHEET = 500;
 const MAX_PDF_PAGES = 200;
 /** Maximale Textlänge je Anhang (Überschuss wird abgeschnitten). */
 const MAX_CHARS_PER_ATTACHMENT = 60_000;
+/**
+ * Ab dieser Zeichenzahl gilt die Textebene einer PDF-Seite als vorhanden;
+ * darunter (z. B. reine Scans oder nur eine eingebettete Seitenzahl) läuft
+ * die OCR-Nachverarbeitung für die Seite.
+ */
+const MIN_PAGE_TEXT_CHARS = 20;
+/** Maximale Seiten je PDF, für die OCR läuft (Tempo-Schutz; Überschuss wird übersprungen). */
+const MAX_OCR_PAGES = 20;
 
 const TEXT_EXTENSIONS = new Set<string>(TEXT_ATTACHMENT_EXTENSIONS);
 const EXCEL_EXTENSIONS = new Set<string>(EXCEL_ATTACHMENT_EXTENSIONS);
@@ -155,8 +167,9 @@ async function excelToText(buffer: Buffer, name: string, t: TranslateFn): Promis
  *
  * Version bewusst auf der 4.x-Linie halten: Diese lädt im reinen
  * Node-Kontext ohne DOM-Globals (ab 5.x wird DOMMatrix bereits beim
- * Modul-Import zwingend erwartet bzw. @napi-rs/canvas als natives Polyfill
- * gefordert - beides kommt für die App nicht infrage).
+ * Modul-Import zwingend erwartet). Die OCR-Rasterung (src/lib/ai/ocr.ts)
+ * nutzt @napi-rs/canvas - genau die Bibliothek, die pdfjs 4.x selbst als
+ * optionale Abhängigkeit deklariert; Version daran ausrichten.
  */
 async function loadPdfJs(t: TranslateFn): Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> {
 	try {
@@ -165,6 +178,19 @@ async function loadPdfJs(t: TranslateFn): Promise<typeof import("pdfjs-dist/lega
 		console.error("[ai] pdfjs-dist konnte nicht geladen werden:", error);
 		throw new AttachmentError(t("chat.attach.pdfEngineUnavailable"));
 	}
+}
+
+/** Extrahiert den Text einer einzelnen PDF-Seite (leer, wenn keine Textebene). */
+async function extractPageText(page: { getTextContent(): Promise<{ items: unknown[] }> }): Promise<string> {
+	const content = await page.getTextContent();
+	return content.items
+		.map((item) => (typeof item === "object" && item !== null && "str" in item ? String((item as TextItem).str) : ""))
+		// Leerzeichen zwischen Textstücken: pdf.js liefert die Items oft
+		// wort-/fragmentweise, ein schlichter Abstand ist die robusteste
+		// Näherung (zeilengetreue Rekonstruktion wäre erheblich aufwendiger).
+		.join(" ")
+		.replace(/\s{2,}/g, " ")
+		.trim();
 }
 
 async function pdfToText(buffer: Buffer, name: string, t: TranslateFn): Promise<string> {
@@ -188,25 +214,71 @@ async function pdfToText(buffer: Buffer, name: string, t: TranslateFn): Promise<
 	try {
 		const pdf = await task.promise;
 		const pageCount = Math.min(pdf.numPages, MAX_PDF_PAGES);
-		const parts: string[] = [];
+
+		// 1) Textebene je Seite extrahieren.
+		const pageTexts: string[] = [];
 		for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
 			const page = await pdf.getPage(pageNumber);
-			const content = await page.getTextContent();
-			const text = content.items
-				.map((item) => ("str" in item ? (item as TextItem).str : ""))
-				// Leerzeichen zwischen Textstücken: pdf.js liefert die Items oft
-				// wort-/fragmentweise, ein schlichter Abstand ist die robusteste
-				// Näherung (zeilengetreue Rekonstruktion wäre erheblich aufwendiger).
-				.join(" ")
-				.replace(/\s{2,}/g, " ")
-				.trim();
-			if (text) parts.push(`${t("chat.attach.pageMarker", { page: pageNumber })}\n${text}`);
+			pageTexts.push(await extractPageText(page));
 		}
-		const truncated = pdf.numPages > MAX_PDF_PAGES;
+
+		// 2) Seiten ohne nennenswerte Textebene (typisch: Scans) per OCR
+		// nachverarbeiten - gerastert und lokal durch tesseract.js.
+		const ocrCandidates: number[] = [];
+		for (let index = 0; index < pageTexts.length; index++) {
+			if (pageTexts[index].length < MIN_PAGE_TEXT_CHARS) ocrCandidates.push(index + 1);
+		}
+		const ocrPageNumbers = ocrCandidates.slice(0, MAX_OCR_PAGES);
+		let ocrResults = new Map<number, string>();
+		let ocrUnavailable = false;
+		if (ocrPageNumbers.length > 0) {
+			try {
+				ocrResults = await ocrPdfPages(pdf, ocrPageNumbers);
+			} catch (error) {
+				if (!(error instanceof OcrEngineError)) throw error;
+				// OCR-Engine nicht verfügbar (z. B. Plattform-Binary fehlt):
+				// Verhalten wie vor Einführung der OCR - Text verwenden, soweit
+				// vorhanden, sonst die gewohnte Fehlermeldung.
+				console.warn("[ai] OCR-Engine nicht verfügbar - Scans können nicht gelesen werden:", error.message);
+				ocrUnavailable = true;
+			}
+		}
+
+		// 3) Zusammenführen: Textebene hat Vorrang, OCR füllt die Lücken.
+		const parts: string[] = [];
+		let ocrUsed = false;
+		for (let index = 0; index < pageTexts.length; index++) {
+			const pageNumber = index + 1;
+			const embeddedText = pageTexts[index];
+			if (embeddedText.length >= MIN_PAGE_TEXT_CHARS) {
+				parts.push(`${t("chat.attach.pageMarker", { page: pageNumber })}\n${embeddedText}`);
+				continue;
+			}
+			const ocrText = ocrResults.get(pageNumber);
+			if (ocrText) {
+				ocrUsed = true;
+				parts.push(`${t("chat.attach.pageMarkerOcr", { page: pageNumber })}\n${ocrText}`);
+			} else if (embeddedText) {
+				// Winzige Textreste (z. B. eine eingebettete Seitenzahl) trotzdem übernehmen.
+				parts.push(`${t("chat.attach.pageMarker", { page: pageNumber })}\n${embeddedText}`);
+			}
+		}
+
 		if (parts.length === 0) {
-			throw new AttachmentError(t("chat.attach.pdfNoText", { name }));
+			throw new AttachmentError(t(ocrUnavailable ? "chat.attach.pdfOcrUnavailable" : "chat.attach.pdfNoText", { name }));
 		}
-		return parts.join("\n\n") + (truncated ? `\n\n${t("chat.attach.pdfPagesTruncated", { max: MAX_PDF_PAGES, total: pdf.numPages })}` : "");
+
+		let result = parts.join("\n\n");
+		if (ocrUsed) {
+			result = `${t("chat.attach.ocrNotice")}\n\n${result}`;
+		}
+		if (ocrCandidates.length > MAX_OCR_PAGES) {
+			result += `\n\n${t("chat.attach.ocrPagesTruncated", { max: MAX_OCR_PAGES, total: ocrCandidates.length })}`;
+		}
+		if (pdf.numPages > MAX_PDF_PAGES) {
+			result += `\n\n${t("chat.attach.pdfPagesTruncated", { max: MAX_PDF_PAGES, total: pdf.numPages })}`;
+		}
+		return result;
 	} catch (error) {
 		if (error instanceof AttachmentError) throw error;
 		const message = error instanceof Error ? error.message : String(error);

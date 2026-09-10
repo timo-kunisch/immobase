@@ -47,6 +47,17 @@ files:
   - dist-electron/**
   - package.json
   - "!**/*.map"
+  # Der OCR-Stack (KI-Chat, Scanned-PDF-Erkennung) läuft ausschließlich im
+  # eingebetteten Next.js-Server - seine Dateien kommen über den
+  # Standalone-Trace nach resources/standalone/node_modules (extraResources
+  # unten). Der Electron-Main-Prozess require()t diese Pakete nie; ohne die
+  # Ausschlüsse würde electron-builder sie zusätzlich in app.asar duplizieren
+  # (~85 MB totes Gewicht im Paket).
+  - "!node_modules/tesseract.js/**"
+  - "!node_modules/tesseract.js-core/**"
+  - "!node_modules/@tesseract.js-data/**"
+  - "!node_modules/@napi-rs/**"
+  - "!node_modules/wasm-feature-detect/**"
 
 extraResources:
   - from: .next/standalone

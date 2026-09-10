@@ -6,6 +6,7 @@ import { migration0005 } from "./0005_knowledge_base.ts";
 import { migration0006 } from "./0006_ticket_messages.ts";
 import { migration0007 } from "./0007_chat_messages.ts";
 import { migration0008 } from "./0008_prompt_templates.ts";
+import { migration0009 } from "./0009_chat_message_attachments.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -23,4 +24,5 @@ export const migrations: Migration[] = [
 	migration0006,
 	migration0007,
 	migration0008,
+	migration0009,
 ];

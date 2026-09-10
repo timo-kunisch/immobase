@@ -93,7 +93,7 @@ CREATE TABLE chat_messages (
 	role text NOT NULL,
 	content text NOT NULL,
 	tool_calls text,
-	created_at text NOT NULL,
+	created_at text NOT NULL, attachments text,
 	FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
 );
 

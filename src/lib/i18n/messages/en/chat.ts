@@ -37,6 +37,7 @@ export const chat: typeof deChat = {
 	historyLargeHint:
 		"Since the entire history is sent to the AI with every message, token consumption (and thus cost and response time) increases noticeably. It is recommended to delete the history and start a new conversation. Continuing is blocked from {max} characters.",
 	removeAttachment: "Remove attachment {name}",
+	attachmentHistoryTitle: "File attached to this message (the file content is not stored in the history)",
 	attachTitle: "Attach file (PDF, Office, Excel, images, text/code)",
 	attachAria: "Attach file",
 	placeholderDefault: "Message to the AI… (Enter sends, Shift+Enter for a line break)",
@@ -114,8 +115,14 @@ export const chat: typeof deChat = {
 		"PDF support could not be initialized (details in the server log). Other file types and chat without attachments continue to work.",
 	"attach.pdfOpenFailed": "The PDF file \"{name}\" could not be opened.",
 	"attach.pageMarker": "--- Page {page} ---",
+	"attach.pageMarkerOcr": "--- Page {page} (recognized via OCR) ---",
+	"attach.ocrNotice":
+		"Note: Pages marked \"recognized via OCR\" come from automatic text recognition (scan without a text layer) and may contain recognition errors.",
+	"attach.ocrPagesTruncated": "[... truncated: OCR was only run for the first {max} of {total} pages without a text layer ...]",
 	"attach.pdfNoText":
-		"The PDF file \"{name}\" contains no extractable text (probably a scan without a text layer). Note: As a workaround, convert the PDF into images and attach those.",
+		"The PDF file \"{name}\" contains no extractable text - automatic text recognition (OCR) could not recognize any text either.",
+	"attach.pdfOcrUnavailable":
+		"The PDF file \"{name}\" contains no extractable text (probably a scan without a text layer), and the OCR component is not available on this installation (details in the server log).",
 	"attach.pdfPagesTruncated": "[... truncated: Only the first {max} of {total} pages were included ...]",
 	"attach.pdfPassword": "The PDF file \"{name}\" is password-protected - please remove the protection and attach it again.",
 	"attach.pdfReadFailed": "The PDF file \"{name}\" could not be read (corrupted or not a valid PDF).",

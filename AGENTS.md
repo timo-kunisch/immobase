@@ -216,14 +216,29 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   nicht-streamend sind, sendet der Ursprungsserver bis zum Abschluss der Generierung keinerlei
   Daten; dauert sie zu lange, bricht Cloudflare nach ~100 s mit 524 ab (ein erneuter Versuch geht
   dann häufig durch). Bleibt auch der letzte Versuch ein 504/524, trägt die Fehlermeldung einen
-  Timeout-Hinweis. **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
-  clientseitig als Base64 mitgesendet und serverseitig aufbereitet (`src/lib/ai/attachments.ts`,
-  geteilte Konstanten in `attachment-types.ts` – client-sicher, kein Node-Import): **PDF** via
-  `pdfjs-dist` (**4.x gepinnt** – ab 5.x wird `DOMMatrix` als Browser-Global beim Modul-Import
-  zwingend erwartet, das fehlt im eingebetteten Node der Electron-Shell → Route lädt nicht mehr,
-  HTTP 500. Import daher auch lazy in `attachments.ts`, sodass ein pdfjs-Ladefehler nur
-  PDF-Anhänge betrifft, nicht den Chat. Text je Seite, Scans ohne Textebene werden mit Hinweis
-  abgelehnt), **Excel** (.xlsx/.xlsm) via `exceljs` → Semikolon-CSV je Tabellenblatt,
+   Timeout-Hinweis. **Datei-Anhänge** (z. B. Excel-Tabellen mit Mietern, PDF-Abrechnungen) werden
+   clientseitig als Base64 mitgesendet und serverseitig aufbereitet (`src/lib/ai/attachments.ts`,
+   geteilte Konstanten in `attachment-types.ts` – client-sicher, kein Node-Import): **PDF** via
+   `pdfjs-dist` (**4.x gepinnt** – ab 5.x wird `DOMMatrix` als Browser-Global beim Modul-Import
+   zwingend erwartet, das fehlt im eingebetteten Node der Electron-Shell → Route lädt nicht mehr,
+   HTTP 500. Import daher auch lazy in `attachments.ts`, sodass ein pdfjs-Ladefehler nur
+   PDF-Anhänge betrifft, nicht den Chat). Text je Seite; **Seiten ohne nennenswerte Textebene
+   (Scans) werden automatisch per OCR nachverarbeitet** (`src/lib/ai/ocr.ts`, lazy geladen):
+   pdfjs rastert die Seite (2,5-fache Skalierung, weißer Hintergrund) über `@napi-rs/canvas`
+   (N-API, ABI-stabil → kein Electron-Rebuild nötig; Version an pdfjs' optionalDependency
+   `^0.1.65` ausgerichtet – 1.x segfaultet mit pdfjs 4.10), das PNG läuft durch `tesseract.js`
+   (WASM, OEM.LSTM_ONLY, worker_thread) mit dem **gebündelten deutschen Sprachmodell**
+   (`@tesseract.js-data/deu`, Variante `4.0.0_best_int`, per langPath lokal – vollständig offline;
+   Pfadauflösung per Verzeichnis-Hochlauf ab `import.meta.url`, weil Turbopack `require.resolve`
+   zur Build-Zeit ersetzt). OCR-Seiten sind im Text als „per OCR erkannt" markiert, mit
+   Hinweis-Präambel für das Modell; Schwellwert „keine Textebene" < 20 Zeichen, max. 20
+   OCR-Seiten/Dokument (Kürzungshinweis). Fällt die OCR-Engine aus (z. B. fehlende
+   Plattform-Binary), greift das bisherige Verhalten: Fehlermeldung statt Absturz.
+   Packaging-Falle tesseract.js 7.0.0: `worker-script/node/getCore.js` prüft den
+   `lstmOnly`-Boolean gegen die OEM-Enum-Werte (immer false) und require()t daher IMMER die
+   Nicht-LSTM-Core-Variante (`tesseract-core[-simd|-relaxedsimd]`) – der Standalone-Trace in
+   `next.config.ts` muss genau diese (nicht die `-lstm`-)Varianten enthalten.
+   **Excel** (.xlsx/.xlsm) via `exceljs` → Semikolon-CSV je Tabellenblatt,
   **Word/PowerPoint/OpenDocument** (.docx/.pptx/.odt/.ods/.odp) via `jszip` (Textextraktion aus
   dem XML-Inhalt; ODS-Zellen als Semikolon-Näherung), **Bilder** (.png/.jpg/.gif/.webp) als
   Vision-Input (OpenAI-`image_url`-Content-Parts mit Data-URL – setzt ein multimodales Modell
@@ -242,7 +257,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
    Transaktion). **Fehlgeschlagene Durchläufe** werden ebenfalls persistiert – Nutzerfrage +
    Fehlermeldung mit Rolle `error`, im Dialog als farblich markierte Fehler-Nachricht an
    derselben Stelle; dem Modell werden sie als markierte Assistenten-Notiz mitgesendet.
-   Datei-Anhänge werden nicht gespeichert. Größen-Grenzen (Summe der
+   Von Datei-Anhängen werden nur die **Metadaten** (Name + Größe, JSON-Spalte
+   `chat_messages.attachments`) mit der Nutzer-Nachricht gespeichert und im Verlauf als Chips
+   angezeigt (`AttachmentChipList`) – der Datei-Inhalt wird bewusst nicht gespeichert.
+   Größen-Grenzen (Summe der
    Nachrichten-Zeichen): Ab 100.000 Zeichen (`CHAT_HISTORY_WARNING_CHARS` im Dialog) blendet
    die UI eine Warnung zum steigenden Token-Verbrauch ein und empfiehlt das Löschen; bei
     250.000 Zeichen (`CHAT_HISTORY_HARD_LIMIT_CHARS` in `src/lib/ai/chat-limits.ts`, geteilt)
@@ -433,6 +451,9 @@ src/
     ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
                             # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
+                            # ocr.ts (automatische OCR für PDF-Seiten ohne Textebene:
+                            # pdfjs-Rasterung via @napi-rs/canvas + tesseract.js mit gebündeltem
+                            # deutschen Sprachmodell, offline, lazy geladen),
                             # chat.ts (Tool-Loop über die MCP-Registry), tested-models.ts
                             # (interne Liste erfolgreich getesteter Modelle + unsere Empfehlungen -
                             # nicht gelistete Modelle erhalten in den Einstellungen eine dezente
@@ -510,7 +531,8 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Wissensdatenbank:** `knowledge_base_articles` (einfache Text-Artikel mit optionalem
   Kategorie-Schlagwort; Suche per LIKE über Titel/Kategorie/Inhalt)
 - **KI-Assistent:** `chat_messages` (persistenter Chat-Verlauf pro Nutzer – `user_id` ON
-  DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige, Rolle `error` =
+  DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige, `attachments` als
+  JSON-TEXT mit den Metadaten – Name + Größe – der Datei-Anhänge, Rolle `error` =
   fehlgeschlagene Anfrage als markierte Fehler-Nachricht; bleibt bis zum manuellen Löschen
   im Dialog erhalten, siehe Abschnitt 2), `prompt_templates` (eigene Prompt-Vorlagen pro
   Nutzer; die lokalisierten Vorlagen ab Werk stehen im Code, `src/lib/ai/prompt-templates.ts`)
@@ -646,8 +668,15 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Projektverzeichnisse (`dist`, `dist-electron`, `electron`, `scripts`, `src`, `public`, `build`,
   `.github`) – die Laufzeit braucht nur die kompilierten Chunks; statische Assets kommen via
   `extraResources` ins Paket. Nach Änderungen daran Standalone-Größe (`du -sh .next/standalone`,
-  ~30 MB) und Boot-Test (`node .next/standalone/server.js`, better-sqlite3-Symlink beachten)
-  prüfen.
+  ~120 MB mit dem OCR-Stack für den KI-Chat, der allein ~55 MB beiträgt:
+  @napi-rs/canvas-Binary + tesseract.js-core-WASM + deutsches Sprachmodell; vorher ~30 MB) und
+  Boot-Test (`node .next/standalone/server.js`, better-sqlite3-Symlink beachten) prüfen.
+  Zwei weitere Fallen in dem Zusammenhang: Turbopack wendet Datei-Ausschlüsse unterhalb von
+  `node_modules/tesseract.js-core` NICHT an (die ungenutzten `*.wasm.js`-Single-File-Builds
+  bleiben daher im Trace, ~11 MB totes Gewicht), und electron-builder dupliziert alle
+  `dependencies` zusätzlich in `app.asar` – serverseitige OCR-Pakete sind deshalb in
+  `electron-builder.yml` per `files`-Negation aus app.asar ausgeschlossen (der Main-Prozess
+  require()t sie nie; der Next-Server nutzt ausschließlich den Standalone-Baum).
 - **Tracing-Falle 2 (fehlendes Turbo-Runtime-Modul):** Der Standalone-Trace verfehlt
   `next/dist/compiled/next-server/app-route-turbo.runtime.prod.js` (Runtime aller App-Route-
   Handler), weil Turbopack es nicht als Dependency erkennt – Folge: JEDE Route unter `/api/*`
@@ -671,6 +700,13 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   verschlüsselte Strecke (z. B. VPN) betreiben.
 - **Linux ohne Secret Service**: Dort liegt der Master-Schlüssel nur base64-kodiert in
   `settings.json` (`plain:`-Fallback, Datei 0600) – Schutz dann nur über Dateirechte.
+- **OCR des KI-Chats auf macOS-x64-Paketen (Intel-Mac) nicht verfügbar**: Der macOS-Build
+  erzeugt x64+arm64 aus einem einzigen Runner; das N-API-Binary von `@napi-rs/canvas` wird per
+  optionalDependency nur für die Runner-Architektur installiert – im x64-Paket fehlt es daher
+  (electron-builder kann reine Prebuilt-Pakete nicht pro Architektur nachbauen). Die OCR fällt
+  dort kontrolliert auf die Fehlermeldung „kein extrahierbarer Text" zurück
+  (OcrEngineError-Fallback); Text-PDFs und alle übrigen Anhänge funktionieren uneingeschränkt.
+  Bei Bedarf könnte der Release-Workflow das x64-Paket explizit nachinstallieren.
 - **Keine eigene UI** für Zählerstände (`meters`/`meter_readings`) und Übergabeprotokolle
   (`protocols`) – Tabellen sind vollständig angelegt, aber es gibt noch keine Seiten/Actions dafür.
 - Kein Rollen-Wechsel (`USER` ↔ `ADMIN`) in der Admin-UI, nur der Freigabe-Toggle (`isApproved`).
@@ -680,9 +716,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
   Threading + IMAP-Sync-Stand,
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
-  Fehler-Rolle, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
-  Kaskade),
-  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,
+  Fehler-Rolle/Anhang-Metadaten, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
+  Kaskade),  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,
   Verlauf-Ablage; Mailer gemockt), `src/lib/ticket-ref.test.ts` (Ticket-Kennung im Betreff),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
@@ -694,7 +729,9 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `src/lib/ai/chat.test.ts` (KI-Assistent: Konfiguration inkl.
   Secret-Verschlüsselung, Anhang-Aufbereitung für PDF/Office/Bilder/Excel/Text, Tool-Loop gegen
   gemockten OpenAI-Endpunkt inkl. Vision-Content-Parts, rollenbasierter Werkzeug-Einschränkung und
-  Batch-Ausführung mit UI-Aufschlüsselung der Einzelaufrufe) sowie
+  Batch-Ausführung mit UI-Aufschlüsselung der Einzelaufrufe) und `src/lib/ai/ocr.test.ts`
+  (echter OCR-Durchstich ohne Mocks: Bild-PDF ohne Textebene → pdfjs-Rasterung → tesseract.js)
+  sowie
   `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich) und
   `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.

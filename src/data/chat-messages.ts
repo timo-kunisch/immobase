@@ -1,6 +1,6 @@
 import { getDb } from "./db";
 import { newId, now } from "./helpers";
-import type { ChatMessage, ChatMessageRole, ChatMessageToolCall } from "./types";
+import type { ChatMessage, ChatMessageAttachment, ChatMessageRole, ChatMessageToolCall } from "./types";
 
 /**
  * Repository für den persistenten Chat-Verlauf des KI-Assistenten
@@ -8,17 +8,23 @@ import type { ChatMessage, ChatMessageRole, ChatMessageToolCall } from "./types"
  * gehalten, damit er über Seiten-Neuladen und App-Neustarts hinaus
  * erhalten bleibt - gelöscht wird er nur manuell über den Dialog
  * (clearChatMessages, Papierkorb-Button bzw. Größen-Warnung).
- * Datei-Anhänge werden nicht gespeichert (nur der Begleittext der
- * Nachricht); die Werkzeug-Liste einer Assistenten-Runde dient nur der
- * Anzeige in der UI.
+ * Von Datei-Anhängen werden nur die Metadaten (Name + Größe, JSON in
+ * `attachments`) gespeichert, damit der Verlauf zeigen kann, welche
+ * Dateien an einer Nachricht hingen - der Inhalt fließt nur aufbereitet
+ * in den aktuellen KI-Request (src/lib/ai/attachments.ts). Die
+ * Werkzeug-Liste einer Assistenten-Runde dient nur der Anzeige in der UI.
  */
 
 const CHAT_MESSAGE_COLUMNS = `
-	id, user_id AS userId, role, content, tool_calls AS toolCalls, created_at AS createdAt
+	id, user_id AS userId, role, content, tool_calls AS toolCalls, attachments, created_at AS createdAt
 `;
 
-/** Zeilenform, wie better-sqlite3 sie liefert (toolCalls noch als JSON-TEXT). */
-type ChatMessageRow = Omit<ChatMessage, "role" | "toolCalls"> & { role: string; toolCalls: string | null };
+/** Zeilenform, wie better-sqlite3 sie liefert (toolCalls/attachments noch als JSON-TEXT). */
+type ChatMessageRow = Omit<ChatMessage, "role" | "toolCalls" | "attachments"> & {
+	role: string;
+	toolCalls: string | null;
+	attachments: string | null;
+};
 
 /** Parst die JSON-Spalte tool_calls (defensiv: ungültig/leer -> []). */
 function parseToolCalls(value: string | null): ChatMessageToolCall[] {
@@ -38,8 +44,31 @@ function parseToolCalls(value: string | null): ChatMessageToolCall[] {
 	}
 }
 
+/** Parst die JSON-Spalte attachments (defensiv: ungültig/leer -> []). */
+function parseAttachments(value: string | null): ChatMessageAttachment[] {
+	if (!value) return [];
+	try {
+		const parsed: unknown = JSON.parse(value);
+		if (!Array.isArray(parsed)) return [];
+		return parsed.filter(
+			(entry): entry is ChatMessageAttachment =>
+				typeof entry === "object" &&
+				entry !== null &&
+				typeof (entry as ChatMessageAttachment).name === "string" &&
+				typeof (entry as ChatMessageAttachment).size === "number"
+		);
+	} catch {
+		return [];
+	}
+}
+
 function mapChatMessageRow(row: ChatMessageRow): ChatMessage {
-	return { ...row, role: row.role as ChatMessageRole, toolCalls: parseToolCalls(row.toolCalls) };
+	return {
+		...row,
+		role: row.role as ChatMessageRole,
+		toolCalls: parseToolCalls(row.toolCalls),
+		attachments: parseAttachments(row.attachments),
+	};
 }
 
 /**
@@ -60,6 +89,7 @@ export interface NewChatMessage {
 	role: ChatMessageRole;
 	content: string;
 	toolCalls?: ChatMessageToolCall[];
+	attachments?: ChatMessageAttachment[];
 }
 
 /**
@@ -70,8 +100,8 @@ export interface NewChatMessage {
 export function appendChatMessages(userId: string, messages: NewChatMessage[]): void {
 	const db = getDb();
 	const insert = db.prepare(
-		`INSERT INTO chat_messages (id, user_id, role, content, tool_calls, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)`
+		`INSERT INTO chat_messages (id, user_id, role, content, tool_calls, attachments, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`
 	);
 	db.transaction(() => {
 		for (const message of messages) {
@@ -81,6 +111,7 @@ export function appendChatMessages(userId: string, messages: NewChatMessage[]): 
 				message.role,
 				message.content,
 				message.toolCalls && message.toolCalls.length > 0 ? JSON.stringify(message.toolCalls) : null,
+				message.attachments && message.attachments.length > 0 ? JSON.stringify(message.attachments) : null,
 				now()
 			);
 		}

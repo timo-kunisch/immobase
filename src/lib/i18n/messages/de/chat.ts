@@ -40,6 +40,7 @@ export const chat = {
 	historyLargeHint:
 		"Da der gesamte Verlauf bei jeder Nachricht an die KI mitgesendet wird, steigt der Token-Verbrauch (und damit Kosten und Antwortzeit) spürbar. Es wird empfohlen, den Verlauf zu löschen und ein neues Gespräch zu beginnen. Ab {max} Zeichen wird das Fortsetzen gesperrt.",
 	removeAttachment: "Anhang {name} entfernen",
+	attachmentHistoryTitle: "Datei-Anhang dieser Nachricht (der Datei-Inhalt wird nicht im Verlauf gespeichert)",
 	attachTitle: "Datei anhängen (PDF, Office, Excel, Bilder, Text/Code)",
 	attachAria: "Datei anhängen",
 	placeholderDefault: "Nachricht an die KI… (Enter sendet, Umschalt+Enter für Zeilenumbruch)",
@@ -118,8 +119,14 @@ export const chat = {
 		"Die PDF-Unterstützung konnte nicht initialisiert werden (Details im Server-Log). Andere Dateitypen und der Chat ohne Anhang funktionieren weiterhin.",
 	"attach.pdfOpenFailed": "Die PDF-Datei \"{name}\" konnte nicht geöffnet werden.",
 	"attach.pageMarker": "--- Seite {page} ---",
+	"attach.pageMarkerOcr": "--- Seite {page} (per OCR erkannt) ---",
+	"attach.ocrNotice":
+		"Hinweis: Mit \"per OCR erkannt\" gekennzeichnete Seiten stammen aus einer automatischen Texterkennung (Scan ohne Textebene) und können Erkennungsfehler enthalten.",
+	"attach.ocrPagesTruncated": "[... gekürzt: OCR wurde nur für die ersten {max} von {total} Seiten ohne Textebene ausgeführt ...]",
 	"attach.pdfNoText":
-		"Die PDF-Datei \"{name}\" enthält keinen extrahierbaren Text (vermutlich ein Scan ohne Textebene). Hinweis: Als Workaround die PDF in Bilder umwandeln und diese anhängen.",
+		"Die PDF-Datei \"{name}\" enthält keinen extrahierbaren Text - auch die automatische Texterkennung (OCR) konnte keinen Text erkennen.",
+	"attach.pdfOcrUnavailable":
+		"Die PDF-Datei \"{name}\" enthält keinen extrahierbaren Text (vermutlich ein Scan ohne Textebene), und die OCR-Komponente steht auf dieser Installation nicht zur Verfügung (Details im Server-Log).",
 	"attach.pdfPagesTruncated": "[... gekürzt: Nur die ersten {max} von {total} Seiten wurden übernommen ...]",
 	"attach.pdfPassword": "Die PDF-Datei \"{name}\" ist passwortgeschützt - bitte den Schutz entfernen und erneut anhängen.",
 	"attach.pdfReadFailed": "Die PDF-Datei \"{name}\" konnte nicht gelesen werden (beschädigt oder kein gültiges PDF).",

@@ -13,6 +13,19 @@ import { AttachmentError, processAttachment } from "@/lib/ai/attachments";
 import { ChatError, runChat } from "@/lib/ai/chat";
 import { getAiConfig, isAiConfigured } from "@/lib/ai/config";
 import { registerTool } from "@/lib/mcp/registry";
+import { OcrEngineError, ocrPdfPages } from "@/lib/ai/ocr";
+
+// Die OCR-Engine (tesseract.js/@napi-rs/canvas) wird in dieser Testdatei
+// gemockt - die PDF-Fälle laufen so schnell und deterministisch. Ein
+// echter End-to-End-Durchstich (Rastern + Erkennen) liegt in ocr.test.ts.
+vi.mock("@/lib/ai/ocr", () => {
+	class MockOcrEngineError extends Error {}
+	return {
+		OcrEngineError: MockOcrEngineError,
+		ocrPdfPages: vi.fn(async () => new Map<number, string>()),
+	};
+});
+const ocrPdfPagesMock = vi.mocked(ocrPdfPages);
 
 /**
  * Tests für den KI-Assistenten (src/lib/ai/): Konfiguration (app_settings +
@@ -32,6 +45,9 @@ let testDir: string;
 beforeEach(() => {
 	testDir = fs.mkdtempSync(path.join(os.tmpdir(), "iv-ai-test-"));
 	process.env.APP_DATA_DIR = testDir;
+	// Standard-Verhalten des OCR-Mocks: kein Text erkannt (leere Map).
+	ocrPdfPagesMock.mockReset();
+	ocrPdfPagesMock.mockResolvedValue(new Map());
 });
 
 afterEach(() => {
@@ -147,8 +163,9 @@ describe("Anhang-Verarbeitung (src/lib/ai/attachments.ts)", () => {
 		expect(result.text).toContain("--- Seite 2 ---");
 	});
 
-	it("lehnt PDFs ohne Textebene (Scans) mit Hinweis ab", async () => {
-		// PDF ohne Textinhalt erzeugen (nur leere Seite).
+	it("lehnt PDFs ohne Textebene ab, wenn auch die OCR keinen Text findet", async () => {
+		// PDF ohne Textinhalt erzeugen (nur leere Seite); der OCR-Mock
+		// liefert standardmäßig eine leere Map (kein Text erkannt).
 		const chunks: Buffer[] = [];
 		const pdfDoc = new PDFDocument({ bufferPages: true });
 		pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
@@ -157,7 +174,73 @@ describe("Anhang-Verarbeitung (src/lib/ai/attachments.ts)", () => {
 		pdfDoc.end();
 		await done;
 
-		await expect(processAttachment("scan.pdf", Buffer.concat(chunks).toString("base64"))).rejects.toThrow(/keinen extrahierbaren Text/);
+		await expect(processAttachment("scan.pdf", Buffer.concat(chunks).toString("base64"))).rejects.toThrow(
+			/auch die automatische Texterkennung \(OCR\) konnte keinen Text erkennen/
+		);
+		// Beide Seiten ohne Textebene wurden der OCR-Engine zur
+		// Nachverarbeitung angeboten (pdfkit erzeugt die erste Seite
+		// automatisch, die zweite per addPage).
+		expect(ocrPdfPagesMock).toHaveBeenCalledTimes(1);
+		expect(ocrPdfPagesMock.mock.calls[0][1]).toEqual([1, 2]);
+	});
+
+	it("liest gescannte PDFs ohne Textebene automatisch per OCR", async () => {
+		const chunks: Buffer[] = [];
+		const pdfDoc = new PDFDocument({ bufferPages: true });
+		pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+		const done = new Promise<void>((resolve) => pdfDoc.on("end", resolve));
+		pdfDoc.addPage();
+		pdfDoc.end();
+		await done;
+		ocrPdfPagesMock.mockResolvedValue(new Map([[1, "Mietvertrag Musterweg 5, Kaltmiete 845,30 EUR"]]));
+
+		const result = await processAttachment("scan.pdf", Buffer.concat(chunks).toString("base64"));
+
+		expect(result.kind).toBe("text");
+		if (result.kind !== "text") return;
+		// OCR-Seiten sind als solche markiert und der Hinweis auf
+		// mögliche Erkennungsfehler steht am Anfang.
+		expect(result.text).toContain("--- Seite 1 (per OCR erkannt) ---");
+		expect(result.text).toContain("Mietvertrag Musterweg 5, Kaltmiete 845,30 EUR");
+		expect(result.text.startsWith("Hinweis:")).toBe(true);
+	});
+
+	it("nutzt in gemischten PDFs die Textebene und ergänzt fehlende Seiten per OCR", async () => {
+		// Seite 1 mit Textebene (pdfkit), Seite 2 ohne (leer).
+		const chunks: Buffer[] = [];
+		const pdfDoc = new PDFDocument({ bufferPages: true });
+		pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+		const done = new Promise<void>((resolve) => pdfDoc.on("end", resolve));
+		pdfDoc.fontSize(14).text("Anschreiben mit echter Textebene und genügend Zeichen");
+		pdfDoc.addPage();
+		pdfDoc.end();
+		await done;
+		ocrPdfPagesMock.mockResolvedValue(new Map([[2, "Eingescannter Anhang ohne Textebene"]]));
+
+		const result = await processAttachment("gemischt.pdf", Buffer.concat(chunks).toString("base64"));
+
+		expect(result.kind).toBe("text");
+		if (result.kind !== "text") return;
+		expect(result.text).toContain("--- Seite 1 ---\nAnschreiben mit echter Textebene");
+		expect(result.text).toContain("--- Seite 2 (per OCR erkannt) ---\nEingescannter Anhang ohne Textebene");
+		// Nur die seitenlose Seite 2 wurde der OCR-Engine angeboten.
+		expect(ocrPdfPagesMock).toHaveBeenCalledTimes(1);
+		expect(ocrPdfPagesMock.mock.calls[0][1]).toEqual([2]);
+	});
+
+	it("meldet Scans ohne Textebene gewohnt ab, wenn die OCR-Engine nicht verfügbar ist", async () => {
+		const chunks: Buffer[] = [];
+		const pdfDoc = new PDFDocument({ bufferPages: true });
+		pdfDoc.on("data", (chunk: Buffer) => chunks.push(chunk));
+		const done = new Promise<void>((resolve) => pdfDoc.on("end", resolve));
+		pdfDoc.addPage();
+		pdfDoc.end();
+		await done;
+		ocrPdfPagesMock.mockRejectedValue(new OcrEngineError("Binary fehlt"));
+
+		await expect(processAttachment("scan.pdf", Buffer.concat(chunks).toString("base64"))).rejects.toThrow(
+			/OCR-Komponente steht auf dieser Installation nicht zur Verfügung/
+		);
 	});
 
 	it("extrahiert Text aus DOCX (word/document.xml)", async () => {

@@ -29,7 +29,9 @@ import { cn } from "@/lib/utils";
  * Word-/PowerPoint-Dokumente, Bilder, Text-/Code-Dateien) werden als Base64
  * mitgesendet und serverseitig aufbereitet (src/lib/ai/attachments.ts):
  * Text extrahiert bzw. direkt übernommen, Bilder als Vision-Input
- * durchgereicht.
+ * durchgereicht. Von den Anhängen werden die Metadaten (Name + Größe, nicht
+ * der Inhalt) mit der Nutzer-Nachricht im Verlauf gespeichert, sodass
+ * sichtbar bleibt, welche Dateien angehängt waren (AttachmentChipList).
  *
  * Über den Buch-Button in der Eingabeleiste lässt sich ein Panel mit
  * Prompt-Vorlagen einblenden (prompt-templates-panel.tsx): lokalisierte
@@ -75,6 +77,13 @@ interface ChatMessage {
 	content: string;
 	/** Bei Assistenten-Antworten: die in dieser Runde ausgeführten Werkzeuge. */
 	toolCalls?: ToolCallInfo[];
+	/** Bei Nutzer-Nachrichten: Metadaten der Datei-Anhänge (Name + Größe). */
+	attachments?: AttachmentMeta[];
+}
+
+interface AttachmentMeta {
+	name: string;
+	size: number;
 }
 
 interface PendingAttachment {
@@ -157,6 +166,30 @@ function formatBytes(bytes: number): string {
 	if (bytes < 1024) return `${bytes} B`;
 	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
 	return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * Anhang-Chips unter einer Nutzer-Nachricht im Verlauf: Name + Größe der
+ * an diese Nachricht gehängten Dateien. Nur Metadaten - der Datei-Inhalt
+ * wird nicht im Verlauf gespeichert (Hinweis als Tooltip), die Chips sind
+ * daher bewusst nicht klickbar.
+ */
+function AttachmentChipList({ attachments }: { attachments: AttachmentMeta[] }) {
+	const { t } = useI18n();
+	return (
+		<p className="flex flex-wrap items-center justify-end gap-1 text-xs text-muted-foreground">
+			{attachments.map((attachment, index) => (
+				<span
+					key={index}
+					className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5"
+					title={t("chat.attachmentHistoryTitle")}
+				>
+					<Paperclip className="size-3" />
+					{attachment.name} ({formatBytes(attachment.size)})
+				</span>
+			))}
+		</p>
+	);
 }
 
 /** Zeichenanzahl mit deutschem Tausendertrennzeichen (für die Größen-Warnung). */
@@ -291,7 +324,14 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		const text = input.trim();
 		if (pending || historyHardLimitReached || (!text && attachments.length === 0)) return;
 
-		const userMessage: ChatMessage = { role: "user", content: text || t("chat.attachmentOnly") };
+		const userMessage: ChatMessage = {
+			role: "user",
+			content: text || t("chat.attachmentOnly"),
+			// Metadaten der Anhänge direkt in die optimistische Nachricht -
+			// dieselben Metadaten persistiert die Chat-Route serverseitig,
+			// sodass die Chips auch nach einem Neuladen sichtbar bleiben.
+			attachments: attachments.map(({ name, size }) => ({ name, size })),
+		};
 		const nextMessages = [...messages, userMessage];
 		const sentAttachments = attachments.map(({ name, dataBase64 }) => ({ name, dataBase64 }));
 
@@ -462,6 +502,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 									</div>
 									{message.toolCalls && message.toolCalls.length > 0 ? (
 										<ToolCallList toolCalls={message.toolCalls} />
+									) : null}
+									{message.attachments && message.attachments.length > 0 ? (
+										<AttachmentChipList attachments={message.attachments} />
 									) : null}
 								</div>
 								{message.role === "user" ? <User className="mt-1 size-4 shrink-0 text-muted-foreground" /> : null}

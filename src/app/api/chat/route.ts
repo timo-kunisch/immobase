@@ -132,6 +132,15 @@ export async function POST(request: Request) {
 			);
 		}
 
+		// Von den Datei-Anhängen werden nur die Metadaten (Name + Größe) für
+		// die Verlaufsanzeige persistiert - niemals der Datei-Inhalt. Die
+		// Metadaten stehen in beiden Persistenzpfaden (Erfolg und Fehlschlag)
+		// an derselben Stelle.
+		const attachmentMeta = parsed.attachments.map((attachment) => ({
+			name: attachment.name,
+			size: Buffer.byteLength(attachment.dataBase64, "base64"),
+		}));
+
 		try {
 			// Gespeicherter Verlauf + die neue Nutzernachricht bilden den
 			// Kontext für den KI-Endpunkt. Fehler-Einträge (Rolle "error")
@@ -152,7 +161,7 @@ export async function POST(request: Request) {
 			// Erst nach erfolgreichem Durchlauf persistieren: Nutzerfrage und
 			// Assistenten-Antwort gehören zusammen (eine Transaktion).
 			appendChatMessages(user.id, [
-				{ role: "user", content: parsed.message },
+				{ role: "user", content: parsed.message, attachments: attachmentMeta },
 				{ role: "assistant", content: result.reply, toolCalls: result.toolCalls.map(({ name, ok }) => ({ name, ok })) },
 			]);
 			return NextResponse.json(result);
@@ -169,7 +178,7 @@ export async function POST(request: Request) {
 			// verdecken.
 			try {
 				appendChatMessages(user.id, [
-					{ role: "user", content: parsed.message },
+					{ role: "user", content: parsed.message, attachments: attachmentMeta },
 					{ role: "error", content: message },
 				]);
 			} catch (persistError) {
