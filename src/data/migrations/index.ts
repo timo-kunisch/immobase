@@ -5,6 +5,7 @@ import { migration0004 } from "./0004_calendar_events.ts";
 import { migration0005 } from "./0005_knowledge_base.ts";
 import { migration0006 } from "./0006_ticket_messages.ts";
 import { migration0007 } from "./0007_chat_messages.ts";
+import { migration0008 } from "./0008_prompt_templates.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -21,4 +22,5 @@ export const migrations: Migration[] = [
 	migration0005,
 	migration0006,
 	migration0007,
+	migration0008,
 ];

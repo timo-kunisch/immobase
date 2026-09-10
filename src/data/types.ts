@@ -756,6 +756,22 @@ export interface ChatMessage {
 	createdAt: string;
 }
 
+/**
+ * Eigene Prompt-Vorlage eines Nutzers für den KI-Assistenten (Tabelle
+ * `prompt_templates`): Wiederverwendbarer Textbaustein, der per Klick in
+ * das Eingabefeld des Chat-Dialogs übernommen wird. Die lokalisierten
+ * Vorlagen ab Werk stehen nicht in der Datenbank, sondern im Code
+ * (src/lib/ai/prompt-templates.ts).
+ */
+export interface PromptTemplate {
+	id: string;
+	userId: string;
+	title: string;
+	content: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
 // ============================================================
 // Aktivitätsprotokoll (Audit Log)
 // ============================================================

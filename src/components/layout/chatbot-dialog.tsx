@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, TriangleAlert, User, Wrench, X } from "lucide-react";
+import { BookMarked, Bot, Loader2, MessageCircle, Paperclip, SendHorizontal, Trash2, TriangleAlert, User, Wrench, X } from "lucide-react";
 
 import { MarkdownContent } from "@/components/layout/markdown-content";
+import { PromptTemplatesPanel } from "@/components/layout/prompt-templates-panel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -29,6 +30,13 @@ import { cn } from "@/lib/utils";
  * mitgesendet und serverseitig aufbereitet (src/lib/ai/attachments.ts):
  * Text extrahiert bzw. direkt übernommen, Bilder als Vision-Input
  * durchgereicht.
+ *
+ * Über den Buch-Button in der Eingabeleiste lässt sich ein Panel mit
+ * Prompt-Vorlagen einblenden (prompt-templates-panel.tsx): lokalisierte
+ * Vorlagen ab Werk (src/lib/ai/prompt-templates.ts) plus eigene Vorlagen
+ * des Nutzers (Tabelle prompt_templates, Route /api/chat/prompt-templates).
+ * Per Klick wird der Vorlagentext ins Eingabefeld übernommen (bei bereits
+ * vorhandenem Text mit Leerzeile angehängt).
  *
  * Der Gesprächsverlauf wird serverseitig pro Nutzer persistiert (Tabelle
  * chat_messages, Zugriff über /api/chat/history) und bleibt über das
@@ -166,6 +174,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const [pending, setPending] = useState(false);
 	const [clearing, setClearing] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// Ein-/Ausblenden des Vorlagen-Panels über dem Eingabefeld (Buch-Button
+	// in der Eingabeleiste).
+	const [templatesOpen, setTemplatesOpen] = useState(false);
 	// In-App-Benachrichtigung, wenn eine Antwort bei GESCHLOSSENEM Dialog
 	// fertig wird (success) bzw. fehlschlägt (error) - als Karte unten rechts
 	// plus Hinweispunkt auf dem Sprechblasen-Button.
@@ -342,6 +353,18 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	}
 
 	/**
+	 * Übernimmt eine Prompt-Vorlage ins Eingabefeld: Bei leerem Feld wird
+	 * der Text gesetzt, bei vorhandenem Text mit Leerzeile angehängt, damit
+	 * bereits Getipptes nicht verloren geht. Danach wird das Panel
+	 * zugeklappt und der Fokus ins Eingabefeld gesetzt.
+	 */
+	function handleInsertTemplate(content: string) {
+		setInput((current) => (current.trim() ? `${current.trimEnd()}\n\n${content}` : content));
+		setTemplatesOpen(false);
+		textareaRef.current?.focus();
+	}
+
+	/**
 	 * Löscht den gesamten Chatverlauf - serverseitig (chat_messages) und
 	 * lokal. Bewusst der einzige Weg, den Verlauf zu beenden: Er übersteht
 	 * sonst Dialog-Schließen, Neuladen und App-Neustarts.
@@ -513,6 +536,11 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 
 					{error ? <p className="text-sm text-destructive">{error}</p> : null}
 
+					{/* Vorlagen-Panel (eingeblendet über den Buch-Button in der
+					    Eingabeleiste): Werk-Vorlagen + eigene Vorlagen, per Klick
+					    ins Eingabefeld übernehmbar. */}
+					{templatesOpen && !historyHardLimitReached ? <PromptTemplatesPanel onInsert={handleInsertTemplate} /> : null}
+
 					<div className="flex items-end gap-2">
 						<input
 							ref={fileInputRef}
@@ -532,6 +560,19 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							onClick={() => fileInputRef.current?.click()}
 						>
 							<Paperclip className="size-4" />
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon-sm"
+							title={t("chat.templates.buttonTitle")}
+							aria-label={t("chat.templates.buttonAria")}
+							aria-expanded={templatesOpen}
+							disabled={pending || historyHardLimitReached}
+							onClick={() => setTemplatesOpen((value) => !value)}
+							className={templatesOpen ? "bg-muted" : undefined}
+						>
+							<BookMarked className="size-4" />
 						</Button>
 						<Textarea
 							ref={textareaRef}

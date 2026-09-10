@@ -144,4 +144,60 @@ export const chat = {
 		"System-Hinweis: Das Werkzeug-Budget ist erschöpft - dir stehen keine weiteren Werkzeugaufrufe zur Verfügung. Antworte dem Nutzer jetzt abschließend: Fasse knapp zusammen, was du bereits erledigt bzw. herausgefunden hast, benenne konkret, was noch offen ist, und weise darauf hin, dass der Nutzer die Fortsetzung mit \"weiter\" (oder einer konkreten Folgeanweisung) anstoßen kann.",
 	"budget.fallbackReply":
 		"Das Werkzeug-Budget von {max} Runden ist erschöpft. Es wurden {total} Werkzeugaufrufe ausgeführt (davon {failed} fehlgeschlagen). Schreiben Sie \"weiter\", damit der Assistent fortfährt - oder formulieren Sie die Anfrage konkreter.",
+	// Prompt-Vorlagen (Button im Eingabebereich): Wiederverwendbare
+	// Textbausteine - Werk-Vorlagen aus src/lib/ai/prompt-templates.ts
+	// (Texte unten unter templates.defaults.*) plus eigene Vorlagen des
+	// Nutzers (Tabelle prompt_templates, Route /api/chat/prompt-templates).
+	"templates.buttonTitle": "Prompt-Vorlagen",
+	"templates.buttonAria": "Prompt-Vorlagen ein- oder ausblenden",
+	"templates.title": "Prompt-Vorlagen",
+	"templates.hint": "Per Klick wird eine Vorlage in das Eingabefeld übernommen.",
+	"templates.insert": "In das Eingabefeld übernehmen",
+	"templates.defaultBadge": "Ab Werk",
+	"templates.emptyMine": "Noch keine eigenen Vorlagen angelegt.",
+	"templates.new": "Neue Vorlage",
+	"templates.edit": "Vorlage bearbeiten",
+	"templates.delete": "Vorlage löschen",
+	"templates.deleteConfirm": "Wirklich löschen?",
+	"templates.formTitleNew": "Neue Vorlage anlegen",
+	"templates.formTitleEdit": "Vorlage bearbeiten",
+	"templates.namePlaceholder": "Titel der Vorlage",
+	"templates.contentPlaceholder": "Vorlagentext - wird per Klick in das Eingabefeld übernommen…",
+	"templates.validation": "Bitte Titel und Text ausfüllen (Titel max. {maxTitle} Zeichen, Text max. {maxContent} Zeichen).",
+	"templates.loading": "Vorlagen werden geladen…",
+	"templates.loadFailed": "Die Vorlagen konnten nicht geladen werden (HTTP {status}).",
+	"templates.saveFailed": "Die Vorlage konnte nicht gespeichert werden (HTTP {status}).",
+	"templates.deleteFailed": "Die Vorlage konnte nicht gelöscht werden (HTTP {status}).",
+	// Route /api/chat/prompt-templates: Fehlermeldungen an den Client
+	"templates.route.invalidPayload":
+		"Erwartet werden ein nicht-leerer Titel (max. {maxTitle} Zeichen) und ein nicht-leerer Text (max. {maxContent} Zeichen).",
+	"templates.route.limitReached": "Es sind höchstens {max} eigene Vorlagen erlaubt.",
+	"templates.route.invalidId": "Ungültige oder fehlende Vorlagen-ID.",
+	"templates.route.notFound": "Die Vorlage wurde nicht gefunden.",
+	"templates.route.loadFailed": "Die Vorlagen konnten nicht geladen werden (Details im Server-Log).",
+	"templates.route.saveFailed": "Die Vorlage konnte nicht gespeichert werden (Details im Server-Log).",
+	"templates.route.deleteFailed": "Die Vorlage konnte nicht gelöscht werden (Details im Server-Log).",
+	// Vorlagen ab Werk (lokalisiert, für alle Nutzer; nicht editierbar).
+	// Die erste Vorlage ist der zentrale Datei-Import: Der Nutzer hängt nur
+	// noch eine Datei an, das Modell extrahiert die Daten und pflegt sie
+	// über die MCP-Werkzeuge ein.
+	"templates.defaults.fileImport.title": "Datei importieren (Mieter, Verträge & Co.)",
+	"templates.defaults.fileImport.content":
+		"Analysiere die angehängte Datei und übernimm die enthaltenen Daten vollständig in ImmoBase. Gehe dabei so vor:\n" +
+		"1. Verschaffe dir einen Überblick über Aufbau und Inhalt der Datei.\n" +
+		"2. Prüfe mit den *_list-Werkzeugen, welche referenzierten Datensätze (z. B. Liegenschaften, Einheiten, Mieter) bereits existieren, und verwende deren IDs, statt Duplikate anzulegen.\n" +
+		"3. Lege alle fehlenden Datensätze mit den passenden *_create-Werkzeugen an und verknüpfe sie korrekt (z. B. Mieter und Mietvertrag mit der richtigen Einheit).\n" +
+		"4. Fasse abschließend knapp zusammen: Was wurde angelegt, was existierte bereits, was konnte nicht übernommen werden (und warum)?",
+	"templates.defaults.arrears.title": "Offene Zahlungsrückstände",
+	"templates.defaults.arrears.content":
+		"Erstelle eine Übersicht aller offenen und überfälligen Zahlungen (Mieteingänge und Hausgeld), gruppiert nach Liegenschaft. Nenne je Posten Mieter bzw. Eigentümer, Einheit, Fälligkeitsdatum und offenen Betrag. Schließe mit der Gesamtsumme aller Rückstände ab.",
+	"templates.defaults.vacancies.title": "Leerstands-Übersicht",
+	"templates.defaults.vacancies.content":
+		"Liste alle aktuell nicht vermieteten Einheiten auf: Liegenschaft, Bezeichnung der Einheit, Wohnfläche und seit wann die Einheit leer steht (Ende des letzten Mietvertrags). Nenne am Ende die Anzahl der betroffenen Einheiten.",
+	"templates.defaults.leaseExpiry.title": "Auslaufende Mietverträge prüfen",
+	"templates.defaults.leaseExpiry.content":
+		"Prüfe alle Mietverträge: Welche laufen in den nächsten sechs Monaten aus oder sind bereits beendet? Liste sie mit Mieter, Einheit, Liegenschaft und Enddatum, sortiert nach Enddatum, und weise auf Verträge hin, zu denen noch kein Folgevertrag existiert.",
+	"templates.defaults.meetingPrep.title": "Eigentümerversammlung vorbereiten (WEG)",
+	"templates.defaults.meetingPrep.content":
+		"Hilf mir, die nächste Eigentümerversammlung vorzubereiten: Zeige zuerst, für welche WEGs Versammlungen anstehen oder zuletzt stattgefunden haben, und liste die Beschlüsse des laufenden Jahres. Schlage mir anschließend eine Tagesordnung mit den üblichen Punkten vor (Genehmigung der Jahresabrechnung, Wirtschaftsplan, Stand der Erhaltungsrücklage, Instandhaltungsmaßnahmen, Versicherungen).",
 };

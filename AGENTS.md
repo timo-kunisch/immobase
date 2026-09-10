@@ -243,7 +243,16 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
     die Antwort bei geschlossenem Dialog fertig (oder schlägt sie fehl), erscheint eine
     In-App-Benachrichtigung (Karte unten rechts, `replyNotice`) plus Hinweispunkt auf dem
     Sprechblasen-Button – quittiert durch Öffnen des Chats, Wegklicken oder die nächste
-    Nachricht.
+    Nachricht. **Prompt-Vorlagen** (Buch-Button im Eingabebereich, Panel
+    `src/components/layout/prompt-templates-panel.tsx`): Wiederverwendbare Textbausteine, die
+    per Klick ins Eingabefeld übernommen werden (bei vorhandenem Text angehängt). Es gibt
+    lokalisierte **Vorlagen ab Werk** (Konstanten in `src/lib/ai/prompt-templates.ts` –
+    client-sicher, Titel/Text als i18n-Schlüssel `chat.templates.defaults.*`; nicht editierbar;
+    die erste ist der Datei-Import: Datei anhängen, das Modell extrahiert und pflegt die Daten
+    über die MCP-Werkzeuge ein) und **eigene Vorlagen pro Nutzer** (Tabelle `prompt_templates`,
+    Repository `src/data/prompt-templates.ts` – strikt user_id-scoped, Route
+    `src/app/api/chat/prompt-templates/route.ts` mit GET/POST/PUT/DELETE; Limits in
+    `src/lib/ai/prompt-templates.ts`: Titel 100 / Text 4000 Zeichen, max. 50 je Nutzer).
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -374,6 +383,7 @@ src/
     api/mcp/route.ts        # MCP-Endpunkt (Bearer-Token, optional aktivierbar)
     api/chat/route.ts       # KI-Assistent-Chat (Session, alle Nutzer; Rolle bestimmt Werkzeug-Scope)
     api/chat/history/route.ts  # Persistenter Chat-Verlauf (GET laden / DELETE löschen, pro Nutzer)
+    api/chat/prompt-templates/route.ts  # Eigene Prompt-Vorlagen (CRUD, pro Nutzer)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
@@ -491,7 +501,8 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **KI-Assistent:** `chat_messages` (persistenter Chat-Verlauf pro Nutzer – `user_id` ON
   DELETE CASCADE, `tool_calls` als JSON-TEXT nur für die UI-Anzeige, Rolle `error` =
   fehlgeschlagene Anfrage als markierte Fehler-Nachricht; bleibt bis zum manuellen Löschen
-  im Dialog erhalten, siehe Abschnitt 2)
+  im Dialog erhalten, siehe Abschnitt 2), `prompt_templates` (eigene Prompt-Vorlagen pro
+  Nutzer; die lokalisierten Vorlagen ab Werk stehen im Code, `src/lib/ai/prompt-templates.ts`)
 - **Einstellungen:** `company_settings` (Singleton, feste `id = "singleton"`), `app_settings`
   (technische Key/Value-Konfiguration: SMTP, LetterXpress, KI-Endpunkt, URL-Overrides – keine Fachdaten;
   Geheimnisse wie `smtp.pass`/`letterxpress.apikey`/`ai.apikey` sind feldverschlüsselt, transparent über
@@ -658,7 +669,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
   Threading + IMAP-Sync-Stand,
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
-  Fehler-Rolle),
+  Fehler-Rolle, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
+  Kaskade),
   `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,
   Verlauf-Ablage; Mailer gemockt), `src/lib/ticket-ref.test.ts` (Ticket-Kennung im Betreff),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),

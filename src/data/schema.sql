@@ -451,6 +451,16 @@ CREATE TABLE postal_shipments (
 	FOREIGN KEY (requested_by_user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
 );
 
+CREATE TABLE prompt_templates (
+	id text PRIMARY KEY NOT NULL,
+	user_id text NOT NULL,
+	title text NOT NULL,
+	content text NOT NULL,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE cascade
+);
+
 CREATE TABLE properties (
 	id text PRIMARY KEY NOT NULL,
 	name text NOT NULL,
@@ -744,6 +754,8 @@ CREATE UNIQUE INDEX password_reset_tokens_identifier_token_key ON password_reset
 CREATE UNIQUE INDEX password_reset_tokens_token_unique ON password_reset_tokens (token);
 
 CREATE INDEX postal_shipments_source_idx ON postal_shipments (source_type, source_id);
+
+CREATE INDEX prompt_templates_user_idx ON prompt_templates (user_id);
 
 CREATE INDEX protocols_lease_id_idx ON protocols (lease_id);
 

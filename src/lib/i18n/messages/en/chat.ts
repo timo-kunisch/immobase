@@ -138,4 +138,59 @@ export const chat: typeof deChat = {
 		"System note: The tool budget is exhausted - no further tool calls are available to you. Now give the user a final answer: briefly summarize what you have already completed or found out, state concretely what is still open, and point out that the user can trigger the continuation with \"continue\" (or a concrete follow-up instruction).",
 	"budget.fallbackReply":
 		"The tool budget of {max} rounds is exhausted. {total} tool calls were executed ({failed} of them failed). Write \"continue\" so the assistant proceeds - or phrase the request more specifically.",
+	// Prompt templates (button in the input area): reusable text snippets -
+	// factory templates from src/lib/ai/prompt-templates.ts (texts below
+	// under templates.defaults.*) plus the user's own templates (table
+	// prompt_templates, route /api/chat/prompt-templates).
+	"templates.buttonTitle": "Prompt templates",
+	"templates.buttonAria": "Show or hide prompt templates",
+	"templates.title": "Prompt templates",
+	"templates.hint": "Click a template to insert it into the input field.",
+	"templates.insert": "Insert into the input field",
+	"templates.defaultBadge": "Built-in",
+	"templates.emptyMine": "No custom templates created yet.",
+	"templates.new": "New template",
+	"templates.edit": "Edit template",
+	"templates.delete": "Delete template",
+	"templates.deleteConfirm": "Really delete?",
+	"templates.formTitleNew": "Create new template",
+	"templates.formTitleEdit": "Edit template",
+	"templates.namePlaceholder": "Template title",
+	"templates.contentPlaceholder": "Template text - inserted into the input field on click…",
+	"templates.validation": "Please fill in title and text (title max. {maxTitle} characters, text max. {maxContent} characters).",
+	"templates.loading": "Loading templates…",
+	"templates.loadFailed": "The templates could not be loaded (HTTP {status}).",
+	"templates.saveFailed": "The template could not be saved (HTTP {status}).",
+	"templates.deleteFailed": "The template could not be deleted (HTTP {status}).",
+	// Route /api/chat/prompt-templates: error messages to the client
+	"templates.route.invalidPayload":
+		"Expected a non-empty title (max. {maxTitle} characters) and a non-empty text (max. {maxContent} characters).",
+	"templates.route.limitReached": "At most {max} custom templates are allowed.",
+	"templates.route.invalidId": "Invalid or missing template ID.",
+	"templates.route.notFound": "The template was not found.",
+	"templates.route.loadFailed": "The templates could not be loaded (details in the server log).",
+	"templates.route.saveFailed": "The template could not be saved (details in the server log).",
+	"templates.route.deleteFailed": "The template could not be deleted (details in the server log).",
+	// Built-in templates (localized, for all users; not editable). The first
+	// template is the central file import: the user just attaches a file,
+	// the model extracts the data and imports it via the MCP tools.
+	"templates.defaults.fileImport.title": "Import file (tenants, leases & more)",
+	"templates.defaults.fileImport.content":
+		"Analyze the attached file and import all contained data into ImmoBase. Proceed as follows:\n" +
+		"1. Get an overview of the structure and content of the file.\n" +
+		"2. Use the *_list tools to check which referenced records (e.g. properties, units, tenants) already exist and reuse their IDs instead of creating duplicates.\n" +
+		"3. Create all missing records with the appropriate *_create tools and link them correctly (e.g. tenant and lease to the right unit).\n" +
+		"4. Finally, summarize briefly: what was created, what already existed, what could not be imported (and why)?",
+	"templates.defaults.arrears.title": "Outstanding payment arrears",
+	"templates.defaults.arrears.content":
+		"Create an overview of all open and overdue payments (rent payments and housing charges), grouped by property. For each item, state the tenant or owner, the unit, the due date and the outstanding amount. Finish with the total sum of all arrears.",
+	"templates.defaults.vacancies.title": "Vacancy overview",
+	"templates.defaults.vacancies.content":
+		"List all units that are currently not rented out: property, unit name, living space and since when the unit has been vacant (end of the last lease). Finally state the number of affected units.",
+	"templates.defaults.leaseExpiry.title": "Check expiring leases",
+	"templates.defaults.leaseExpiry.content":
+		"Check all leases: which expire within the next six months or have already ended? List them with tenant, unit, property and end date, sorted by end date, and point out leases for which no follow-up lease exists yet.",
+	"templates.defaults.meetingPrep.title": "Prepare owners' meeting (HOA)",
+	"templates.defaults.meetingPrep.content":
+		"Help me prepare the next owners' meeting: first show for which HOAs meetings are upcoming or have recently taken place, and list this year's resolutions. Then propose an agenda with the usual items (approval of the annual statement, economic plan, status of the reserve fund, maintenance measures, insurances).",
 };
