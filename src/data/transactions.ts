@@ -170,23 +170,36 @@ export function listTransactionsPage(filter: TransactionFilter = {}, page: { lim
 }
 
 /**
- * Beträge (Decimal-Strings) aller fälligen/überfälligen Zahlungen
+ * Offene Restbeträge (Decimal-Strings) aller fälligen/überfälligen Zahlungen
  * (Status OPEN/OVERDUE, Fälligkeit <= `date`), optional auf einen Vertrag
  * eingegrenzt - analog zu listRentArrearAmounts in dashboard.ts, hier mit
  * Lease-Filter für die Rückstands-Karte auf /finanzen (unabhängig von der
- * aktuell angezeigten Seite). Die Summe wird im Aufrufer gebildet.
+ * aktuell angezeigten Seite). Bereits zugeordnete Teilzahlungen aus der
+ * Buchhaltung (Buchungszeilen gegen die Sollstellung) werden abgezogen -
+ * der Rückstand zeigt den verbleibenden offenen Rest, nicht den vollen
+ * Sollbetrag. Vollständig zugeordnete Sollstellungen sind PAID und fallen
+ * ohnehin nicht mehr unter den Filter. Die Summe wird im Aufrufer gebildet.
  */
 export function listOpenTransactionArrearAmounts(date: Date, filter: { leaseId?: string } = {}): string[] {
-	const conditions = ["status IN ('OPEN', 'OVERDUE')", "due_date <= ?"];
+	const conditions = ["tr.status IN ('OPEN', 'OVERDUE')", "tr.due_date <= ?"];
 	const params: string[] = [date.toISOString()];
 	if (filter.leaseId) {
-		conditions.push("lease_id = ?");
+		conditions.push("tr.lease_id = ?");
 		params.push(filter.leaseId);
 	}
 	const rows = getDb()
-		.prepare(`SELECT amount FROM transactions WHERE ${conditions.join(" AND ")}`)
-		.all(...params) as { amount: string }[];
-	return rows.map((row) => row.amount);
+		.prepare(
+			`SELECT tr.amount,
+			 		COALESCE((SELECT SUM(a.amount) FROM bank_transaction_allocations a WHERE a.transaction_id = tr.id), 0) AS allocated
+			 FROM transactions tr WHERE ${conditions.join(" AND ")}`
+		)
+		.all(...params) as { amount: string; allocated: string | number }[];
+	const remainders: string[] = [];
+	for (const row of rows) {
+		const remainderCents = Math.round(Number(row.amount) * 100) - Math.round(Number(row.allocated) * 100);
+		if (remainderCents > 0) remainders.push((remainderCents / 100).toFixed(2));
+	}
+	return remainders;
 }
 
 /** Einzelne Zahlung inkl. Vertrags-Relationen (für Detailabfragen). */

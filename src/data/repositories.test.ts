@@ -34,7 +34,8 @@ import { createLease, createRentAdjustment, listLeasesWithDetails } from "@/data
 import { createProperty, deleteProperty, getProperty, getPropertyStats, listProperties, updateProperty } from "@/data/properties";
 import { insertSession, deleteAllSessionsForUser, getSessionByToken } from "@/data/sessions";
 import { createTenant } from "@/data/tenants";
-import { createTransaction, generateDueTransactions, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
+import { listRentArrearAmounts } from "@/data/dashboard";
+import { createTransaction, generateDueTransactions, listOpenTransactionArrearAmounts, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
 import { createUnit } from "@/data/units";
 import { countUsers, createUser, getUserByEmail, listAdminEmails, updateUserApproval } from "@/data/users";
 
@@ -372,8 +373,10 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 		expect(listBankTransactions({ propertyId: property.id, status: "RECONCILED" })).toHaveLength(1);
 		expect(listBankTransactions({ propertyId: property.id, status: "OPEN" })).toHaveLength(0);
 
-		// Die bezahlte Sollstellung taucht nicht mehr unter den offenen auf.
+		// Die bezahlte Sollstellung taucht nicht mehr unter den offenen auf
+		// und erzeugt auch keinen Rückstand mehr.
 		expect(listOpenTransactionsForProperty(property.id)).toHaveLength(0);
+		expect(listOpenTransactionArrearAmounts(new Date("2026-02-15T00:00:00.000Z"))).toEqual([]);
 
 		// Löschen der Banktransaktion entfernt die Zuordnung: Die Sollstellung
 		// ist wieder offen (Buchungsevidenz weg).
@@ -410,6 +413,13 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 		const transactionAfter = listTransactions({ leaseId: lease.id })[0];
 		expect(transactionAfter.status).toBe("OPEN");
 		expect(transactionAfter.paidDate).toBeNull();
+
+		// Rückstände (Finanzen + Dashboard) zeigen nur den verbleibenden
+		// offenen Rest: 950 € Sollbetrag abzüglich 500 € zugeordneter
+		// Teilzahlung aus der Buchhaltung.
+		const now = new Date("2026-02-15T00:00:00.000Z");
+		expect(listOpenTransactionArrearAmounts(now)).toEqual(["450.00"]);
+		expect(listRentArrearAmounts(now)).toEqual(["450.00"]);
 	});
 
 	it("deleteBillingPeriodWithArtifacts entfernt auch finalisierte Perioden samt Statements und Protokollen", async () => {

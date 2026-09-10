@@ -137,15 +137,28 @@ export function listActiveLeasesForRent(date: Date): DashboardActiveLease[] {
 }
 
 /**
- * Beträge (Decimal-Strings) aller fälligen/überfälligen Mieteingänge
- * (Status OPEN/OVERDUE, Fälligkeit <= `date`). Die Summe wird bewusst im
- * Aufrufer gebildet (bisheriges Verhalten: Number()-Addition in JS).
+ * Offene Restbeträge (Decimal-Strings) aller fälligen/überfälligen
+ * Mieteingänge (Status OPEN/OVERDUE, Fälligkeit <= `date`). Bereits
+ * zugeordnete Teilzahlungen aus der Buchhaltung (Buchungszeilen gegen die
+ * Sollstellung) werden abgezogen - analog zu
+ * listOpenTransactionArrearAmounts in transactions.ts. Die Summe wird
+ * bewusst im Aufrufer gebildet (bisheriges Verhalten: Number()-Addition
+ * in JS).
  */
 export function listRentArrearAmounts(date: Date): string[] {
 	const rows = getDb()
-		.prepare("SELECT amount FROM transactions WHERE status IN ('OPEN', 'OVERDUE') AND due_date <= ?")
-		.all(date.toISOString()) as { amount: string }[];
-	return rows.map((row) => row.amount);
+		.prepare(
+			`SELECT tr.amount,
+					COALESCE((SELECT SUM(a.amount) FROM bank_transaction_allocations a WHERE a.transaction_id = tr.id), 0) AS allocated
+			 FROM transactions tr WHERE tr.status IN ('OPEN', 'OVERDUE') AND tr.due_date <= ?`
+		)
+		.all(date.toISOString()) as { amount: string; allocated: string | number }[];
+	const remainders: string[] = [];
+	for (const row of rows) {
+		const remainderCents = Math.round(Number(row.amount) * 100) - Math.round(Number(row.allocated) * 100);
+		if (remainderCents > 0) remainders.push((remainderCents / 100).toFixed(2));
+	}
+	return remainders;
 }
 
 /**
