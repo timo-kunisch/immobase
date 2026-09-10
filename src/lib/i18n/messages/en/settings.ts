@@ -303,6 +303,10 @@ export const settings: typeof deSettings = {
 	"cards.ai.model": "Model",
 	"cards.ai.modelHint":
 		"The model must support tool calls (function/tool calling) so the assistant can access the app data. For attached images, a multimodal (\"vision\"-capable) model is additionally required.",
+	"cards.ai.modelRecommendation":
+		"Our recommendation as of now: {cloudModel} (cloud endpoint) - for local AI at least {localModel}.",
+	"cards.ai.modelUntested":
+		"This model has not been tested yet. It must support tool calls (function/tool calling); behavior and response quality may vary.",
 	"cards.ai.apiKey": "API key (optional)",
 	"cards.ai.apiKeyPlaceholderSet": "stored - leave empty to keep it",
 	"cards.ai.apiKeyHint": "Stored encrypted. Local endpoints (e.g. LM Studio, Ollama) usually work without a key.",

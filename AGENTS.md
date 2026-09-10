@@ -412,7 +412,10 @@ src/
     ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
                             # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
-                            # chat.ts (Tool-Loop über die MCP-Registry)
+                            # chat.ts (Tool-Loop über die MCP-Registry), tested-models.ts
+                            # (interne Liste erfolgreich getesteter Modelle + unsere Empfehlungen -
+                            # nicht gelistete Modelle erhalten in den Einstellungen eine dezente
+                            # Warnung, keine Sperre; client-sicher)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
     i18n/                   # Mehrsprachigkeit (de/en): config.ts (Locales/Cookie), translator.ts
                             # (t()-Fabrik, typsichere Schlüssel), server.ts (getLocale/getT via

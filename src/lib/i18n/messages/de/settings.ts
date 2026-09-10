@@ -309,6 +309,10 @@ export const settings = {
 	"cards.ai.model": "Modell",
 	"cards.ai.modelHint":
 		"Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen, damit der Assistent auf die App-Daten zugreifen kann. Für angehängte Bilder ist zusätzlich ein multimodales („vision“-fähiges) Modell nötig.",
+	"cards.ai.modelRecommendation":
+		"Unsere Empfehlung nach derzeitigem Stand: {cloudModel} (Cloud-Endpunkt) - für lokale KI mindestens {localModel}.",
+	"cards.ai.modelUntested":
+		"Dieses Modell wurde noch nicht getestet. Es muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen; Verhalten und Antwortqualität können abweichen.",
 	"cards.ai.apiKey": "API-Schlüssel (optional)",
 	"cards.ai.apiKeyPlaceholderSet": "hinterlegt - leer lassen, um ihn beizubehalten",
 	"cards.ai.apiKeyHint": "Wird verschlüsselt gespeichert. Lokale Endpunkte (z. B. LM Studio, Ollama) kommen meist ohne Schlüssel aus.",

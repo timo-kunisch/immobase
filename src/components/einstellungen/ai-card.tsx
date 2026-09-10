@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { Loader2, Save, ShieldAlert, Sparkles } from "lucide-react";
+import { Loader2, Save, ShieldAlert, Sparkles, TriangleAlert } from "lucide-react";
 
 import { saveAiSettingsAction } from "@/app/(app)/einstellungen/actions";
+import { isTestedAiModel, RECOMMENDED_AI_MODEL, RECOMMENDED_LOCAL_AI_MODEL } from "@/lib/ai/tested-models";
 import { Guide, GuideStep } from "@/components/einstellungen/guide";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,10 @@ export function AiCard({ state }: { state: AiCardState }) {
 	// den (geänderten) Freigabestatus der Sprechblase übernimmt (Muster wie
 	// beim MCP-Toggle in mcp-card.tsx).
 	const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	// Live-Prüfung des eingetragenen Modells gegen die intern getestete Liste:
+	// Nicht getestete Modelle erhalten eine dezente Warnung (keine Sperre).
+	const [model, setModel] = useState(state.model);
+	const showUntestedModelWarning = model.trim() !== "" && !isTestedAiModel(model);
 
 	useEffect(() => {
 		if (formState.success && !reloadTimer.current) {
@@ -141,10 +146,29 @@ export function AiCard({ state }: { state: AiCardState }) {
 					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="aiModel">{t("settings.cards.ai.model")}</Label>
-						<Input id="aiModel" name="aiModel" defaultValue={state.model} placeholder="gpt-4o-mini" autoComplete="off" />
+						<Input
+							id="aiModel"
+							name="aiModel"
+							value={model}
+							onChange={(event) => setModel(event.target.value)}
+							placeholder={RECOMMENDED_AI_MODEL}
+							autoComplete="off"
+						/>
 						<p className="text-xs text-muted-foreground">
 							{t("settings.cards.ai.modelHint")}
 						</p>
+						<p className="text-xs text-muted-foreground">
+							{t("settings.cards.ai.modelRecommendation", {
+								cloudModel: RECOMMENDED_AI_MODEL,
+								localModel: RECOMMENDED_LOCAL_AI_MODEL,
+							})}
+						</p>
+						{showUntestedModelWarning ? (
+							<p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+								<TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+								<span>{t("settings.cards.ai.modelUntested")}</span>
+							</p>
+						) : null}
 					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="aiApiKey">{t("settings.cards.ai.apiKey")}</Label>
