@@ -98,8 +98,9 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
 - **Ticket-Postfach (IMAP-Empfang, „Mini-Zendesk")** – **optionale Online-Funktion**: Der Admin
   hinterlegt einen IMAP-Server unter Einstellungen → Integrationen & KI (`imap.host/.port/.secure/.user/
   .mailbox` Klartext, `imap.pass` feldverschlüsselt in `SECRET_SETTING_KEYS`; Env-Fallbacks
-  `IMAP_HOST` etc.; `src/lib/email/imap.ts`, `isImapConfigured()`). Wenn konfiguriert, erscheint das
-  Modul `/postfach` in der Sidebar: `src/lib/email/imap-sync.ts` ruft neue Nachrichten per
+  `IMAP_HOST` etc.; `src/lib/email/imap.ts`, `isImapConfigured()`). Das Modul `/postfach` ist in
+  der Sidebar immer sichtbar, aber ohne IMAP-Konfiguration deaktiviert (Hinweis als Tooltip):
+  `src/lib/email/imap-sync.ts` ruft neue Nachrichten per
   `imapflow` ab (inkrementell über UID, Stand in `imap_sync_state`; UIDVALIDITY-Wechsel =
   Neuabgleich), parst sie mit `mailparser` und legt sie als `INBOUND`-Einträge in
   `ticket_messages` ab (Dedup über partiellen Unique-Index Ordner+UID). Antworten auf bekannte

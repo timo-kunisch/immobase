@@ -14,6 +14,8 @@ export const nav = {
 	"item.units": "Einheiten",
 	"item.tickets": "Tickets",
 	"item.mailbox": "Postfach",
+	"item.mailboxDisabledHint":
+		"Das Postfach ist deaktiviert - ein Administrator kann unter Einstellungen → Integrationen & KI ein IMAP-Konto konfigurieren",
 	"item.documents": "Dokumente",
 	"item.calendar": "Kalender",
 	"item.knowledge": "Wissen",

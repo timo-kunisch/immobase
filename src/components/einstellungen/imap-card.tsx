@@ -72,7 +72,7 @@ export function ImapCard({ settings }: { settings: ImapSettings }) {
 	const [state, formAction] = useActionState(saveImapSettingsAction, initialActionState);
 
 	// Nach dem Speichern neu laden, damit die Sidebar den Postfach-Eintrag
-	// ein-/ausblendet (Muster wie AiCard/McpCard).
+	// aktiviert/deaktiviert (Muster wie AiCard/McpCard).
 	const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	useEffect(() => {
 		if (state.success && !reloadTimer.current) {

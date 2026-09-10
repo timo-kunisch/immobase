@@ -13,6 +13,8 @@ export const nav: typeof deNav = {
 	"item.units": "Units",
 	"item.tickets": "Tickets",
 	"item.mailbox": "Mailbox",
+	"item.mailboxDisabledHint":
+		"The mailbox is disabled - an administrator can configure an IMAP account under Settings → Integrations & AI",
 	"item.documents": "Documents",
 	"item.calendar": "Calendar",
 	"item.knowledge": "Knowledge",

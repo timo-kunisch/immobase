@@ -111,11 +111,25 @@ export function AppSidebar({
 	const pathname = usePathname();
 	const { t } = useI18n();
 
-	// Das Postfach (E-Mail-Eingang per IMAP) erscheint nur, wenn der Admin
-	// einen IMAP-Server konfiguriert hat (optionale Online-Funktion).
-	const generalItems = mailboxEnabled
-		? [...generalNavItems.slice(0, 4), { titleKey: "nav.item.mailbox" as MessageKey, href: "/postfach", icon: Inbox }, ...generalNavItems.slice(4)]
-		: generalNavItems;
+	// Das Postfach (E-Mail-Eingang per IMAP) ist immer sichtbar, aber ohne
+	// konfigurierten IMAP-Server deaktiviert (optionale Online-Funktion).
+	const generalItems: {
+		titleKey: MessageKey;
+		href: string;
+		icon: typeof LayoutDashboard;
+		disabled?: boolean;
+		disabledHintKey?: MessageKey;
+	}[] = [
+		...generalNavItems.slice(0, 4),
+		{
+			titleKey: "nav.item.mailbox",
+			href: "/postfach",
+			icon: Inbox,
+			disabled: !mailboxEnabled,
+			disabledHintKey: "nav.item.mailboxDisabledHint",
+		},
+		...generalNavItems.slice(4),
+	];
 
 	// "/" und "/weg" sind exakte Matches (sonst wäre der Dashboard- bzw.
 	// "WEGs"-Eintrag fälschlich auch auf allen jeweiligen Unterseiten aktiv,
@@ -183,12 +197,32 @@ export function AppSidebar({
 						<SidebarGroupContent>
 							<SidebarMenu>
 								{generalItems.map((item) => (
-									<SidebarMenuItem key={item.href}>
-										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={t(item.titleKey)}>
-											<Link href={item.href}>
-												<item.icon />
-												<span>{t(item.titleKey)}</span>
-											</Link>
+									// Der Hinweis auf deaktivierte Einträge (Postfach ohne
+									// IMAP-Konto) liegt als nativer Titel auf dem li: Der
+									// gesperrte Button fängt wegen pointer-events-none
+									// keine Mouse-Events und damit auch keinen Tooltip
+									// (gleiches Muster wie der KI-Assistent im Footer).
+									<SidebarMenuItem key={item.href} title={item.disabled && item.disabledHintKey ? t(item.disabledHintKey) : undefined}>
+										{/* Deaktivierte Einträge rendern ohne asChild als
+										    native <button disabled> - `disabled` ist auf
+										    Links (asChild + Link) wirkungslos. */}
+										<SidebarMenuButton
+											asChild={!item.disabled}
+											disabled={item.disabled}
+											isActive={isItemActive(item.href)}
+											tooltip={t(item.titleKey)}
+										>
+											{item.disabled ? (
+												<>
+													<item.icon />
+													<span>{t(item.titleKey)}</span>
+												</>
+											) : (
+												<Link href={item.href}>
+													<item.icon />
+													<span>{t(item.titleKey)}</span>
+												</Link>
+											)}
 										</SidebarMenuButton>
 									</SidebarMenuItem>
 								))}
