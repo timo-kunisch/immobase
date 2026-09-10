@@ -231,7 +231,7 @@ export const settings: typeof deSettings = {
 	"cards.reset.confirmMismatch": "Please enter exactly \"{phrase}\" to confirm.",
 
 	// Variant: Reset contents (accounts and settings are kept)
-	"cards.reset.content.button": "Reset contents …",
+	"cards.reset.content.button": "Reset contents",
 	"cards.reset.content.dialogTitle": "Reset the contents permanently?",
 	"cards.reset.content.deletedData":
 		"all business data: properties, units, tenants, leases, tickets, finances, statements, HOA management, documents, templates, calendar, knowledge base, AI chat history, activity log",
@@ -246,7 +246,7 @@ export const settings: typeof deSettings = {
 	"cards.reset.content.success": "The contents have been reset. Your accounts and settings have been kept.",
 
 	// Variant: Reset contents and settings (factory state)
-	"cards.reset.full.button": "Reset contents and settings …",
+	"cards.reset.full.button": "Reset contents and settings",
 	"cards.reset.full.dialogTitle": "Reset contents and settings permanently?",
 	"cards.reset.full.doneTitle": "Application reset",
 	"cards.reset.full.redirecting": "You are being redirected to the initial setup …",

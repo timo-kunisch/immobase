@@ -237,7 +237,7 @@ export const settings = {
 	"cards.reset.confirmMismatch": "Bitte geben Sie zur Bestätigung exakt „{phrase}“ ein.",
 
 	// Variante: Inhalte zurücksetzen (Konten und Einstellungen bleiben erhalten)
-	"cards.reset.content.button": "Inhalte zurücksetzen …",
+	"cards.reset.content.button": "Inhalte zurücksetzen",
 	"cards.reset.content.dialogTitle": "Inhalte endgültig zurücksetzen?",
 	"cards.reset.content.deletedData":
 		"alle Fachdaten: Liegenschaften, Einheiten, Mieter, Verträge, Tickets, Finanzen, Abrechnungen, WEG-Verwaltung, Dokumente, Vorlagen, Kalender, Wissensdatenbank, KI-Chat-Verlauf, Aktivitätsprotokoll",
@@ -252,7 +252,7 @@ export const settings = {
 	"cards.reset.content.success": "Die Inhalte wurden zurückgesetzt. Ihre Konten und Einstellungen sind erhalten geblieben.",
 
 	// Variante: Inhalte und Einstellungen zurücksetzen (Auslieferungszustand)
-	"cards.reset.full.button": "Inhalte und Einstellungen zurücksetzen …",
+	"cards.reset.full.button": "Inhalte und Einstellungen zurücksetzen",
 	"cards.reset.full.dialogTitle": "Inhalte und Einstellungen endgültig zurücksetzen?",
 	"cards.reset.full.doneTitle": "Anwendung zurückgesetzt",
 	"cards.reset.full.redirecting": "Sie werden zur Ersteinrichtung weitergeleitet …",
