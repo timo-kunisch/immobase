@@ -35,12 +35,17 @@ export function proxy(request: NextRequest) {
 	const hasSessionCookie = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
 
 	if (isPublicPath(pathname)) {
-		// Bereits angemeldete Nutzer müssen die Login-/Register-Seiten nicht
-		// mehr sehen – die autoritative Prüfung (DAL) leitet ungültige/
-		// abgelaufene Sessions ohnehin zurück zu /login.
-		if (hasSessionCookie && pathname !== "/verify-email") {
-			return NextResponse.redirect(new URL("/", request.url));
-		}
+		// Öffentliche Pfade laufen hier IMMER durch - insbesondere darf der
+		// Proxy sie bei vorhandenem Session-Cookie NICHT selbst nach "/"
+		// umleiten: Das Cookie kann veraltet sein (Session in der DB
+		// ungültig/abgelaufen/gelöscht, z. B. nach Freigabe-Entzug,
+		// Passwort-Reset oder Backup-Import einer fremden Datenbank), und
+		// requireUser() im App-Layout würde dann zurück zu /login leiten -
+		// eine unendliche Redirect-Schleife (ERR_TOO_MANY_REDIRECTS), aus
+		// der der Nutzer nicht mehr zum Login käme. Ob ein Nutzer bereits
+		// (tatsächlich, autoritativ) angemeldet ist, prüfen daher die
+		// öffentlichen Seiten selbst per getCurrentUser() und leiten ihn
+		// dann erst weiter (siehe src/app/(auth)/*/page.tsx).
 		return NextResponse.next();
 	}
 

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { countUsers } from "@/data/users";
+import { getCurrentUser } from "@/lib/auth/dal";
 import { getT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -38,6 +39,15 @@ export default async function LoginPage({
 	// (Administrator-)Konto an.
 	if (countUsers() === 0) {
 		redirect("/setup");
+	}
+
+	// Bereits (tatsächlich, autoritativ geprüft) angemeldete Nutzer müssen
+	// die Login-Seite nicht mehr sehen. Bewusst HIER und nicht im Proxy:
+	// Nur die DAL kennt die Gültigkeit der Session - ein veraltetes Cookie
+	// würde im Proxy zu einer Redirect-Schleife /login -> / -> /login führen
+	// (siehe src/proxy.ts).
+	if (await getCurrentUser()) {
+		redirect("/");
 	}
 
 	const t = await getT();

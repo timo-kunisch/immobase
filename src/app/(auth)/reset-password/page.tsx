@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { XCircle } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
+import { getCurrentUser } from "@/lib/auth/dal";
 import { isValidPasswordResetToken } from "@/lib/auth/tokens";
 import { getT } from "@/lib/i18n/server";
 
@@ -18,6 +20,13 @@ export const dynamic = "force-dynamic";
 export default async function ResetPasswordPage({ searchParams }: { searchParams: Promise<{ token?: string }> }) {
 	const t = await getT();
 	const { token } = await searchParams;
+
+	// Bereits (autoritativ geprüft) angemeldete Nutzer müssen die Seite
+	// nicht sehen. Bewusst HIER und nicht im Proxy (siehe src/proxy.ts
+	// und login/page.tsx).
+	if (await getCurrentUser()) {
+		redirect("/");
+	}
 
 	const isValid = token ? await isValidPasswordResetToken(token) : false;
 

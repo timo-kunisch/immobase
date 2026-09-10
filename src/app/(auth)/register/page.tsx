@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { RegisterForm } from "@/components/auth/register-form";
 import { countUsers } from "@/data/users";
+import { getCurrentUser } from "@/lib/auth/dal";
 import { getT } from "@/lib/i18n/server";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -21,11 +22,19 @@ export async function generateMetadata(): Promise<Metadata> {
 // https://nextjs.org/docs/messages/failed-to-find-server-action
 export const dynamic = "force-dynamic";
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
 	// Das erste Konto wird über die Ersteinrichtung (Setup-Wizard) angelegt,
 	// die zusätzlich durch die Grundeinstellungen führt.
 	if (countUsers() === 0) {
 		redirect("/setup");
 	}
+
+	// Bereits (autoritativ geprüft) angemeldete Nutzer müssen die
+	// Register-Seite nicht mehr sehen. Bewusst HIER und nicht im Proxy
+	// (siehe src/proxy.ts und login/page.tsx).
+	if (await getCurrentUser()) {
+		redirect("/");
+	}
+
 	return <RegisterForm />;
 }
