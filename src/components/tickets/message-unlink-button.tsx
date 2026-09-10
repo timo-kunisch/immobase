@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { Loader2, Unlink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 
 import { unlinkTicketMessageAction } from "@/app/(app)/tickets/actions";
 import type { TicketMessage } from "@/data/types";
@@ -16,7 +17,6 @@ import type { TicketMessage } from "@/data/types";
 export function MessageUnlinkButton({ message }: { message: TicketMessage }) {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [error, setError] = useState<string | null>(null);
 
 	function handleClick() {
 		if (
@@ -25,29 +25,25 @@ export function MessageUnlinkButton({ message }: { message: TicketMessage }) {
 		) {
 			return;
 		}
-		setError(null);
 		startTransition(async () => {
 			const result = await unlinkTicketMessageAction(message.id);
 			if (result?.error) {
-				setError(result.error);
+				showError(result.error);
 			}
 		});
 	}
 
 	return (
-		<div className="flex items-center gap-2">
-			<Button
-				type="button"
-				variant="ghost"
-				size="icon-sm"
-				onClick={handleClick}
-				disabled={isPending}
-				aria-label={t("tickets.actions.unlink")}
-				title={t("tickets.actions.unlinkTitle")}
-			>
-				{isPending ? <Loader2 className="size-4 animate-spin" /> : <Unlink className="size-4 text-muted-foreground" />}
-			</Button>
-			{error ? <span className="text-xs text-destructive">{error}</span> : null}
-		</div>
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon-sm"
+			onClick={handleClick}
+			disabled={isPending}
+			aria-label={t("tickets.actions.unlink")}
+			title={t("tickets.actions.unlinkTitle")}
+		>
+			{isPending ? <Loader2 className="size-4 animate-spin" /> : <Unlink className="size-4 text-muted-foreground" />}
+		</Button>
 	);
 }

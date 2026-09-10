@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { FileDown, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { formatFileSize } from "@/lib/format";
 import { formatDate } from "@/lib/format";
 
@@ -32,14 +33,12 @@ export function GenerateMeetingPdfButton({
 }) {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [error, setError] = useState<string | null>(null);
 
 	function handleClick() {
-		setError(null);
 		startTransition(async () => {
 			const result = await action();
 			if (result && "error" in result && result.error) {
-				setError(result.error);
+				showError(result.error);
 			}
 		});
 	}
@@ -55,7 +54,6 @@ export function GenerateMeetingPdfButton({
 				{isPending ? <Loader2 className="animate-spin" /> : <FileDown />}
 				{pdfPath ? t("hoaMeetings.actions.regenerate", { label }) : label}
 			</Button>
-			{error ? <span className="text-xs text-destructive">{error}</span> : null}
 		</div>
 	);
 }

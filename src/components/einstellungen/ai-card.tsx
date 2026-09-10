@@ -7,6 +7,7 @@ import { Loader2, Save, ShieldAlert, Sparkles, TriangleAlert } from "lucide-reac
 import { saveAiSettingsAction } from "@/app/(app)/einstellungen/actions";
 import { isTestedAiModel, RECOMMENDED_AI_MODEL, RECOMMENDED_LOCAL_AI_MODEL } from "@/lib/ai/tested-models";
 import { Guide, GuideStep } from "@/components/einstellungen/guide";
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -184,13 +185,13 @@ export function AiCard({ state }: { state: AiCardState }) {
 						</p>
 					</div>
 
-					<div className="flex items-center gap-3">
-						<SubmitButton />
-						{formState.error ? <p className="text-sm text-destructive">{formState.error}</p> : null}
-						{formState.success ? (
-							<p className="text-sm text-emerald-600">{t("settings.cards.ai.savedReload")}</p>
-						) : null}
-					</div>
+<div className="flex items-center gap-3">
+					<SubmitButton />
+					<ActionErrorToast state={formState} />
+					{formState.success ? (
+						<p className="text-sm text-emerald-600">{t("settings.cards.ai.savedReload")}</p>
+					) : null}
+				</div>
 				</form>
 
 				<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">

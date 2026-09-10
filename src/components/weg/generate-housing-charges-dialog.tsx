@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { CalendarClock, Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ export function GenerateHousingChargesDialog({ economicPlanId, hoaId }: { econom
 								<Input id="dueDay" name="dueDay" type="number" min="1" max="28" defaultValue="3" required />
 								<p className="text-xs text-muted-foreground">{t("hoaFinance.charges.fields.dueDayHint")}</p>
 							</div>
-							{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+							<ActionErrorToast state={state} />
 						</div>
 
 						<DialogFooter>

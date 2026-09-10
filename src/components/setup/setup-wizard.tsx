@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Copy, KeyRound, Loader2, SkipForward } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import type { MessageKey } from "@/lib/i18n/translator";
 import type { CompanySettings } from "@/data/types";
 
@@ -133,7 +135,6 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 	const bridge = getDesktopBridge();
 	const [selected, setSelected] = useState<AppMode>("local");
 	const [busy, setBusy] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 
 	// Aktuell wirksamen Modus als Vorauswahl laden (relevant, wenn der Wizard
 	// z. B. auf einem Client im Host-Modus erneut durchlaufen wird).
@@ -162,11 +163,10 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 			return;
 		}
 		setBusy(true);
-		setError(null);
 		try {
 			const result = await bridge.setMode(selected);
 			if (!result.ok) {
-				setError(result.error ?? t("setup.errors.modeApply"));
+				showError(result.error ?? t("setup.errors.modeApply"));
 				return;
 			}
 			// Bei "client" wechselt das Fenster automatisch auf die
@@ -174,7 +174,7 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 			// endet auf diesem Gerät hier.
 			if (selected !== "client") onDone();
 		} catch {
-			setError(t("setup.errors.modeApply"));
+			showError(t("setup.errors.modeApply"));
 		} finally {
 			setBusy(false);
 		}
@@ -221,8 +221,6 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 						{t("setup.mode.clientHint")}
 					</p>
 				) : null}
-
-				{error ? <p className="text-sm text-destructive">{error}</p> : null}
 			</CardContent>
 			<CardFooter className="justify-between">
 				<Button type="button" variant="ghost" onClick={onBack}>
@@ -295,7 +293,7 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 						/>
 					</div>
 
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+					<ActionErrorToast state={state} />
 				</CardContent>
 				<CardFooter className="justify-between">
 					<Button type="button" variant="ghost" onClick={onBack}>
@@ -509,18 +507,18 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 							required
 						/>
 					</div>
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-				</CardContent>
-				<CardFooter className="justify-between">
-					<Button type="button" variant="ghost" onClick={onBack}>
-						<ChevronLeft />
-						{t("common.back")}
-					</Button>
-					<Button type="submit" disabled={isPending}>
-						{isPending ? <Loader2 className="animate-spin" /> : null}
-						{t("setup.account.submit")}
-					</Button>
-				</CardFooter>
+<ActionErrorToast state={state} />
+			</CardContent>
+			<CardFooter className="justify-between">
+				<Button type="button" variant="ghost" onClick={onBack}>
+					<ChevronLeft />
+					{t("common.back")}
+				</Button>
+				<Button type="submit" disabled={isPending}>
+					{isPending ? <Loader2 className="animate-spin" /> : null}
+					{t("setup.account.submit")}
+				</Button>
+			</CardFooter>
 			</form>
 		</Card>
 	);

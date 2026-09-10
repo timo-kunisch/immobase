@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Forward, Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -74,7 +75,7 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 							</Select>
 						</div>
 
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+						<ActionErrorToast state={state} />
 					</div>
 
 					<DialogFooter>

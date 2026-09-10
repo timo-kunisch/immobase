@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Loader2, Save } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState } from "@/lib/action-state";
@@ -19,7 +20,7 @@ export function MinutesTextForm({ hoaId, meetingId, minutesText }: { hoaId: stri
 			<input type="hidden" name="hoaId" value={hoaId} />
 			<input type="hidden" name="meetingId" value={meetingId} />
 			<Textarea name="minutesText" className="min-h-48" placeholder={t("hoaMeetings.minutes.placeholder")} defaultValue={minutesText ?? ""} />
-			{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+			<ActionErrorToast state={state} />
 			<div className="flex justify-end">
 				<Button type="submit" size="sm" disabled={isPending}>
 					{isPending ? <Loader2 className="animate-spin" /> : <Save />}

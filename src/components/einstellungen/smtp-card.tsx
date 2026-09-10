@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Loader2, Save } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -93,8 +94,8 @@ export function SmtpCard({ settings }: { settings: SmtpSettings }) {
 						{t("settings.cards.smtp.hint")}
 					</p>
 
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-					{state.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
+<ActionErrorToast state={state} />
+				{state.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
 
 					<div className="flex justify-end">
 						<SubmitButton />

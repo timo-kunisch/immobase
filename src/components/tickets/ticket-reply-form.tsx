@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { Loader2, Send } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +44,7 @@ export function TicketReplyForm({ ticketId, defaultTo, defaultSubject }: { ticke
 				<Label htmlFor="reply-body">{t("tickets.reply.messageLabel")}</Label>
 				<Textarea id="reply-body" name="body" rows={5} placeholder={t("tickets.reply.messagePlaceholder")} required />
 			</div>
-			{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+			<ActionErrorToast state={state} />
 			{state.success ? <p className="text-sm text-emerald-600">{t("tickets.success.replySent")}</p> : null}
 			<div className="flex justify-end">
 				<Button type="submit" disabled={isPending}>

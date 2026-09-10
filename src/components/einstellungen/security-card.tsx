@@ -6,6 +6,7 @@ import { Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { encryptExistingFilesAction, getRecoveryKeyAction } from "@/app/(app)/einstellungen/actions";
 
 export interface SecurityStatus {
@@ -30,7 +31,7 @@ export interface SecurityStatus {
 export function SecurityCard({ status }: { status: SecurityStatus }) {
 	const { t } = useI18n();
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 	const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
 	const [keyBusy, setKeyBusy] = useState(false);
 
@@ -38,23 +39,21 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 		setBusy(true);
 		setMessage(null);
 		try {
-			const result = await encryptExistingFilesAction();
-			if (result.error) {
-				setMessage({ kind: "error", text: result.error });
-			} else {
-				setMessage({
-					kind: "success",
-					text:
-						(result.encrypted ?? 0) > 0
-							? t("settings.cards.security.encryptSuccess", { count: result.encrypted ?? 0 })
-							: t("settings.cards.security.encryptNone"),
-				});
-				// Statusanzeige aktualisieren (Server Component neu rendern).
-				window.location.reload();
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.security.encryptRunFailed") });
-		} finally {
+const result = await encryptExistingFilesAction();
+		if (result.error) {
+			showError(result.error);
+		} else {
+			setMessage(
+				(result.encrypted ?? 0) > 0
+					? t("settings.cards.security.encryptSuccess", { count: result.encrypted ?? 0 })
+					: t("settings.cards.security.encryptNone")
+			);
+			// Statusanzeige aktualisieren (Server Component neu rendern).
+			window.location.reload();
+		}
+	} catch {
+		showError(t("settings.cards.security.encryptRunFailed"));
+	} finally {
 			setBusy(false);
 		}
 	}
@@ -66,15 +65,15 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 		}
 		setKeyBusy(true);
 		try {
-			const result = await getRecoveryKeyAction();
-			if (result.error || !result.key) {
-				setMessage({ kind: "error", text: result.error ?? t("settings.cards.security.recoveryKey.readFailed") });
-			} else {
-				setRecoveryKey(result.key);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.security.recoveryKey.readFailed") });
-		} finally {
+const result = await getRecoveryKeyAction();
+		if (result.error || !result.key) {
+			showError(result.error ?? t("settings.cards.security.recoveryKey.readFailed"));
+		} else {
+			setRecoveryKey(result.key);
+		}
+	} catch {
+		showError(t("settings.cards.security.recoveryKey.readFailed"));
+	} finally {
 			setKeyBusy(false);
 		}
 	}
@@ -149,11 +148,7 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 					) : null}
 				</div>
 
-				{message ? (
-					<p className={`text-sm ${message.kind === "error" ? "text-destructive" : "text-emerald-600"}`} role="status">
-						{message.text}
-					</p>
-				) : null}
+{message ? <p className="text-sm text-emerald-600" role="status">{message}</p> : null}
 
 				<p className="text-xs text-muted-foreground">
 					{t("settings.cards.security.databaseNote")}

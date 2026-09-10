@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -33,7 +34,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 						<Label htmlFor="passwordConfirm">{t("auth.register.passwordConfirm")}</Label>
 						<Input id="passwordConfirm" name="passwordConfirm" type="password" autoComplete="new-password" minLength={8} required />
 					</div>
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+					<ActionErrorToast state={state} />
 				</CardContent>
 				<CardFooter>
 					<Button type="submit" className="w-full" disabled={isPending}>

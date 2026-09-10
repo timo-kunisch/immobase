@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -66,7 +67,7 @@ export function EconomicPlanFormDialog({ hoaId, economicPlan }: { hoaId: string;
 							<Label htmlFor="notes">{t("common.notes")}</Label>
 							<Textarea id="notes" name="notes" defaultValue={economicPlan?.notes ?? ""} />
 						</div>
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+						<ActionErrorToast state={state} />
 					</div>
 
 					<DialogFooter>

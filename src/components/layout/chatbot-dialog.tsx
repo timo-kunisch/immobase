@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ACCEPTED_FILE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/ai/attachment-types";
 import { CHAT_HISTORY_HARD_LIMIT_CHARS } from "@/lib/ai/chat-limits";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 /**
@@ -206,7 +207,6 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	const [input, setInput] = useState("");
 	const [pending, setPending] = useState(false);
 	const [clearing, setClearing] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	// Ein-/Ausblenden des Vorlagen-Panels über dem Eingabefeld (Buch-Button
 	// in der Eingabeleiste).
 	const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -260,11 +260,11 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 					throw new Error(data?.error ?? t("chat.loadFailedHttp", { status: response.status }));
 				}
 				if (!cancelled) setMessages(data.messages);
-			} catch (cause) {
-				if (!cancelled) {
-					setError(cause instanceof Error ? cause.message : t("chat.loadFailed"));
-				}
-			} finally {
+} catch (cause) {
+			if (!cancelled) {
+				showError(cause instanceof Error ? cause.message : t("chat.loadFailed"));
+			}
+		} finally {
 				if (!cancelled) setHistoryLoaded(true);
 			}
 		})();
@@ -296,15 +296,14 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 
 	async function handleFilesSelected(fileList: FileList | null): Promise<void> {
 		if (!fileList) return;
-		setError(null);
 		const next = [...attachments];
 		for (const file of Array.from(fileList)) {
 			if (next.length >= MAX_ATTACHMENTS) {
-				setError(t("chat.maxAttachments", { max: MAX_ATTACHMENTS }));
+				showError(t("chat.maxAttachments", { max: MAX_ATTACHMENTS }));
 				break;
 			}
 			if (file.size > MAX_ATTACHMENT_BYTES) {
-				setError(
+				showError(
 					t("chat.fileTooLarge", { name: file.name, size: formatBytes(file.size), max: formatBytes(MAX_ATTACHMENT_BYTES) })
 				);
 				continue;
@@ -312,7 +311,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			try {
 				next.push({ name: file.name, size: file.size, dataBase64: await fileToBase64(file) });
 			} catch {
-				setError(t("chat.fileUnreadable", { name: file.name }));
+				showError(t("chat.fileUnreadable", { name: file.name }));
 			}
 		}
 		setAttachments(next);
@@ -339,7 +338,6 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		setInput("");
 		setAttachments([]);
 		setPending(true);
-		setError(null);
 		// Eine evtl. noch stehende Benachrichtigung der vorherigen Runde ist
 		// ab jetzt überholt (die neue Antwort ersetzt sie in Kürze).
 		setReplyNotice(null);
@@ -412,7 +410,6 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	async function handleClearHistory(): Promise<void> {
 		if (pending || clearing) return;
 		setClearing(true);
-		setError(null);
 		try {
 			const response = await fetch("/api/chat/history", { method: "DELETE" });
 			if (!response.ok) {
@@ -423,7 +420,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			setAttachments([]);
 			setInput("");
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : t("chat.deleteFailed"));
+			showError(cause instanceof Error ? cause.message : t("chat.deleteFailed"));
 		} finally {
 			setClearing(false);
 			textareaRef.current?.focus();
@@ -575,11 +572,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 								</span>
 							))}
 						</div>
-					) : null}
+) : null}
 
-					{error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-					{/* Vorlagen-Panel (eingeblendet über den Buch-Button in der
+				{/* Vorlagen-Panel (eingeblendet über den Buch-Button in der
 					    Eingabeleiste): Werk-Vorlagen + eigene Vorlagen, per Klick
 					    ins Eingabefeld übernehmbar. */}
 					{templatesOpen && !historyHardLimitReached ? <PromptTemplatesPanel onInsert={handleInsertTemplate} /> : null}

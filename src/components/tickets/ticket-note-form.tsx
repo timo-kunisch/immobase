@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef } from "react";
 import { Loader2, StickyNote } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +31,7 @@ export function TicketNoteForm({ ticketId }: { ticketId: string }) {
 				<Label htmlFor="note-body">{t("tickets.note.label")}</Label>
 				<Textarea id="note-body" name="body" rows={3} placeholder={t("tickets.note.placeholder")} required />
 			</div>
-			{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+			<ActionErrorToast state={state} />
 			<div className="flex justify-end">
 				<Button type="submit" variant="outline" disabled={isPending}>
 					{isPending ? <Loader2 className="animate-spin" /> : <StickyNote />}

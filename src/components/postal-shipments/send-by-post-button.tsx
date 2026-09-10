@@ -5,6 +5,7 @@ import { Loader2, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import type { PostalShipmentActionState } from "@/lib/postal-shipments";
 
 /**
@@ -23,13 +24,17 @@ import type { PostalShipmentActionState } from "@/lib/postal-shipments";
 export function SendByPostButton({ sendAction, disabled = false, disabledReason }: { sendAction: () => Promise<PostalShipmentActionState>; disabled?: boolean; disabledReason?: string }) {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [result, setResult] = useState<PostalShipmentActionState | null>(null);
+	const [result, setResult] = useState<Extract<PostalShipmentActionState, { success: true }> | null>(null);
 
 	function handleClick() {
 		setResult(null);
 		startTransition(async () => {
 			const response = await sendAction();
-			setResult(response);
+			if ("error" in response) {
+				showError(response.error);
+			} else {
+				setResult(response);
+			}
 		});
 	}
 
@@ -46,8 +51,7 @@ export function SendByPostButton({ sendAction, disabled = false, disabledReason 
 			>
 				{isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
 			</Button>
-			{result && "error" in result ? <span className="max-w-[220px] text-right text-xs text-destructive">{result.error}</span> : null}
-			{result && "success" in result ? (
+			{result ? (
 				<span className="max-w-[220px] text-right text-xs text-emerald-600">
 					{t("postal.success.jobSubmitted", { jobId: result.jobId, testHint: result.mode === "test" ? t("postal.success.testModeHint") : "" })}
 				</span>

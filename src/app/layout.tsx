@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 import { I18nProvider } from "@/lib/i18n/provider";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { getMessages } from "@/lib/i18n/messages";
@@ -50,9 +51,10 @@ export default async function RootLayout({
 				<link rel="manifest" href="/site.webmanifest" />
 			</head>
 			<body className="min-h-full">
-				<I18nProvider locale={locale} messages={getMessages(locale)}>
-					<TooltipProvider>{children}</TooltipProvider>
-				</I18nProvider>
+<I18nProvider locale={locale} messages={getMessages(locale)}>
+				<TooltipProvider>{children}</TooltipProvider>
+				<Toaster />
+			</I18nProvider>
 			</body>
 		</html>
 	);

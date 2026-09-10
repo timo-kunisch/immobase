@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 
 type ImportMode = "replace" | "merge";
 
@@ -36,7 +37,7 @@ export function DataExportCard() {
 	const { t } = useI18n();
 	const bridge = getDesktopBridge();
 	const [busy, setBusy] = useState<"export" | "import" | null>(null);
-	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 	const [importMode, setImportMode] = useState<ImportMode>("replace");
 	const [encryptExport, setEncryptExport] = useState(false);
 	const [exportPassword, setExportPassword] = useState("");
@@ -47,11 +48,11 @@ export function DataExportCard() {
 		if (!bridge) return; // Browser-Fallback läuft über den <a href>-Download
 		if (encryptExport) {
 			if (exportPassword.length < MIN_PASSWORD_LENGTH) {
-				setMessage({ kind: "error", text: t("settings.errors.passwordTooShort", { min: MIN_PASSWORD_LENGTH }) });
+				showError(t("settings.errors.passwordTooShort", { min: MIN_PASSWORD_LENGTH }));
 				return;
 			}
 			if (exportPassword !== exportPasswordConfirm) {
-				setMessage({ kind: "error", text: t("settings.errors.passwordMismatch") });
+				showError(t("settings.errors.passwordMismatch"));
 				return;
 			}
 		}
@@ -67,23 +68,22 @@ export function DataExportCard() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(encryptExport ? { targetPath, password: exportPassword } : { targetPath }),
 			});
-			const payload = (await response.json()) as { ok?: boolean; fileCount?: number; error?: string };
-			if (!response.ok) {
-				setMessage({ kind: "error", text: payload.error ?? t("settings.cards.backup.exportFailed") });
-			} else {
-				setMessage({
-					kind: "success",
-					text: t(encryptExport ? "settings.cards.backup.exportSuccessEncrypted" : "settings.cards.backup.exportSuccess", {
-						count: payload.fileCount ?? 0,
-						path: targetPath,
-					}),
-				});
-				setExportPassword("");
-				setExportPasswordConfirm("");
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.backup.exportFailed") });
-		} finally {
+const payload = (await response.json()) as { ok?: boolean; fileCount?: number; error?: string };
+		if (!response.ok) {
+			showError(payload.error ?? t("settings.cards.backup.exportFailed"));
+		} else {
+			setMessage(
+				t(encryptExport ? "settings.cards.backup.exportSuccessEncrypted" : "settings.cards.backup.exportSuccess", {
+					count: payload.fileCount ?? 0,
+					path: targetPath,
+				})
+			);
+			setExportPassword("");
+			setExportPasswordConfirm("");
+		}
+	} catch {
+		showError(t("settings.cards.backup.exportFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -104,21 +104,20 @@ export function DataExportCard() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(importPassword ? { path: sourcePath, mode: importMode, password: importPassword } : { path: sourcePath, mode: importMode }),
 			});
-			const payload = (await response.json()) as { ok?: boolean; backupPath?: string | null; error?: string };
-			if (!response.ok) {
-				setMessage({ kind: "error", text: payload.error ?? t("settings.cards.backup.importFailed") });
-			} else {
-				setMessage({
-					kind: "success",
-					text: payload.backupPath
-						? t("settings.cards.backup.importSuccessWithBackup", { backupPath: payload.backupPath })
-						: t("settings.cards.backup.importSuccess"),
-				});
-				setTimeout(() => window.location.reload(), 1500);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.backup.importFailed") });
-		} finally {
+const payload = (await response.json()) as { ok?: boolean; backupPath?: string | null; error?: string };
+		if (!response.ok) {
+			showError(payload.error ?? t("settings.cards.backup.importFailed"));
+		} else {
+			setMessage(
+				payload.backupPath
+					? t("settings.cards.backup.importSuccessWithBackup", { backupPath: payload.backupPath })
+					: t("settings.cards.backup.importSuccess")
+			);
+			setTimeout(() => window.location.reload(), 1500);
+		}
+	} catch {
+		showError(t("settings.cards.backup.importFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -220,11 +219,7 @@ export function DataExportCard() {
 					</p>
 				)}
 
-				{message ? (
-					<p className={`text-sm ${message.kind === "error" ? "text-destructive" : "text-emerald-600"}`} role="status">
-						{message.text}
-					</p>
-				) : null}
+{message ? <p className="text-sm text-emerald-600" role="status">{message}</p> : null}
 
 				<p className="flex items-start gap-1.5 text-xs text-muted-foreground">
 					<HardDriveDownload className="mt-0.5 size-3.5 shrink-0" />

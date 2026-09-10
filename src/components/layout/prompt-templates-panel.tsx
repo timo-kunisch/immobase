@@ -14,6 +14,7 @@ import {
 	MAX_PROMPT_TEMPLATE_TITLE_CHARS,
 } from "@/lib/ai/prompt-templates";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 
 /**
  * Vorlagen-Panel des KI-Assistenten (über dem Eingabefeld des Chat-Dialogs,
@@ -37,7 +38,6 @@ interface TemplateFormState {
 export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string) => void }) {
 	const { t } = useI18n();
 	const [templates, setTemplates] = useState<PromptTemplate[] | null>(null);
-	const [error, setError] = useState<string | null>(null);
 	const [form, setForm] = useState<TemplateFormState | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -55,11 +55,11 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 					throw new Error(data?.error ?? t("chat.templates.loadFailed", { status: response.status }));
 				}
 				if (!cancelled) setTemplates(data.templates);
-			} catch (cause) {
-				if (!cancelled) {
-					setError(cause instanceof Error ? cause.message : t("chat.templates.loadFailed", { status: "?" }));
-				}
+} catch (cause) {
+			if (!cancelled) {
+				showError(cause instanceof Error ? cause.message : t("chat.templates.loadFailed", { status: "?" }));
 			}
+		}
 		})();
 		return () => {
 			cancelled = true;
@@ -73,7 +73,7 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 		const title = form.title.trim();
 		const content = form.content.trim();
 		if (!title || !content) {
-			setError(
+			showError(
 				t("chat.templates.validation", {
 					maxTitle: MAX_PROMPT_TEMPLATE_TITLE_CHARS,
 					maxContent: MAX_PROMPT_TEMPLATE_CONTENT_CHARS,
@@ -82,7 +82,6 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 			return;
 		}
 		setSaving(true);
-		setError(null);
 		try {
 			const isEdit = form.id !== null;
 			const response = await fetch("/api/chat/prompt-templates", {
@@ -103,18 +102,17 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 						: [...current, saved]
 			);
 			setForm(null);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : t("chat.templates.saveFailed", { status: "?" }));
-		} finally {
-			setSaving(false);
-		}
+} catch (cause) {
+		showError(cause instanceof Error ? cause.message : t("chat.templates.saveFailed", { status: "?" }));
+	} finally {
+		setSaving(false);
 	}
+}
 
 	/** Löscht eine eigene Vorlage (nach Inline-Bestätigung). */
 	async function handleDelete(id: string): Promise<void> {
 		if (deleting) return;
 		setDeleting(true);
-		setError(null);
 		try {
 			const response = await fetch(`/api/chat/prompt-templates?id=${encodeURIComponent(id)}`, { method: "DELETE" });
 			if (!response.ok) {
@@ -124,12 +122,12 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 			setTemplates((current) => (current === null ? current : current.filter((template) => template.id !== id)));
 			setConfirmDeleteId(null);
 			if (form?.id === id) setForm(null);
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : t("chat.templates.deleteFailed", { status: "?" }));
-		} finally {
-			setDeleting(false);
-		}
+} catch (cause) {
+		showError(cause instanceof Error ? cause.message : t("chat.templates.deleteFailed", { status: "?" }));
+	} finally {
+		setDeleting(false);
 	}
+}
 
 	/** Kopfzeile einer Vorlage: Titel + Vorschau der ersten Textzeile. */
 	function renderInsertRow(key: string, title: string, content: string, badge: boolean, actions?: ReactNode) {
@@ -171,7 +169,6 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 						size="xs"
 						onClick={() => {
 							setForm({ id: null, title: "", content: "" });
-							setError(null);
 						}}
 					>
 						<Plus className="size-3" />
@@ -267,7 +264,6 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 											onClick={() => {
 												setForm({ id: template.id, title: template.title, content: template.content });
 												setConfirmDeleteId(null);
-												setError(null);
 											}}
 										>
 											<Pencil className="size-3" />
@@ -289,8 +285,6 @@ export function PromptTemplatesPanel({ onInsert }: { onInsert: (content: string)
 					)
 				)}
 			</div>
-
-			{error ? <p className="text-xs text-destructive">{error}</p> : null}
 		</div>
 	);
 }

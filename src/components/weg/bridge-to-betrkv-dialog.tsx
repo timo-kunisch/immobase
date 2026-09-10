@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { ArrowRightLeft, Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -66,7 +67,7 @@ export function BridgeToBetrKvDialog({ unitResultId, hoaId, availableBillingPeri
 								</SelectContent>
 							</Select>
 						</div>
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+						<ActionErrorToast state={state} />
 						{state.success && state.message ? <p className="text-sm text-emerald-600">{state.message}</p> : null}
 					</div>
 

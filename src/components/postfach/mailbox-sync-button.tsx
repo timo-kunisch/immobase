@@ -5,19 +5,24 @@ import { Loader2, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { syncMailboxAction } from "@/app/(app)/postfach/actions";
 
 /** Manueller Abruf des IMAP-Postfachs mit Ergebnis-Rückmeldung. */
 export function MailboxSyncButton() {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [result, setResult] = useState<{ error?: string; message?: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 
 	function handleClick() {
-		setResult(null);
+		setMessage(null);
 		startTransition(async () => {
 			const state = await syncMailboxAction();
-			setResult({ error: state.error, message: state.message });
+			if (state.error) {
+				showError(state.error);
+			} else {
+				setMessage(state.message ?? null);
+			}
 		});
 	}
 
@@ -27,8 +32,7 @@ export function MailboxSyncButton() {
 				{isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
 				{t("tickets.mailbox.syncNow")}
 			</Button>
-			{result?.error ? <span className="text-xs text-destructive">{result.error}</span> : null}
-			{result?.message ? <span className="text-xs text-emerald-600">{result.message}</span> : null}
+			{message ? <span className="text-xs text-emerald-600">{message}</span> : null}
 		</div>
 	);
 }

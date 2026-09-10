@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { Loader2, Wrench } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -96,7 +97,7 @@ export function ConvertToTicketDialog({ message, properties, units }: { message:
 							<Textarea id="description" name="description" rows={8} defaultValue={message.bodyText ?? ""} className="max-h-64" />
 						</div>
 
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+						<ActionErrorToast state={state} />
 					</div>
 
 					<DialogFooter>

@@ -7,6 +7,7 @@ import { getMcpTokenAction, regenerateMcpTokenAction, setMcpEnabledAction } from
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import type { McpTokenKind } from "@/lib/mcp/auth";
 
 export interface McpCardState {
@@ -33,7 +34,7 @@ export interface McpCardState {
 export function McpCard({ state }: { state: McpCardState }) {
 	const { t } = useI18n();
 	const [busy, setBusy] = useState(false);
-	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 
 	// Die öffentliche URL ist clientseitig bekannt (gleiche Herkunft wie die App).
 	const endpointUrl = typeof window !== "undefined" ? `${window.location.origin}/api/mcp` : "/api/mcp";
@@ -42,21 +43,20 @@ export function McpCard({ state }: { state: McpCardState }) {
 		setBusy(true);
 		setMessage(null);
 		try {
-			const result = await setMcpEnabledAction(!state.enabled);
-			if (result.error) {
-				setMessage({ kind: "error", text: result.error });
-			} else {
-				setMessage({
-					kind: "success",
-					text: state.enabled
-						? t("settings.cards.mcp.disabledSuccess")
-						: t("settings.cards.mcp.enabledSuccess"),
-				});
-				setTimeout(() => window.location.reload(), 1200);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.mcp.errors.saveFailed") });
-		} finally {
+const result = await setMcpEnabledAction(!state.enabled);
+		if (result.error) {
+			showError(result.error);
+		} else {
+			setMessage(
+				state.enabled
+					? t("settings.cards.mcp.disabledSuccess")
+					: t("settings.cards.mcp.enabledSuccess")
+			);
+			setTimeout(() => window.location.reload(), 1200);
+		}
+	} catch {
+		showError(t("settings.cards.mcp.errors.saveFailed"));
+	} finally {
 			setBusy(false);
 		}
 	}
@@ -118,13 +118,9 @@ export function McpCard({ state }: { state: McpCardState }) {
 					/>
 				) : null}
 
-				{message ? (
-					<p className={`text-sm ${message.kind === "error" ? "text-destructive" : "text-emerald-600"}`} role="status">
-						{message.text}
-					</p>
-				) : null}
+{message ? <p className="text-sm text-emerald-600" role="status">{message}</p> : null}
 
-				<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+			<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
 					<ShieldAlert className="mt-0.5 size-4 shrink-0" />
 					<span>
 						{t("settings.cards.mcp.warning")}
@@ -149,7 +145,7 @@ function TokenSection({
 }) {
 	const { t } = useI18n();
 	const [busy, setBusy] = useState<"reveal" | "rotate" | null>(null);
-	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 	const [token, setToken] = useState<string | null>(null);
 	const [copied, setCopied] = useState<"token" | "config" | null>(null);
 
@@ -159,7 +155,7 @@ function TokenSection({
 			setCopied(what);
 			setTimeout(() => setCopied(null), 2000);
 		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.mcp.token.copyFailed") });
+			showError(t("settings.cards.mcp.token.copyFailed"));
 		}
 	}
 
@@ -171,15 +167,15 @@ function TokenSection({
 		setBusy("reveal");
 		setMessage(null);
 		try {
-			const result = await getMcpTokenAction(kind);
-			if (result.error || !result.token) {
-				setMessage({ kind: "error", text: result.error ?? t("settings.cards.mcp.token.readFailed") });
-			} else {
-				setToken(result.token);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.mcp.token.readFailed") });
-		} finally {
+const result = await getMcpTokenAction(kind);
+		if (result.error || !result.token) {
+			showError(result.error ?? t("settings.cards.mcp.token.readFailed"));
+		} else {
+			setToken(result.token);
+		}
+	} catch {
+		showError(t("settings.cards.mcp.token.readFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -195,16 +191,16 @@ function TokenSection({
 		setBusy("rotate");
 		setMessage(null);
 		try {
-			const result = await regenerateMcpTokenAction(kind);
-			if (result.error || !result.token) {
-				setMessage({ kind: "error", text: result.error ?? t("settings.cards.mcp.token.regenerateFailed") });
-			} else {
-				setToken(result.token);
-				setMessage({ kind: "success", text: t("settings.cards.mcp.token.regenerated") });
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.mcp.token.regenerateFailed") });
-		} finally {
+const result = await regenerateMcpTokenAction(kind);
+		if (result.error || !result.token) {
+			showError(result.error ?? t("settings.cards.mcp.token.regenerateFailed"));
+		} else {
+			setToken(result.token);
+			setMessage(t("settings.cards.mcp.token.regenerated"));
+		}
+	} catch {
+		showError(t("settings.cards.mcp.token.regenerateFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -266,11 +262,7 @@ function TokenSection({
 				</div>
 			) : null}
 
-			{message ? (
-				<p className={`text-sm ${message.kind === "error" ? "text-destructive" : "text-emerald-600"}`} role="status">
-					{message.text}
-				</p>
-			) : null}
+			{message ? <p className="text-sm text-emerald-600" role="status">{message}</p> : null}
 		</div>
 	);
 }

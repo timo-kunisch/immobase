@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { FileDown, Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -113,9 +114,9 @@ export function GenerateDocumentForm({ templateId, leases }: { templateId: strin
 							<p className="text-xs text-muted-foreground">{t("templates.generate.bodyHint")}</p>
 						</div>
 
-						{previewState.error ? <p className="text-sm text-destructive">{previewState.error}</p> : null}
-						{generateState.error ? <p className="text-sm text-destructive">{generateState.error}</p> : null}
-						{generateState.success ? <p className="text-sm text-emerald-600">{t("templates.generate.success")}</p> : null}
+<ActionErrorToast state={previewState} />
+					<ActionErrorToast state={generateState} />
+					{generateState.success ? <p className="text-sm text-emerald-600">{t("templates.generate.success")}</p> : null}
 
 						<div className="flex justify-end">
 							<GenerateSubmitButton />

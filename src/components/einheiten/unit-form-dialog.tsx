@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from "react";
 import { Loader2, Pencil, Plus } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -88,7 +89,7 @@ export function UnitFormDialog({ unit, properties }: { unit?: Unit; properties: 
 						<Input id="coOwnershipShare" name="coOwnershipShare" type="number" step="0.01" min="0" defaultValue={unit?.coOwnershipShare ?? ""} />
 						<p className="text-xs text-muted-foreground">{t("units.fields.coOwnershipShareHint")}</p>
 					</div>
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+						<ActionErrorToast state={state} />
 					</div>
 
 					<DialogFooter>

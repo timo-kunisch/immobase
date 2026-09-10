@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { FileStack, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { generateAllBillingStatementPdfsAction } from "@/app/(app)/abrechnung/actions";
 
 /**
@@ -15,25 +16,20 @@ import { generateAllBillingStatementPdfsAction } from "@/app/(app)/abrechnung/ac
 export function GenerateAllStatementPdfsButton({ billingPeriodId }: { billingPeriodId: string }) {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [error, setError] = useState<string | null>(null);
 
 	function handleClick() {
-		setError(null);
 		startTransition(async () => {
 			const result = await generateAllBillingStatementPdfsAction(billingPeriodId);
 			if (result?.error) {
-				setError(result.error);
+				showError(result.error);
 			}
 		});
 	}
 
 	return (
-		<div className="flex flex-col items-end gap-1">
-			<Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={isPending}>
-				{isPending ? <Loader2 className="animate-spin" /> : <FileStack />}
-				{t("billing.actions.generateAllPdfs")}
-			</Button>
-			{error ? <span className="text-xs text-destructive">{error}</span> : null}
-		</div>
+		<Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={isPending}>
+			{isPending ? <Loader2 className="animate-spin" /> : <FileStack />}
+			{t("billing.actions.generateAllPdfs")}
+		</Button>
 	);
 }

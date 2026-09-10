@@ -13,6 +13,7 @@ import {
 	startDropboxConnectAction,
 } from "@/app/(app)/einstellungen/dropbox-actions";
 import { Guide, GuideStep } from "@/components/einstellungen/guide";
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
 import { formatDateTime } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 
 /**
  * Strukturell identisch zu DropboxUiState in src/lib/dropbox-backup.ts -
@@ -73,7 +75,7 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 	const [connectStep, setConnectStep] = useState<"idle" | "awaiting-code">(state.connectPending ? "awaiting-code" : "idle");
 	const [code, setCode] = useState("");
 	const [busy, setBusy] = useState<"connect" | "complete" | "disconnect" | "backup" | "cancel" | null>(null);
-	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 	const [encrypt, setEncrypt] = useState(state.passwordSet);
 	const [formState, formAction] = useActionState(saveDropboxBackupSettingsAction, initialActionState);
 
@@ -83,18 +85,15 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 		try {
 			const result = await startDropboxConnectAction(appKey);
 			if (result.error || !result.url) {
-				setMessage({ kind: "error", text: result.error ?? t("settings.cards.dropbox.errors.connectStartFailed") });
+				showError(result.error ?? t("settings.cards.dropbox.errors.connectStartFailed"));
 			} else {
 				window.open(result.url, "_blank", "noopener,noreferrer");
 				setConnectStep("awaiting-code");
 				setCode("");
-				setMessage({
-					kind: "success",
-					text: t("settings.cards.dropbox.connectStarted"),
-				});
+				setMessage(t("settings.cards.dropbox.connectStarted"));
 			}
 		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.connectStartFailed") });
+			showError(t("settings.cards.dropbox.errors.connectStartFailed"));
 		} finally {
 			setBusy(null);
 		}
@@ -104,21 +103,20 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 		setBusy("complete");
 		setMessage(null);
 		try {
-			const result = await completeDropboxConnectAction(code);
-			if (result.error) {
-				setMessage({ kind: "error", text: result.error });
-			} else {
-				setMessage({
-					kind: "success",
-					text: result.email
-						? t("settings.cards.dropbox.connectedSuccessAs", { email: result.email })
-						: t("settings.cards.dropbox.connectedSuccess"),
-				});
-				setTimeout(() => window.location.reload(), 1200);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.connectCompleteFailed") });
-		} finally {
+const result = await completeDropboxConnectAction(code);
+		if (result.error) {
+			showError(result.error);
+		} else {
+			setMessage(
+				result.email
+					? t("settings.cards.dropbox.connectedSuccessAs", { email: result.email })
+					: t("settings.cards.dropbox.connectedSuccess")
+			);
+			setTimeout(() => window.location.reload(), 1200);
+		}
+	} catch {
+		showError(t("settings.cards.dropbox.errors.connectCompleteFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -144,16 +142,16 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 		setBusy("disconnect");
 		setMessage(null);
 		try {
-			const result = await disconnectDropboxAction();
-			if (result.error) {
-				setMessage({ kind: "error", text: result.error });
-			} else {
-				setMessage({ kind: "success", text: t("settings.cards.dropbox.disconnectSuccess") });
-				setTimeout(() => window.location.reload(), 1200);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.disconnectFailed") });
-		} finally {
+const result = await disconnectDropboxAction();
+		if (result.error) {
+			showError(result.error);
+		} else {
+			setMessage(t("settings.cards.dropbox.disconnectSuccess"));
+			setTimeout(() => window.location.reload(), 1200);
+		}
+	} catch {
+		showError(t("settings.cards.dropbox.errors.disconnectFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -162,19 +160,18 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 		setBusy("backup");
 		setMessage(null);
 		try {
-			const result = await runDropboxBackupNowAction();
-			if (result.error) {
-				setMessage({ kind: "error", text: result.error });
-			} else {
-				setMessage({
-					kind: "success",
-					text: t("settings.cards.dropbox.backupUploadedReload", { message: result.message ?? t("settings.cards.dropbox.backupUploaded") }),
-				});
-				setTimeout(() => window.location.reload(), 1500);
-			}
-		} catch {
-			setMessage({ kind: "error", text: t("settings.cards.dropbox.backupRunFailed") });
-		} finally {
+const result = await runDropboxBackupNowAction();
+		if (result.error) {
+			showError(result.error);
+		} else {
+			setMessage(
+				t("settings.cards.dropbox.backupUploadedReload", { message: result.message ?? t("settings.cards.dropbox.backupUploaded") })
+			);
+			setTimeout(() => window.location.reload(), 1500);
+		}
+	} catch {
+		showError(t("settings.cards.dropbox.backupRunFailed"));
+	} finally {
 			setBusy(null);
 		}
 	}
@@ -352,8 +349,8 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 								</p>
 							</div>
 
-							{formState.error ? <p className="text-sm text-destructive">{formState.error}</p> : null}
-							{formState.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
+<ActionErrorToast state={formState} />
+						{formState.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
 
 							<div className="flex justify-end">
 								<SaveButton />
@@ -373,11 +370,7 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 					</>
 				)}
 
-				{message ? (
-					<p className={`text-sm ${message.kind === "error" ? "text-destructive" : "text-emerald-600"}`} role="status">
-						{message.text}
-					</p>
-				) : null}
+{message ? <p className="text-sm text-emerald-600" role="status">{message}</p> : null}
 
 				<p className="text-xs text-muted-foreground">
 					{state.connectedAt

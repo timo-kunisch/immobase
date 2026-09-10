@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,8 +30,8 @@ export function ForgotPasswordForm() {
 						<Label htmlFor="email">{t("auth.fields.email")}</Label>
 						<Input id="email" name="email" type="email" autoComplete="email" required disabled={state.success} />
 					</div>
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-					{state.message ? <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">{state.message}</p> : null}
+<ActionErrorToast state={state} />
+				{state.message ? <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">{state.message}</p> : null}
 				</CardContent>
 				<CardFooter className="flex flex-col gap-4">
 					<Button type="submit" className="w-full" disabled={isPending || state.success}>

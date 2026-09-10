@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
 import { deleteCalendarEventAction, saveCalendarEventAction } from "@/app/(app)/kalender/actions";
@@ -29,7 +31,6 @@ export function EventFormDialog({ event, defaultDate, label, className }: { even
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveCalendarEventAction, initialActionState);
 	const [isDeleting, startDelete] = useTransition();
-	const [deleteError, setDeleteError] = useState<string | null>(null);
 
 	useEffect(() => {
 		if (state.success) {
@@ -42,11 +43,10 @@ export function EventFormDialog({ event, defaultDate, label, className }: { even
 		if (typeof window !== "undefined" && !window.confirm(t("calendar.confirm.delete", { title: event.title }))) {
 			return;
 		}
-		setDeleteError(null);
 		startDelete(async () => {
 			const result = await deleteCalendarEventAction(event.id);
 			if (result?.error) {
-				setDeleteError(result.error);
+				showError(result.error);
 			} else {
 				setOpen(false);
 			}
@@ -121,8 +121,7 @@ export function EventFormDialog({ event, defaultDate, label, className }: { even
 							/>
 						</div>
 
-						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-						{deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
+						<ActionErrorToast state={state} />
 					</div>
 
 					<DialogFooter className="sm:justify-between">

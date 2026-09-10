@@ -4,12 +4,14 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import { useFormStatus } from "react-dom";
 import { Loader2, PlugZap, Save } from "lucide-react";
 
+import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
+import { showError } from "@/lib/toast";
 
 import { saveImapSettingsAction, testImapConnectionAction } from "@/app/(app)/einstellungen/actions";
 
@@ -37,13 +39,17 @@ function SubmitButton() {
 function TestConnectionButton() {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
-	const [result, setResult] = useState<{ error?: string; message?: string } | null>(null);
+	const [message, setMessage] = useState<string | null>(null);
 
 	function handleClick() {
-		setResult(null);
+		setMessage(null);
 		startTransition(async () => {
 			const state = await testImapConnectionAction();
-			setResult({ error: state.error, message: state.message });
+			if (state.error) {
+				showError(state.error);
+			} else {
+				setMessage(state.message ?? null);
+			}
 		});
 	}
 
@@ -53,8 +59,7 @@ function TestConnectionButton() {
 				{isPending ? <Loader2 className="animate-spin" /> : <PlugZap />}
 				{t("settings.cards.imap.testConnection")}
 			</Button>
-			{result?.error ? <p className="text-sm text-destructive">{result.error}</p> : null}
-			{result?.message ? <p className="text-sm text-emerald-600">{result.message}</p> : null}
+			{message ? <p className="text-sm text-emerald-600">{message}</p> : null}
 		</div>
 	);
 }
@@ -131,8 +136,8 @@ export function ImapCard({ settings }: { settings: ImapSettings }) {
 						{t("settings.cards.imap.hint")}
 					</p>
 
-					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-					{state.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
+<ActionErrorToast state={state} />
+				{state.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
 
 					<div className="flex items-center justify-between gap-2">
 						<TestConnectionButton />
