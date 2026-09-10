@@ -16,18 +16,12 @@ import { TransactionFormDialog } from "@/components/finanzen/transaction-form-di
 import { GenerateDueTransactionsDialog } from "@/components/finanzen/generate-due-transactions-dialog";
 import { MarkPaidButton } from "@/components/finanzen/mark-paid-button";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { resolvePagination } from "@/lib/pagination";
 
 import { deleteTransactionAction } from "./actions";
 
 export const dynamic = "force-dynamic";
-
-const depositStatusLabels: Record<string, string> = {
-	PENDING: "Ausstehend",
-	RECEIVED: "Hinterlegt",
-	PARTIALLY_REFUNDED: "Teilweise zurückgezahlt",
-	REFUNDED: "Vollständig zurückgezahlt",
-};
 
 const depositStatusStyles: Record<string, string> = {
 	PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
@@ -36,15 +30,8 @@ const depositStatusStyles: Record<string, string> = {
 	REFUNDED: "bg-muted text-muted-foreground",
 };
 
-const transactionStatusLabels: Record<TransactionStatus, string> = {
-	OPEN: "Fällig",
-	PAID: "Bezahlt",
-	OVERDUE: "Überfällig",
-	CANCELLED: "Storniert",
-};
-
 /** Gültige Status-Werte für den Filter (Absicherung gegen beliebige Query-Strings). */
-const transactionStatuses = Object.keys(transactionStatusLabels) as TransactionStatus[];
+const transactionStatuses: TransactionStatus[] = ["OPEN", "PAID", "OVERDUE", "CANCELLED"];
 
 const transactionStatusStyles: Record<string, string> = {
 	OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
@@ -54,6 +41,7 @@ const transactionStatusStyles: Record<string, string> = {
 };
 
 export default async function FinanzenPage({ searchParams }: { searchParams: Promise<{ leaseId?: string; status?: string; page?: string }> }) {
+	const t = await getT();
 	const { leaseId, status: statusParam, page: pageParam } = await searchParams;
 
 	// Status-Filter nur akzeptieren, wenn es ein gültiger Zahlungsstatus ist.
@@ -75,24 +63,24 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Finanzen" description="Kautionskonten und Mieteingänge." />
+			<SiteHeader title={t("finances.title")} description={t("finances.description")} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				{filterLabel ? (
 					<p className="text-sm text-muted-foreground">
-						Gefiltert nach: <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
+						{t("finances.filter.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
 						<Link href="/finanzen" className="text-primary hover:underline">
-							Filter zurücksetzen
+							{t("common.resetFilters")}
 						</Link>
 					</p>
 				) : null}
 				<Tabs defaultValue="mieteingaenge">
 					<TabsList>
 						<TabsTrigger value="mieteingaenge">
-							<Wallet /> Mieteingänge
+							<Wallet /> {t("finances.tabs.transactions")}
 						</TabsTrigger>
 						<TabsTrigger value="kautionen">
-							<PiggyBank /> Kautionskonten
+							<PiggyBank /> {t("finances.tabs.deposits")}
 						</TabsTrigger>
 					</TabsList>
 
@@ -102,7 +90,7 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 								<CardContent className="flex items-center gap-3 py-4">
 									<AlertTriangle className="size-5 text-red-600" />
 									<p className="text-sm">
-										<span className="font-semibold">{formatCurrency(arrears)}</span> an Mietrückständen (fällige/überfällige Zahlungen).
+										<span className="font-semibold">{formatCurrency(arrears)}</span> {t("finances.stats.arrears")}
 									</p>
 								</CardContent>
 							</Card>
@@ -116,23 +104,23 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 								{leaseId ? <input type="hidden" name="leaseId" value={leaseId} /> : null}
 								<div className="flex flex-col gap-1">
 									<label htmlFor="status" className="text-xs text-muted-foreground">
-										Status
+										{t("common.status")}
 									</label>
 									<select id="status" name="status" defaultValue={status ?? ""} className="h-9 rounded-md border bg-background px-3 text-sm">
-										<option value="">Alle Status</option>
+										<option value="">{t("finances.filter.allStatuses")}</option>
 										{transactionStatuses.map((value) => (
 											<option key={value} value={value}>
-												{transactionStatusLabels[value]}
+												{t(`finances.status.${value}`)}
 											</option>
 										))}
 									</select>
 								</div>
 								<Button type="submit" variant="outline" size="sm">
-									Filtern
+									{t("common.filter")}
 								</Button>
 								{status ? (
 									<Button asChild variant="ghost" size="sm">
-										<Link href={leaseId ? `/finanzen?leaseId=${leaseId}` : "/finanzen"}>Zurücksetzen</Link>
+										<Link href={leaseId ? `/finanzen?leaseId=${leaseId}` : "/finanzen"}>{t("finances.filter.reset")}</Link>
 									</Button>
 								) : null}
 							</form>
@@ -147,18 +135,18 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 								{transactionList.length === 0 ? (
 									<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 										<Wallet className="size-8" />
-										<p>{status ? "Keine Zahlungen für den gewählten Status." : "Noch keine Zahlungen erfasst."}</p>
+										<p>{status ? t("finances.empty.transactionsFiltered") : t("finances.empty.transactions")}</p>
 									</div>
 								) : (
 									<Table>
 										<TableHeader>
 											<TableRow>
-												<TableHead>Mieter / Einheit</TableHead>
-												<TableHead>Verwendungszweck</TableHead>
-												<TableHead>Fällig am</TableHead>
-												<TableHead className="text-right">Betrag</TableHead>
-												<TableHead>Status</TableHead>
-												<TableHead className="w-[120px] text-right">Aktionen</TableHead>
+												<TableHead>{t("finances.table.tenantUnit")}</TableHead>
+												<TableHead>{t("finances.table.purpose")}</TableHead>
+												<TableHead>{t("finances.table.dueDate")}</TableHead>
+												<TableHead className="text-right">{t("common.amount")}</TableHead>
+												<TableHead>{t("common.status")}</TableHead>
+												<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
 											</TableRow>
 										</TableHeader>
 										<TableBody>
@@ -175,18 +163,18 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 													<TableCell className="text-muted-foreground">{transaction.purpose ?? "–"}</TableCell>
 													<TableCell className="text-muted-foreground">{formatDate(transaction.dueDate)}</TableCell>
 													<TableCell className="text-right">{formatCurrency(transaction.amount)}</TableCell>
-													<TableCell>
-														<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${transactionStatusStyles[transaction.status]}`}>
-															{transactionStatusLabels[transaction.status]}
-														</span>
-													</TableCell>
-													<TableCell>
-														<div className="flex items-center justify-end gap-1">
-															{transaction.status !== "PAID" ? <MarkPaidButton transactionId={transaction.id} /> : null}
-															<TransactionFormDialog transaction={transaction} leases={leaseList} />
-															<ConfirmDeleteButton action={deleteTransactionAction.bind(null, transaction.id)} confirmMessage="Diese Zahlung wirklich löschen?" />
-														</div>
-													</TableCell>
+												<TableCell>
+													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${transactionStatusStyles[transaction.status]}`}>
+														{t(`finances.status.${transaction.status}`)}
+													</span>
+												</TableCell>
+												<TableCell>
+													<div className="flex items-center justify-end gap-1">
+														{transaction.status !== "PAID" ? <MarkPaidButton transactionId={transaction.id} /> : null}
+														<TransactionFormDialog transaction={transaction} leases={leaseList} />
+														<ConfirmDeleteButton action={deleteTransactionAction.bind(null, transaction.id)} confirmMessage={t("finances.confirm.deleteTransaction")} />
+													</div>
+												</TableCell>
 												</TableRow>
 											))}
 										</TableBody>
@@ -201,22 +189,22 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 					<TabsContent value="kautionen" className="space-y-4">
 						<Card>
 							<CardContent className="p-0">
-								{leaseList.length === 0 ? (
-									<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-										<PiggyBank className="size-8" />
-										<p>Noch keine Mietverträge vorhanden.</p>
-									</div>
-								) : (
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>Mieter / Einheit</TableHead>
-												<TableHead className="text-right">Kaution (Vertrag)</TableHead>
-												<TableHead className="text-right">Betrag (Konto)</TableHead>
-												<TableHead>Status</TableHead>
-												<TableHead className="w-[100px] text-right">Aktionen</TableHead>
-											</TableRow>
-										</TableHeader>
+							{leaseList.length === 0 ? (
+								<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+									<PiggyBank className="size-8" />
+									<p>{t("finances.empty.leases")}</p>
+								</div>
+							) : (
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>{t("finances.table.tenantUnit")}</TableHead>
+											<TableHead className="text-right">{t("finances.table.depositContract")}</TableHead>
+											<TableHead className="text-right">{t("finances.table.depositAccount")}</TableHead>
+											<TableHead>{t("common.status")}</TableHead>
+											<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
+										</TableRow>
+									</TableHeader>
 										<TableBody>
 											{leaseList.map((lease) => (
 												<TableRow key={lease.id}>
@@ -230,15 +218,15 @@ export default async function FinanzenPage({ searchParams }: { searchParams: Pro
 													</TableCell>
 													<TableCell className="text-right text-muted-foreground">{formatCurrency(lease.deposit)}</TableCell>
 													<TableCell className="text-right">{lease.depositAccount ? formatCurrency(lease.depositAccount.amount) : "–"}</TableCell>
-													<TableCell>
-														{lease.depositAccount ? (
-															<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${depositStatusStyles[lease.depositAccount.status]}`}>
-																{depositStatusLabels[lease.depositAccount.status]}
-															</span>
-														) : (
-															<span className="text-xs text-muted-foreground">Nicht erfasst</span>
-														)}
-													</TableCell>
+												<TableCell>
+													{lease.depositAccount ? (
+														<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${depositStatusStyles[lease.depositAccount.status]}`}>
+															{t(`finances.depositStatus.${lease.depositAccount.status}`)}
+														</span>
+													) : (
+														<span className="text-xs text-muted-foreground">{t("finances.deposit.notRecorded")}</span>
+													)}
+												</TableCell>
 													<TableCell>
 														<div className="flex items-center justify-end gap-1">
 															<DepositFormDialog

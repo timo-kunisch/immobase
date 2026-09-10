@@ -1,4 +1,4 @@
-import type { EconomicPlanStatus, HoaAllocationKey, HoaCostCategory } from "@/data/types";
+import type { EconomicPlanStatus, HoaAllocationKey } from "@/data/types";
 import { toCents, centsToDecimalString, distributeCents } from "@/lib/money";
 
 /**
@@ -154,29 +154,8 @@ export function calculateEconomicPlanResult(plan: EconomicPlanInput): EconomicPl
 	return { unitShares, warnings, totalAnnualAmountCents };
 }
 
-export const economicPlanStatusLabels: Record<EconomicPlanStatus, string> = {
-	DRAFT: "Entwurf",
-	FINALIZED: "Finalisiert",
-};
-
 export const economicPlanStatusStyles: Record<EconomicPlanStatus, string> = {
 	DRAFT: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
 	FINALIZED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
 };
 
-export const hoaCostCategoryLabels: Record<HoaCostCategory, string> = {
-	RESERVE_CONTRIBUTION: "Zuführung Erhaltungsrücklage",
-	ADMINISTRATOR_FEE: "Verwaltervergütung",
-	INSURANCE: "Versicherung",
-	CARETAKER: "Hauswart",
-	MAINTENANCE_REPAIR: "Instandhaltung/Reparatur",
-	WATER_DRAINAGE: "Wasser/Abwasser",
-	HEATING: "Heizung",
-	ELECTRICITY_COMMON: "Strom Gemeinschaftsflächen",
-	CLEANING: "Reinigung",
-	GARDEN_MAINTENANCE: "Gartenpflege",
-	ELEVATOR: "Aufzug",
-	LEGAL_ADVICE: "Rechts-/Steuerberatung",
-	BANK_FEES: "Bankgebühren",
-	OTHER: "Sonstige Kosten",
-};

@@ -14,7 +14,9 @@ import { DocumentSearchForm } from "@/components/dokumente/document-search-form"
 import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
 import { formatDate } from "@/lib/format";
 import { formatFileSize } from "@/lib/format";
-import { documentSourceTypeLabels, loadUnifiedDocuments } from "@/lib/documents-overview";
+import { loadUnifiedDocuments } from "@/lib/documents-overview";
+import { getT } from "@/lib/i18n/server";
+import type { MessageKey } from "@/lib/i18n/translator";
 import { resolvePagination } from "@/lib/pagination";
 
 import { deleteAnyDocumentAction, sendAnyDocumentByPostAction } from "./actions";
@@ -22,11 +24,17 @@ import { isLetterXpressConfigured } from "@/lib/letterxpress";
 
 export const dynamic = "force-dynamic";
 
-const typeLabels: Record<string, string> = {
-	CONTRACT: "Vertrag",
-	INVOICE: "Rechnung",
-	FLOORPLAN: "Grundriss",
-	OTHER: "Sonstiges",
+const typeLabelKeys: Record<string, MessageKey> = {
+	CONTRACT: "documents.category.CONTRACT",
+	INVOICE: "documents.category.INVOICE",
+	FLOORPLAN: "documents.category.FLOORPLAN",
+	OTHER: "documents.category.OTHER",
+};
+
+const sourceTypeLabelKeys: Record<string, MessageKey> = {
+	DOCUMENT: "documents.sourceType.DOCUMENT",
+	GENERATED_DOCUMENT: "documents.sourceType.GENERATED_DOCUMENT",
+	TENANT_STATEMENT: "documents.sourceType.TENANT_STATEMENT",
 };
 
 const sourceTypeStyles: Record<string, string> = {
@@ -46,6 +54,7 @@ export default async function DokumentePage({
 		page?: string;
 	}>;
 }) {
+	const t = await getT();
 	const { q, propertyId, unitId, tenantId, page: pageParam } = await searchParams;
 	const postalConfigured = isLetterXpressConfigured();
 	const query = q?.trim();
@@ -76,36 +85,36 @@ export default async function DokumentePage({
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Dokumente" description="Digitale Dokumentenablage (DMS)." actions={<DocumentUploadDialog properties={propertyList} units={unitList} tenants={tenantList} />} />
+		<SiteHeader title={t("documents.title")} description={t("documents.description")} actions={<DocumentUploadDialog properties={propertyList} units={unitList} tenants={tenantList} />} />
 
-			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				{filterLabel ? (
-					<p className="text-sm text-muted-foreground">
-						Gefiltert nach: <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
-						<Link href="/dokumente" className="text-primary hover:underline">
-							Filter zurücksetzen
-						</Link>
-					</p>
-				) : null}
+		<div className="flex-1 space-y-4 p-4 sm:p-6">
+			{filterLabel ? (
+				<p className="text-sm text-muted-foreground">
+					{t("documents.filter.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
+					<Link href="/dokumente" className="text-primary hover:underline">
+						{t("common.resetFilters")}
+					</Link>
+				</p>
+			) : null}
 				<DocumentSearchForm defaultValue={query} />
 
 				<Card>
 					<CardContent className="p-0">
 						{documentRows.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-								<FolderOpen className="size-8" />
-								<p>{query ? `Keine Dokumente gefunden für "${query}".` : "Noch keine Dokumente vorhanden."}</p>
+							<FolderOpen className="size-8" />
+							<p>{query ? t("documents.emptySearch", { query }) : t("documents.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
-									<TableRow>
-										<TableHead>Datei</TableHead>
-										<TableHead>Quelle</TableHead>
-										<TableHead>Verknüpft mit</TableHead>
-										<TableHead>Datum</TableHead>
-										<TableHead className="w-[100px] text-right">Aktionen</TableHead>
-									</TableRow>
+								<TableRow>
+									<TableHead>{t("documents.table.file")}</TableHead>
+									<TableHead>{t("documents.table.source")}</TableHead>
+									<TableHead>{t("documents.table.linkedTo")}</TableHead>
+									<TableHead>{t("common.date")}</TableHead>
+									<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
+								</TableRow>
 								</TableHeader>
 							<TableBody>
 								{pagedDocumentRows.map((document) => (
@@ -119,8 +128,8 @@ export default async function DokumentePage({
 											</TableCell>
 											<TableCell>
 												<div className="flex flex-col gap-1">
-													<Badge className={sourceTypeStyles[document.sourceType]}>{documentSourceTypeLabels[document.sourceType]}</Badge>
-													{document.documentType ? <Badge variant="secondary">{typeLabels[document.documentType]}</Badge> : null}
+												<Badge className={sourceTypeStyles[document.sourceType]}>{t(sourceTypeLabelKeys[document.sourceType])}</Badge>
+												{document.documentType ? <Badge variant="secondary">{t(typeLabelKeys[document.documentType])}</Badge> : null}
 												</div>
 											</TableCell>
 											<TableCell className="text-muted-foreground">
@@ -149,17 +158,17 @@ export default async function DokumentePage({
 											<TableCell className="text-muted-foreground">{formatDate(document.createdAt)}</TableCell>
 											<TableCell>
 												<div className="flex items-center justify-end gap-1">
-													<SendByPostButton
-														sendAction={sendAnyDocumentByPostAction.bind(null, document.sourceType, document.id)}
-														disabled={!postalConfigured || document.mimeType !== "application/pdf"}
-														disabledReason={!postalConfigured ? "Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" : "Nur PDF-Dokumente können per Post versendet werden."}
+												<SendByPostButton
+													sendAction={sendAnyDocumentByPostAction.bind(null, document.sourceType, document.id)}
+													disabled={!postalConfigured || document.mimeType !== "application/pdf"}
+													disabledReason={!postalConfigured ? t("postal.notConfiguredShort") : t("documents.errors.onlyPdf")}
+												/>
+												{document.sourceType !== "TENANT_STATEMENT" ? (
+													<ConfirmDeleteButton
+														action={deleteAnyDocumentAction.bind(null, document.sourceType, document.id)}
+														confirmMessage={t("documents.confirm.delete", { name: document.fileName })}
 													/>
-													{document.sourceType !== "TENANT_STATEMENT" ? (
-														<ConfirmDeleteButton
-															action={deleteAnyDocumentAction.bind(null, document.sourceType, document.id)}
-															confirmMessage={`"${document.fileName}" wirklich löschen?`}
-														/>
-													) : null}
+												) : null}
 												</div>
 											</TableCell>
 										</TableRow>

@@ -1,17 +1,22 @@
 /** Minimalistische, dependency-freie Validierung für Auth-Formulare. */
 
+import type { MessageKey } from "@/lib/i18n/translator";
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function isValidEmail(email: string): boolean {
 	return EMAIL_REGEX.test(email);
 }
 
-const MIN_PASSWORD_LENGTH = 8;
+export const MIN_PASSWORD_LENGTH = 8;
 
-/** Gibt bei ungültigem Passwort eine Fehlermeldung zurück, sonst null. */
-export function validatePassword(password: string): string | null {
+/**
+ * Gibt bei ungültigem Passwort den Übersetzungsschlüssel der Fehlermeldung
+ * zurück, sonst null. Aufrufer übersetzen mit t(key, { min: MIN_PASSWORD_LENGTH }).
+ */
+export function validatePassword(password: string): MessageKey | null {
 	if (password.length < MIN_PASSWORD_LENGTH) {
-		return `Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.`;
+		return "auth.errors.passwordTooShort";
 	}
 	return null;
 }

@@ -13,6 +13,7 @@ import { resetApplicationData } from "@/data/reset";
 import { ActionState } from "@/lib/action-state";
 import { getDataKeyBase64 } from "@/lib/data-key";
 import { encryptPlaintextFilesInTree } from "@/lib/file-crypto";
+import { getT } from "@/lib/i18n/server";
 import { generateMcpToken, getMcpToken, hasMcpToken, setMcpEnabled, type McpTokenKind } from "@/lib/mcp/auth";
 
 import { RESET_CONFIRMATION_PHRASE } from "./reset-confirmation";
@@ -29,6 +30,7 @@ function getString(formData: FormData, key: string): string {
  */
 export async function saveCompanySettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	const name = getString(formData, "name");
 	const street = getString(formData, "street");
@@ -47,7 +49,7 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
 		logActivity(admin, "UPDATE", "einstellungen", "Absenderdaten aktualisiert");
 	} catch (error) {
 		console.error("saveCompanySettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -61,6 +63,7 @@ export async function saveCompanySettingsAction(_prevState: ActionState, formDat
  */
 export async function saveSmtpSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	try {
 		// Leere Host-Adresse = deaktiviert -> alle E-Mail-Funktionen abgeschaltet
@@ -75,7 +78,7 @@ export async function saveSmtpSettingsAction(_prevState: ActionState, formData: 
 		logActivity(admin, "UPDATE", "einstellungen", "SMTP-Einstellungen (E-Mail-Versand) aktualisiert");
 	} catch (error) {
 		console.error("saveSmtpSettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -90,6 +93,7 @@ export async function saveSmtpSettingsAction(_prevState: ActionState, formData: 
  */
 export async function saveLetterXpressSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	try {
 		setSetting("letterxpress.username", getString(formData, "lxUsername"));
@@ -100,7 +104,7 @@ export async function saveLetterXpressSettingsAction(_prevState: ActionState, fo
 		logActivity(admin, "UPDATE", "einstellungen", "LetterXpress-Einstellungen (Postversand) aktualisiert");
 	} catch (error) {
 		console.error("saveLetterXpressSettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -116,6 +120,7 @@ export async function saveLetterXpressSettingsAction(_prevState: ActionState, fo
  */
 export async function saveImapSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	try {
 		setSetting("imap.host", getString(formData, "imapHost"));
@@ -129,7 +134,7 @@ export async function saveImapSettingsAction(_prevState: ActionState, formData: 
 		logActivity(admin, "UPDATE", "einstellungen", "IMAP-Einstellungen (E-Mail-Postfach) aktualisiert");
 	} catch (error) {
 		console.error("saveImapSettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -144,13 +149,14 @@ export async function saveImapSettingsAction(_prevState: ActionState, formData: 
  */
 export async function testImapConnectionAction(): Promise<ActionState> {
 	await requireAdmin();
+	const t = await getT();
 	// Lazy import: imapflow soll nur geladen werden, wenn es auch gebraucht wird.
 	const { testImapConnection } = await import("@/lib/email/imap-sync");
 	const result = await testImapConnection();
 	if (!result.ok) {
-		return { error: `Verbindung fehlgeschlagen: ${result.error ?? "Unbekannter Fehler"}` };
+		return { error: t("settings.cards.imap.testFailed", { error: result.error ?? t("settings.errors.unknown") }) };
 	}
-	return { success: true, message: "Die Verbindung zum IMAP-Server war erfolgreich." };
+	return { success: true, message: t("settings.cards.imap.testSuccess") };
 }
 
 export interface EncryptFilesResult {
@@ -167,11 +173,12 @@ export interface EncryptFilesResult {
  */
 export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> {
 	const admin = await requireAdmin();
+	const t = await getT();
 	try {
 		const result = await encryptPlaintextFilesInTree(getFilesDir());
 		if (result.failed.length > 0) {
 			return {
-				error: `${result.failed.length} Datei(en) konnten nicht verschlüsselt werden (Details im Server-Log).`,
+				error: t("settings.cards.security.encryptFailedCount", { count: result.failed.length }),
 				encrypted: result.encrypted,
 				alreadyEncrypted: result.alreadyEncrypted,
 				failed: result.failed.length,
@@ -182,7 +189,7 @@ export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> 
 		return { encrypted: result.encrypted, alreadyEncrypted: result.alreadyEncrypted, failed: 0 };
 	} catch (error) {
 		console.error("encryptExistingFilesAction failed", error);
-		return { error: "Die Dateiverschlüsselung konnte nicht ausgeführt werden." };
+		return { error: t("settings.cards.security.encryptRunFailed") };
 	}
 }
 
@@ -193,11 +200,12 @@ export async function encryptExistingFilesAction(): Promise<EncryptFilesResult> 
  */
 export async function getRecoveryKeyAction(): Promise<{ key?: string; error?: string }> {
 	await requireAdmin();
+	const t = await getT();
 	try {
 		return { key: getDataKeyBase64() };
 	} catch (error) {
 		console.error("getRecoveryKeyAction failed", error);
-		return { error: "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." };
+		return { error: t("settings.cards.security.recoveryKey.readFailed") };
 	}
 }
 
@@ -217,9 +225,10 @@ export async function getRecoveryKeyAction(): Promise<{ key?: string; error?: st
  */
 export async function resetApplicationAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	await requireAdmin();
+	const t = await getT();
 
 	if (getString(formData, "confirmation") !== RESET_CONFIRMATION_PHRASE) {
-		return { error: `Bitte geben Sie zur Bestätigung exakt „${RESET_CONFIRMATION_PHRASE}“ ein.` };
+		return { error: t("settings.cards.reset.confirmMismatch", { phrase: RESET_CONFIRMATION_PHRASE }) };
 	}
 
 	try {
@@ -229,13 +238,13 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
 		resetApplicationData();
 	} catch (error) {
 		console.error("resetApplicationAction failed", error);
-		return { error: "Die Anwendung konnte nicht vollständig zurückgesetzt werden (Details im Server-Log)." };
+		return { error: t("settings.cards.reset.failed") };
 	}
 
 	const cookieStore = await cookies();
 	cookieStore.delete(SESSION_COOKIE_NAME);
 
-	return { success: true, message: "Die Anwendung wurde zurückgesetzt." };
+	return { success: true, message: t("settings.cards.reset.success") };
 }
 
 // ============================================================
@@ -252,19 +261,20 @@ export async function resetApplicationAction(_prevState: ActionState, formData: 
  */
 export async function saveAiSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	const baseUrl = getString(formData, "aiBaseUrl");
 	const model = getString(formData, "aiModel");
 	const apiKey = getString(formData, "aiApiKey");
 
 	if (baseUrl && !/^https?:\/\/.+/.test(baseUrl)) {
-		return { error: "Die Basis-URL muss mit http:// oder https:// beginnen (z. B. https://api.openai.com/v1)." };
+		return { error: t("settings.cards.ai.errors.invalidBaseUrl") };
 	}
 	if (baseUrl && !model) {
-		return { error: "Bitte geben Sie auch ein Modell an (z. B. gpt-4o-mini)." };
+		return { error: t("settings.cards.ai.errors.modelRequired") };
 	}
 	if (!baseUrl && model) {
-		return { error: "Bitte geben Sie auch die Basis-URL an (oder beide Felder leeren, um den KI-Assistenten zu deaktivieren)." };
+		return { error: t("settings.cards.ai.errors.baseUrlRequired") };
 	}
 
 	try {
@@ -274,7 +284,7 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
 		logActivity(admin, "UPDATE", "einstellungen", "KI-Einstellungen aktualisiert");
 	} catch (error) {
 		console.error("saveAiSettingsAction failed", error);
-		return { error: "Die KI-Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.cards.ai.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -296,6 +306,7 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
  */
 export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 	try {
 		setMcpEnabled(enabled);
 		if (enabled) {
@@ -305,12 +316,13 @@ export async function setMcpEnabledAction(enabled: boolean): Promise<ActionState
 		logActivity(admin, "UPDATE", "einstellungen", enabled ? "MCP-Server aktiviert" : "MCP-Server deaktiviert");
 	} catch (error) {
 		console.error("setMcpEnabledAction failed", error);
-		return { error: "Die MCP-Einstellung konnte nicht gespeichert werden." };
+		return { error: t("settings.cards.mcp.errors.saveFailed") };
 	}
 	revalidatePath("/einstellungen");
 	return { success: true };
 }
 
+/** Deutsche Bezeichnungen der Token-Stufen (nur für das Aktivitätsprotokoll). */
 const TOKEN_KIND_LABELS: Record<McpTokenKind, string> = {
 	ADMIN: "Admin-Token",
 	USER: "Nutzer-Token",
@@ -323,14 +335,18 @@ const TOKEN_KIND_LABELS: Record<McpTokenKind, string> = {
  */
 export async function getMcpTokenAction(kind: McpTokenKind): Promise<{ token?: string; error?: string }> {
 	await requireAdmin();
-	if (kind !== "ADMIN" && kind !== "USER") return { error: "Unbekannte Token-Stufe." };
+	const t = await getT();
+	if (kind !== "ADMIN" && kind !== "USER") return { error: t("settings.cards.mcp.errors.unknownTokenKind") };
 	try {
 		const token = getMcpToken(kind);
-		if (!token) return { error: `Es ist noch kein ${TOKEN_KIND_LABELS[kind]} vorhanden - MCP-Server zuerst aktivieren.` };
+		if (!token) {
+			const kindLabel = t(kind === "ADMIN" ? "settings.cards.mcp.tokenKind.ADMIN" : "settings.cards.mcp.tokenKind.USER");
+			return { error: t("settings.cards.mcp.errors.tokenMissing", { kind: kindLabel }) };
+		}
 		return { token };
 	} catch (error) {
 		console.error("getMcpTokenAction failed", error);
-		return { error: "Das MCP-Token konnte nicht gelesen werden." };
+		return { error: t("settings.cards.mcp.token.readFailed") };
 	}
 }
 
@@ -341,13 +357,14 @@ export async function getMcpTokenAction(kind: McpTokenKind): Promise<{ token?: s
  */
 export async function regenerateMcpTokenAction(kind: McpTokenKind): Promise<{ token?: string; error?: string }> {
 	const admin = await requireAdmin();
-	if (kind !== "ADMIN" && kind !== "USER") return { error: "Unbekannte Token-Stufe." };
+	const t = await getT();
+	if (kind !== "ADMIN" && kind !== "USER") return { error: t("settings.cards.mcp.errors.unknownTokenKind") };
 	try {
 		const token = generateMcpToken(kind);
 		logActivity(admin, "UPDATE", "einstellungen", `MCP-${TOKEN_KIND_LABELS[kind]} neu erzeugt`);
 		return { token };
 	} catch (error) {
 		console.error("regenerateMcpTokenAction failed", error);
-		return { error: "Das MCP-Token konnte nicht neu erzeugt werden." };
+		return { error: t("settings.cards.mcp.token.regenerateFailed") };
 	}
 }

@@ -6,6 +6,8 @@ import { runChat, ChatError, type ChatAttachmentInput } from "@/lib/ai/chat";
 import { AiClientError } from "@/lib/ai/client";
 import { isAiConfigured } from "@/lib/ai/config";
 import { getCurrentUser } from "@/lib/auth/dal";
+import { getLocale, getT } from "@/lib/i18n/server";
+import type { MessageKey, TranslateParams } from "@/lib/i18n/translator";
 import { appendChatMessages, listChatMessages } from "@/data/chat-messages";
 
 export const dynamic = "force-dynamic";
@@ -47,25 +49,29 @@ interface ParsedBody {
 	attachments: ChatAttachmentInput[];
 }
 
-function parseBody(body: unknown): ParsedBody | string {
-	if (typeof body !== "object" || body === null) return "Der Request-Body muss ein JSON-Objekt sein.";
+// Validierungsfehler werden als Übersetzungsschlüssel + Parameter
+// zurückgegeben und erst im Handler in der Sprache des Nutzers aufgelöst.
+type BodyError = { key: MessageKey; params?: TranslateParams };
+
+function parseBody(body: unknown): ParsedBody | BodyError {
+	if (typeof body !== "object" || body === null) return { key: "chat.route.bodyNotObject" };
 	const { message, attachments } = body as { message?: unknown; attachments?: unknown };
 
 	if (typeof message !== "string" || message.trim() === "" || message.length > MAX_MESSAGE_CHARS) {
-		return `Erwartet wird eine nicht-leere Nachricht mit höchstens ${MAX_MESSAGE_CHARS} Zeichen.`;
+		return { key: "chat.route.messageInvalid", params: { max: MAX_MESSAGE_CHARS } };
 	}
 
 	const parsedAttachments: ChatAttachmentInput[] = [];
 	if (attachments !== undefined) {
 		if (!Array.isArray(attachments) || attachments.length > MAX_ATTACHMENTS_PER_MESSAGE) {
-			return `Erwartet werden höchstens ${MAX_ATTACHMENTS_PER_MESSAGE} Datei-Anhänge.`;
+			return { key: "chat.route.attachmentsTooMany", params: { max: MAX_ATTACHMENTS_PER_MESSAGE } };
 		}
 		for (const attachment of attachments) {
-			if (typeof attachment !== "object" || attachment === null) return "Ungültiges Anhang-Format.";
+			if (typeof attachment !== "object" || attachment === null) return { key: "chat.route.attachmentInvalid" };
 			const { name, dataBase64 } = attachment as { name?: unknown; dataBase64?: unknown };
-			if (typeof name !== "string" || name.trim() === "" || name.length > 255) return "Ungültiger Dateiname im Anhang.";
+			if (typeof name !== "string" || name.trim() === "" || name.length > 255) return { key: "chat.route.attachmentNameInvalid" };
 			if (typeof dataBase64 !== "string" || dataBase64.length === 0 || dataBase64.length > MAX_ATTACHMENT_BASE64_CHARS) {
-				return `Der Anhang "${name}" ist zu groß oder beschädigt.`;
+				return { key: "chat.route.attachmentTooLarge", params: { name: String(name) } };
 			}
 			parsedAttachments.push({ name: name.trim(), dataBase64 });
 		}
@@ -74,34 +80,42 @@ function parseBody(body: unknown): ParsedBody | string {
 	return { message: message.trim(), attachments: parsedAttachments };
 }
 
+function isBodyError(parsed: ParsedBody | BodyError): parsed is BodyError {
+	return "key" in parsed;
+}
+
 export async function POST(request: Request) {
 	// Äußerer Catch-All: Diese Route liefert IMMER JSON (auch bei
 	// unerwarteten Fehlern in Auth-/DB-Zugriffen) - der Chat-Client zeigt
 	// die Meldung direkt an; eine HTML-Fehlerseite von Next wäre dort nur
 	// als kryptischer JSON-Parse-Fehler sichtbar.
+	// getT() steht bewusst VOR dem try: ohne Übersetzer könnte auch der
+	// Catch-All keine lokalisierte Meldung liefern; ein Fehler hier würde
+	// ohnehin nur beim Cookie-Zugriff auftreten (Request-Kontext liegt vor).
+	// Die Locale geht zusätzlich an runChat, damit Systemprompt und die
+	// Fehlertexte des KI-Stacks derselben Sprache folgen.
+	const t = await getT();
+	const locale = await getLocale();
 	try {
 		const user = await getCurrentUser();
 		if (!user) {
-			return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+			return NextResponse.json({ error: t("chat.route.unauthorized") }, { status: 401 });
 		}
 
 		if (!isAiConfigured()) {
-			return NextResponse.json(
-				{ error: "Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent." },
-				{ status: 503 }
-			);
+			return NextResponse.json({ error: t("chat.route.notConfigured") }, { status: 503 });
 		}
 
 		let rawBody: unknown;
 		try {
 			rawBody = await request.json();
 		} catch {
-			return NextResponse.json({ error: "Der Request-Body ist kein gültiges JSON." }, { status: 400 });
+			return NextResponse.json({ error: t("chat.route.invalidJson") }, { status: 400 });
 		}
 
 		const parsed = parseBody(rawBody);
-		if (typeof parsed === "string") {
-			return NextResponse.json({ error: parsed }, { status: 400 });
+		if (isBodyError(parsed)) {
+			return NextResponse.json({ error: t(parsed.key, parsed.params) }, { status: 400 });
 		}
 
 		// Harte Obergrenze des Verlaufs (Verlauf + neue Nachricht): Ab hier
@@ -112,7 +126,7 @@ export async function POST(request: Request) {
 		if (totalHistoryChars >= CHAT_HISTORY_HARD_LIMIT_CHARS) {
 			return NextResponse.json(
 				{
-					error: `Der Chatverlauf hat die maximale Größe von ${new Intl.NumberFormat("de-DE").format(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen erreicht. Bitte löschen Sie den Verlauf im Dialog (Papierkorb-Button), bevor Sie weitermachen.`,
+					error: t("chat.route.hardLimit", { max: new Intl.NumberFormat("de-DE").format(CHAT_HISTORY_HARD_LIMIT_CHARS) }),
 				},
 				{ status: 413 }
 			);
@@ -133,6 +147,7 @@ export async function POST(request: Request) {
 				attachments: parsed.attachments,
 				userEmail: user.email,
 				userRole: user.role,
+				locale,
 			});
 			// Erst nach erfolgreichem Durchlauf persistieren: Nutzerfrage und
 			// Assistenten-Antwort gehören zusammen (eine Transaktion).
@@ -143,7 +158,7 @@ export async function POST(request: Request) {
 			return NextResponse.json(result);
 		} catch (error) {
 			const isKnownError = error instanceof ChatError || error instanceof AiClientError;
-			const message = isKnownError ? error.message : "Interner Fehler bei der Verarbeitung (Details im Server-Log).";
+			const message = isKnownError ? error.message : t("chat.route.internalError");
 			if (!isKnownError) {
 				console.error("[ai] Chat-Endpunkt fehlgeschlagen:", error);
 			}
@@ -164,6 +179,6 @@ export async function POST(request: Request) {
 		}
 	} catch (error) {
 		console.error("[ai] Unerwarteter Fehler im Chat-Endpunkt:", error);
-		return NextResponse.json({ error: "Interner Serverfehler im Chat-Endpunkt (Details im Server-Log)." }, { status: 500 });
+		return NextResponse.json({ error: t("chat.route.serverError") }, { status: 500 });
 	}
 }

@@ -6,7 +6,8 @@ import { countUsers, getUserByEmail } from "@/data/users";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { provisionUserAccount } from "@/lib/auth/bootstrap";
-import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/validation";
+import { getT } from "@/lib/i18n/server";
+import { isValidEmail, MIN_PASSWORD_LENGTH, normalizeEmail, validatePassword } from "@/lib/auth/validation";
 
 /**
  * Registrierung neuer Nutzer – Bootstrapping-Muster (siehe
@@ -21,26 +22,27 @@ import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/valid
  * abgesichert zu werden.
  */
 export async function registerAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const t = await getT();
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 	const password = String(formData.get("password") ?? "");
 	const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
 	if (!isValidEmail(email)) {
-		return { error: "Bitte geben Sie eine gültige E-Mail-Adresse an." };
+		return { error: t("auth.errors.invalidEmail") };
 	}
 
 	const passwordError = validatePassword(password);
 	if (passwordError) {
-		return { error: passwordError };
+		return { error: t(passwordError, { min: MIN_PASSWORD_LENGTH }) };
 	}
 
 	if (password !== passwordConfirm) {
-		return { error: "Die Passwörter stimmen nicht überein." };
+		return { error: t("auth.errors.passwordMismatch") };
 	}
 
 	const existing = getUserByEmail(email);
 	if (existing) {
-		return { error: "Für diese E-Mail-Adresse existiert bereits ein Konto." };
+		return { error: t("auth.errors.emailTaken") };
 	}
 
 	const isFirstUser = countUsers() === 0;

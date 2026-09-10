@@ -1,0 +1,136 @@
+/**
+ * Namespace "billing" (Deutsch): Modul "Abrechnung" (Nebenkostenabrechnung
+ * nach § 2 BetrKV) - Übersicht, Detailseite einer Abrechnungsperiode inkl.
+ * Kostenpositionen/Verbrauchswerten/Finalisierung und die Fehlertexte der
+ * Server Actions. Das erzeugte Abrechnungs-PDF bleibt bewusst deutsch und
+ * ist hier nicht Teil der Übersetzung.
+ */
+export const billing = {
+	title: "Abrechnung",
+	description: "Nebenkostenabrechnungen je Liegenschaft und Zeitraum.",
+	// Leer-Zustände
+	"empty.noProperties": "Legen Sie zuerst eine Liegenschaft an, um Abrechnungsperioden erfassen zu können.",
+	"empty.periods": "Noch keine Abrechnungsperioden angelegt.",
+	"empty.periodsFiltered": "Keine Abrechnungsperioden für diese Liegenschaft gefunden.",
+	"empty.costItems": "Noch keine Kostenpositionen erfasst.",
+	"empty.leases": "Für den gewählten Zeitraum wurden keine Mietverhältnisse gefunden.",
+	"empty.statements": "Keine Abrechnungsergebnisse vorhanden.",
+	// Status der Abrechnungsperiode (Enum BillingPeriodStatus)
+	"status.DRAFT": "Entwurf",
+	"status.FINALIZED": "Finalisiert",
+	// Detailseite
+	"detail.title": "Abrechnung: {name}",
+	"detail.costItems": "Kostenpositionen",
+	"detail.statements": "Abrechnung je Mietverhältnis",
+	"detail.finalized": "Finalisiert",
+	"detail.days": "Tage",
+	"detail.balancePayment": "Nachzahlung {amount}",
+	"detail.balanceCredit": "Guthaben {amount}",
+	// Tabellenköpfe
+	"table.period": "Zeitraum",
+	"table.costItems": "Kostenpositionen",
+	"table.label": "Bezeichnung",
+	"table.category": "Kostenart",
+	"table.allocationKey": "Umlageschlüssel",
+	"table.tenantUnit": "Mieter / Einheit",
+	"table.timeShare": "Zeitanteil",
+	"table.allocatedCosts": "Umgelegte Kosten",
+	"table.prepayments": "Vorauszahlungen",
+	"table.balance": "Saldo",
+	"table.pdf": "PDF",
+	// Bestätigungsdialoge
+	"confirm.deletePeriod": "Diese Abrechnungsperiode inkl. aller Kostenpositionen wirklich löschen?",
+	"confirm.deleteCostItem": "Kostenposition \"{label}\" wirklich löschen?",
+	"confirm.finalize":
+		"Diese Abrechnungsperiode wirklich finalisieren? Danach können Kostenpositionen, Verbrauchswerte und Zeitraum nicht mehr geändert werden.",
+	// Umlage-Warnungen (Live-Vorschau im Entwurf)
+	"warning.fallbackItem": "Kostenposition",
+	"warning.notAllocated": "konnte nicht umgelegt werden:",
+	"warning.noOccupants": "Für den Zeitraum sind keine bewohnten Personentage vorhanden.",
+	"warning.noAllocationBasis": "Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlende Wohnfläche oder Verbrauchswerte).",
+	// Filter
+	"filter.allProperties": "Alle Liegenschaften",
+	// Aktionen / Buttons
+	"actions.finalize": "Abrechnung finalisieren",
+	"actions.generateAllPdfs": "Alle PDFs erzeugen",
+	"actions.generatePdf": "PDF erzeugen",
+	"actions.viewPdf": "PDF ansehen",
+	"actions.regeneratePdf": "PDF neu erzeugen",
+	// Dialog "Abrechnungsperiode"
+	"periodDialog.trigger": "Neue Abrechnungsperiode",
+	"periodDialog.createTitle": "Neue Abrechnungsperiode",
+	"periodDialog.editTitle": "Abrechnungsperiode bearbeiten",
+	"periodDialog.description": "Zeitraum (i. d. R. ein Kalenderjahr) für die Nebenkostenabrechnung einer Liegenschaft.",
+	// Dialog "Kostenposition"
+	"costItemDialog.trigger": "Kostenposition",
+	"costItemDialog.createTitle": "Neue Kostenposition",
+	"costItemDialog.editTitle": "Kostenposition bearbeiten",
+	"costItemDialog.description": "Kostenart nach § 2 BetrKV inkl. Umlageschlüssel.",
+	"costItemDialog.consumptionHint":
+		"Die Verbrauchswerte je Einheit können nach dem Speichern über die Tabellenzeile dieser Kostenposition erfasst werden.",
+	// Dialog "Verbrauchswerte"
+	"consumption.trigger": "Verbrauchswerte erfassen",
+	"consumption.title": "Verbrauchswerte: {label}",
+	"consumption.description": "Verbrauch je Einheit für den Abrechnungszeitraum (z. B. m³ Wasser oder Verbrauchseinheiten Heizung).",
+	"consumption.noUnits": "Diese Liegenschaft hat noch keine Einheiten.",
+	// Formular-Felder
+	"fields.propertyPlaceholder": "Liegenschaft auswählen",
+	"fields.periodFrom": "Zeitraum von",
+	"fields.periodTo": "Zeitraum bis",
+	"fields.notesPlaceholder": "Optionale interne Anmerkungen",
+	"fields.label": "Bezeichnung",
+	"fields.labelPlaceholder": "z. B. Gebäudeversicherung",
+	"fields.category": "Kostenart (§ 2 BetrKV)",
+	"fields.totalAmount": "Gesamtbetrag (€)",
+	"fields.allocationKey": "Umlageschlüssel",
+	"fields.directUnit": "Einheit (direkte Zuordnung)",
+	"fields.directUnitPlaceholder": "Einheit auswählen",
+	// Umlageschlüssel (Enum AllocationKey)
+	"allocationKey.LIVING_SPACE": "Wohnfläche",
+	"allocationKey.OCCUPANTS": "Personen",
+	"allocationKey.UNITS": "Einheiten",
+	"allocationKey.CONSUMPTION": "Verbrauch",
+	"allocationKey.DIRECT": "Direkte Zuordnung",
+	// Kostenarten nach § 2 BetrKV (Enum CostCategory, Nr. 1-17)
+	"category.PUBLIC_CHARGES": "1. Laufende öffentliche Lasten des Grundstücks",
+	"category.WATER_SUPPLY": "2. Wasserversorgung",
+	"category.DRAINAGE": "3. Entwässerung",
+	"category.HEATING": "4. Heizung",
+	"category.HOT_WATER": "5. Warmwasser",
+	"category.HEATING_HOT_WATER_COMBINED": "6. Verbundene Heizungs-/Warmwasseranlagen",
+	"category.ELEVATOR": "7. Aufzug",
+	"category.STREET_CLEANING_WASTE": "8. Straßenreinigung und Müllabfuhr",
+	"category.BUILDING_CLEANING_PEST_CONTROL": "9. Gebäudereinigung und Ungezieferbekämpfung",
+	"category.GARDEN_MAINTENANCE": "10. Gartenpflege",
+	"category.LIGHTING": "11. Beleuchtung",
+	"category.CHIMNEY_CLEANING": "12. Schornsteinreinigung",
+	"category.INSURANCE": "13. Sach- und Haftpflichtversicherung",
+	"category.CARETAKER": "14. Hauswart",
+	"category.CABLE_ANTENNA": "15. Gemeinschafts-Antennenanlage / Kabelanschluss",
+	"category.LAUNDRY_FACILITIES": "16. Betrieb der Einrichtungen für die Wäschepflege",
+	"category.OTHER": "17. Sonstige Betriebskosten",
+	// Fehlermeldungen (Server Actions)
+	"errors.periodNotFound": "Die Abrechnungsperiode wurde nicht gefunden.",
+	"errors.periodFinalized": "Diese Abrechnungsperiode ist bereits finalisiert und kann nicht mehr geändert werden.",
+	"errors.periodAlreadyFinalized": "Diese Abrechnungsperiode wurde bereits finalisiert.",
+	"errors.propertyAndPeriodRequired": "Bitte Liegenschaft sowie Zeitraum (von/bis) angeben.",
+	"errors.periodEndBeforeStart": "Das Ende des Zeitraums darf nicht vor dem Beginn liegen.",
+	"errors.periodSaveFailed": "Die Abrechnungsperiode konnte nicht gespeichert werden.",
+	"errors.periodDeleteFailed": "Die Abrechnungsperiode konnte nicht gelöscht werden.",
+	"errors.costItemFieldsRequired": "Bitte Bezeichnung, Betrag und Umlageschlüssel für die Kostenposition angeben.",
+	"errors.invalidAllocationKey": "Ungültiger Umlageschlüssel.",
+	"errors.directUnitRequired": "Bei direkter Zuordnung muss eine Einheit ausgewählt werden.",
+	"errors.costItemSaveFailed": "Die Kostenposition konnte nicht gespeichert werden.",
+	"errors.costItemNotFound": "Die Kostenposition wurde nicht gefunden.",
+	"errors.costItemDeleteFailed": "Die Kostenposition konnte nicht gelöscht werden.",
+	"errors.invalidCostItem": "Ungültige Kostenposition.",
+	"errors.consumptionSaveFailed": "Die Verbrauchswerte konnten nicht gespeichert werden.",
+	"errors.noCostItems": "Bitte erfassen Sie mindestens eine Kostenposition, bevor Sie finalisieren.",
+	"errors.noLeases": "Für den gewählten Zeitraum wurden keine Mietverhältnisse gefunden, die abgerechnet werden könnten.",
+	"errors.finalizeFailed": "Die Abrechnung konnte nicht finalisiert werden.",
+	"errors.statementNotFound": "Die Abrechnung wurde nicht gefunden.",
+	"errors.pdfFailed": "Das PDF konnte nicht erzeugt werden.",
+	"errors.pdfRequiresFinalized": "PDFs können erst erzeugt werden, wenn die Abrechnungsperiode finalisiert wurde.",
+	"errors.somePdfsFailed": "{failed} von {total} PDFs konnten nicht erzeugt werden.",
+	"errors.pdfRequiredBeforePost": "Bitte erzeugen Sie zunächst das PDF, bevor Sie es per Post versenden.",
+};

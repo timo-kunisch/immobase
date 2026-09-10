@@ -10,6 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n/translator";
 import type { CompanySettings } from "@/data/types";
 
 import { getSetupRecoveryKeyAction, setupAccountAction, setupCompanySettingsAction } from "@/app/(setup)/setup/actions";
@@ -46,13 +48,13 @@ import { getSetupRecoveryKeyAction, setupAccountAction, setupCompanySettingsActi
  * eingegebene Werte beim Zurückblättern erhalten bleiben.
  */
 
-const STEP_TITLES = [
-	"Willkommen",
-	"Betriebsmodus",
-	"Absenderdaten",
-	"Online-Integrationen",
-	"Wiederherstellungsschlüssel",
-	"Administratorkonto",
+const STEP_TITLE_KEYS: MessageKey[] = [
+	"setup.steps.welcome",
+	"setup.steps.mode",
+	"setup.steps.company",
+	"setup.steps.integrations",
+	"setup.steps.recoveryKey",
+	"setup.steps.account",
 ];
 
 /**
@@ -65,44 +67,46 @@ const STEP_TITLES = [
 const STEP_CONTENT = "pb-(--card-spacing)";
 
 function StepProgress({ step }: { step: number }) {
+	const { t } = useI18n();
 	return (
 		<div className="space-y-2">
 			<div className="flex gap-1.5">
-				{STEP_TITLES.map((title, index) => (
-					<div key={title} className={`h-1.5 flex-1 rounded-full ${index <= step ? "bg-primary" : "bg-border"}`} />
+				{STEP_TITLE_KEYS.map((titleKey, index) => (
+					<div key={titleKey} className={`h-1.5 flex-1 rounded-full ${index <= step ? "bg-primary" : "bg-border"}`} />
 				))}
 			</div>
 			<p className="text-sm text-muted-foreground">
-				Schritt {step + 1} von {STEP_TITLES.length}: {STEP_TITLES[step]}
+				{t("setup.progress.stepOf", { step: step + 1, total: STEP_TITLE_KEYS.length, title: t(STEP_TITLE_KEYS[step]) })}
 			</p>
 		</div>
 	);
 }
 
 function WelcomeStep({ onNext }: { onNext: () => void }) {
+	const { t } = useI18n();
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Willkommen bei ImmoBase</CardTitle>
+				<CardTitle>{t("setup.welcome.title")}</CardTitle>
 				<CardDescription>
-					Die Ersteinrichtung führt Sie in wenigen Schritten durch die Grundeinstellungen der App.
+					{t("setup.welcome.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className={`${STEP_CONTENT} space-y-3 text-sm text-muted-foreground`}>
-			<p>ImmoBase läuft vollständig offline – alle Daten bleiben auf diesem Rechner.</p>
-			<p>Die folgenden Schritte richten die App ein:</p>
+			<p>{t("setup.welcome.offline")}</p>
+			<p>{t("setup.welcome.stepsIntro")}</p>
 			<ul className="list-disc space-y-1 pl-5">
-				<li>Betriebsmodus (Lokal/Host/Client – Desktop-App)</li>
-				<li>Absenderdaten für erzeugte PDFs (optional)</li>
-				<li>Online-Integrationen (Überblick – die Einrichtung erfolgt später unter „Einstellungen“)</li>
-				<li>Wiederherstellungsschlüssel der lokalen Datenverschlüsselung sichern (erforderlich)</li>
-				<li>Ihr Administratorkonto (erforderlich)</li>
+				<li>{t("setup.welcome.itemMode")}</li>
+				<li>{t("setup.welcome.itemCompany")}</li>
+				<li>{t("setup.welcome.itemIntegrations")}</li>
+				<li>{t("setup.welcome.itemRecoveryKey")}</li>
+				<li>{t("setup.welcome.itemAccount")}</li>
 			</ul>
-				<p>Optionale Schritte können übersprungen und jederzeit unter „Einstellungen“ nachgeholt werden.</p>
+				<p>{t("setup.welcome.optionalHint")}</p>
 			</CardContent>
 			<CardFooter className="justify-end">
 				<Button onClick={onNext}>
-					Einrichtung starten
+					{t("setup.welcome.start")}
 					<ChevronRight />
 				</Button>
 			</CardFooter>
@@ -112,10 +116,10 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
 
 type AppMode = "local" | "host" | "client";
 
-const MODE_OPTIONS: { value: AppMode; title: string; description: string }[] = [
-	{ value: "local", title: "Lokal (Standard)", description: "Nur dieser Rechner. Alle Daten bleiben hier." },
-	{ value: "host", title: "Host", description: "Dieser Rechner stellt die Daten im lokalen Netzwerk bereit." },
-	{ value: "client", title: "Client", description: "Mit einem Host im lokalen Netzwerk verbinden (keine lokalen Daten)." },
+const MODE_OPTIONS: { value: AppMode; titleKey: MessageKey; descriptionKey: MessageKey }[] = [
+	{ value: "local", titleKey: "setup.mode.options.local.title", descriptionKey: "setup.mode.options.local.description" },
+	{ value: "host", titleKey: "setup.mode.options.host.title", descriptionKey: "setup.mode.options.host.description" },
+	{ value: "client", titleKey: "setup.mode.options.client.title", descriptionKey: "setup.mode.options.client.description" },
 ];
 
 /**
@@ -125,6 +129,7 @@ const MODE_OPTIONS: { value: AppMode; title: string; description: string }[] = [
  * Neustart entfällt (der Main-Prozess wendet die Wahl idempotent an).
  */
 function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+	const { t } = useI18n();
 	const bridge = getDesktopBridge();
 	const [selected, setSelected] = useState<AppMode>("local");
 	const [busy, setBusy] = useState(false);
@@ -161,7 +166,7 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 		try {
 			const result = await bridge.setMode(selected);
 			if (!result.ok) {
-				setError(result.error ?? "Der Modus konnte nicht übernommen werden.");
+				setError(result.error ?? t("setup.errors.modeApply"));
 				return;
 			}
 			// Bei "client" wechselt das Fenster automatisch auf die
@@ -169,7 +174,7 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 			// endet auf diesem Gerät hier.
 			if (selected !== "client") onDone();
 		} catch {
-			setError("Der Modus konnte nicht übernommen werden.");
+			setError(t("setup.errors.modeApply"));
 		} finally {
 			setBusy(false);
 		}
@@ -178,10 +183,9 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Betriebsmodus</CardTitle>
+				<CardTitle>{t("setup.steps.mode")}</CardTitle>
 				<CardDescription>
-					Wie möchten Sie ImmoBase nutzen? Die Wahl ist später jederzeit unter „Einstellungen“ → „Verbindung &amp;
-					Mehrbenutzer“ änderbar.
+					{t("setup.mode.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className={`${STEP_CONTENT} space-y-4`}>
@@ -196,29 +200,25 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 								selected === option.value ? "border-primary ring-2 ring-primary" : "hover:border-primary/50"
 							}`}
 						>
-							<span className="block text-sm font-medium">{option.title}</span>
-							<span className="mt-1 block text-xs text-muted-foreground">{option.description}</span>
+							<span className="block text-sm font-medium">{t(option.titleKey)}</span>
+							<span className="mt-1 block text-xs text-muted-foreground">{t(option.descriptionKey)}</span>
 						</button>
 					))}
 				</div>
 
 				{!bridge ? (
 					<p className="text-xs text-muted-foreground">
-						Die Modus-Auswahl steht nur in der Desktop-App zur Verfügung – im Browser läuft ImmoBase immer lokal auf
-						diesem Rechner.
+						{t("setup.mode.browserHint")}
 					</p>
 				) : (
 					<p className="text-xs text-muted-foreground">
-						Die Datenbank liegt immer auf der lokalen Festplatte des Hosts – niemals auf einem Netzlaufwerk
-						(SMB/NFS). Clients benötigen die Adresse des Hosts und das Zugangs-Token.
+						{t("setup.mode.hostHint")}
 					</p>
 				)}
 
 				{bridge && selected === "client" ? (
 					<p className="text-xs text-muted-foreground">
-						Im Client-Modus werden auf diesem Gerät keine Daten gespeichert. Nach der Auswahl öffnet sich die
-						Verbindungsseite, auf der Sie den Host auswählen und das Zugangs-Token eingeben. Die übrigen
-						Einrichtungsschritte entfallen auf diesem Gerät – sie werden auf dem Host durchgeführt.
+						{t("setup.mode.clientHint")}
 					</p>
 				) : null}
 
@@ -227,11 +227,11 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 			<CardFooter className="justify-between">
 				<Button type="button" variant="ghost" onClick={onBack}>
 					<ChevronLeft />
-					Zurück
+					{t("common.back")}
 				</Button>
 				<Button type="button" onClick={() => void handleNext()} disabled={busy}>
 					{busy ? <Loader2 className="animate-spin" /> : null}
-					Weiter
+					{t("common.next")}
 					<ChevronRight />
 				</Button>
 			</CardFooter>
@@ -240,6 +240,7 @@ function ModeStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }
 }
 
 function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; onDone: () => void; onBack: () => void }) {
+	const { t } = useI18n();
 	// Schrittweiterung direkt nach erfolgreichem Speichern (statt useEffect):
 	// So wird onDone genau einmal pro Absenden ausgelöst und kann bei späteren
 	// Re-Renders nicht erneut feuern.
@@ -256,41 +257,40 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 		<Card>
 			<form action={formAction}>
 				<CardHeader>
-					<CardTitle>Absenderdaten</CardTitle>
+					<CardTitle>{t("setup.steps.company")}</CardTitle>
 					<CardDescription>
-						Diese Angaben erscheinen als Briefkopf auf erzeugten PDFs (z. B. Nebenkostenabrechnungen). Optional –
-						jederzeit unter „Einstellungen“ nachpflegbar.
+						{t("setup.company.description")}
 					</CardDescription>
 				</CardHeader>
 				<CardContent className={`${STEP_CONTENT} space-y-4`}>
 					<div className="grid gap-2">
-						<Label htmlFor="setup-name">Name / Firma</Label>
-						<Input id="setup-name" name="name" defaultValue={initial.name} placeholder="Max Mustermann Hausverwaltung" />
+						<Label htmlFor="setup-name">{t("setup.fields.name")}</Label>
+						<Input id="setup-name" name="name" defaultValue={initial.name} placeholder={t("setup.fields.namePlaceholder")} />
 					</div>
 
 					<div className="grid gap-2">
-						<Label htmlFor="setup-street">Straße und Hausnummer</Label>
-						<Input id="setup-street" name="street" defaultValue={initial.street} placeholder="Musterstraße 1" />
+						<Label htmlFor="setup-street">{t("setup.fields.street")}</Label>
+						<Input id="setup-street" name="street" defaultValue={initial.street} placeholder={t("setup.fields.streetPlaceholder")} />
 					</div>
 
 					<div className="grid grid-cols-3 gap-4">
 						<div className="col-span-1 grid gap-2">
-							<Label htmlFor="setup-zipCode">PLZ</Label>
+							<Label htmlFor="setup-zipCode">{t("setup.fields.zipCode")}</Label>
 							<Input id="setup-zipCode" name="zipCode" defaultValue={initial.zipCode} placeholder="12345" />
 						</div>
 						<div className="col-span-2 grid gap-2">
-							<Label htmlFor="setup-city">Ort</Label>
-							<Input id="setup-city" name="city" defaultValue={initial.city} placeholder="Musterstadt" />
+							<Label htmlFor="setup-city">{t("setup.fields.city")}</Label>
+							<Input id="setup-city" name="city" defaultValue={initial.city} placeholder={t("setup.fields.cityPlaceholder")} />
 						</div>
 					</div>
 
 					<div className="grid gap-2">
-						<Label htmlFor="setup-additional">Weitere Angaben</Label>
+						<Label htmlFor="setup-additional">{t("setup.fields.additional")}</Label>
 						<Textarea
 							id="setup-additional"
 							name="additional"
 							defaultValue={initial.additional ?? ""}
-							placeholder="z. B. Bankverbindung, Steuernummer, Kontaktdaten"
+							placeholder={t("setup.fields.additionalPlaceholder")}
 							className="min-h-24"
 						/>
 					</div>
@@ -300,16 +300,16 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
 				<CardFooter className="justify-between">
 					<Button type="button" variant="ghost" onClick={onBack}>
 						<ChevronLeft />
-						Zurück
+						{t("common.back")}
 					</Button>
 					<div className="flex gap-2">
 						<Button type="button" variant="outline" onClick={onDone}>
 							<SkipForward />
-							Überspringen
+							{t("setup.company.skip")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern und weiter
+							{t("setup.company.saveAndNext")}
 						</Button>
 					</div>
 				</CardFooter>
@@ -327,44 +327,43 @@ function CompanyStep({ initial, onDone, onBack }: { initial: CompanySettings; on
  * Stellen gepflegt werden müssen.
  */
 function IntegrationsStep({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+	const { t } = useI18n();
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>Online-Integrationen (optional)</CardTitle>
+				<CardTitle>{t("setup.integrations.title")}</CardTitle>
 				<CardDescription>
-					ImmoBase läuft vollständig offline – alle Daten bleiben auf diesem Rechner. Die folgenden optionalen
-					Dienste richten Sie bei Bedarf nach der Einrichtung unter „Einstellungen“ ein.
+					{t("setup.integrations.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className={`${STEP_CONTENT} space-y-4 text-sm`}>
 				<div>
-					<p className="font-medium">Einstellungen → „Integrationen &amp; KI“</p>
+					<p className="font-medium">{t("setup.integrations.groupIntegrations")}</p>
 					<ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-						<li>E-Mail-Versand (SMTP) – z. B. für Verifizierungs- und Ticket-E-Mails</li>
-						<li>E-Mail-Postfach (IMAP) – eingehende E-Mails im Ticket-System</li>
-						<li>Postversand (LetterXpress) – PDFs (z. B. Abrechnungen) als physische Briefe</li>
-						<li>KI-Assistent – Chatbot in der Sidebar über einen OpenAI-kompatiblen Endpunkt</li>
-						<li>MCP-Server – lesender und schreibender Zugriff externer KI-Clients auf die Fachdaten</li>
+						<li>{t("setup.integrations.itemSmtp")}</li>
+						<li>{t("setup.integrations.itemImap")}</li>
+						<li>{t("setup.integrations.itemLetterxpress")}</li>
+						<li>{t("setup.integrations.itemAi")}</li>
+						<li>{t("setup.integrations.itemMcp")}</li>
 					</ul>
 				</div>
 				<div>
-					<p className="font-medium">Einstellungen → „Datensicherung“</p>
+					<p className="font-medium">{t("setup.integrations.groupBackup")}</p>
 					<ul className="mt-1 list-disc space-y-1 pl-5 text-muted-foreground">
-						<li>Dropbox-Backup – automatische, optional passwortgeschützte Cloud-Sicherung</li>
+						<li>{t("setup.integrations.itemDropbox")}</li>
 					</ul>
 				</div>
 				<p className="text-xs text-muted-foreground">
-					Ohne SMTP-Konfiguration sind alle E-Mail-Funktionen (Verifizierung, Passwort-Reset) deaktiviert – das
-					Ticket-System und alle übrigen Funktionen laufen uneingeschränkt offline.
+					{t("setup.integrations.smtpHint")}
 				</p>
 			</CardContent>
 			<CardFooter className="justify-between">
 				<Button type="button" variant="ghost" onClick={onBack}>
 					<ChevronLeft />
-					Zurück
+					{t("common.back")}
 				</Button>
 				<Button type="button" onClick={onDone}>
-					Weiter
+					{t("common.next")}
 					<ChevronRight />
 				</Button>
 			</CardFooter>
@@ -373,6 +372,7 @@ function IntegrationsStep({ onDone, onBack }: { onDone: () => void; onBack: () =
 }
 
 function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: () => void; onBack: () => void }) {
+	const { t } = useI18n();
 	const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [copied, setCopied] = useState(false);
@@ -388,18 +388,18 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 			.then((result) => {
 				if (cancelled) return;
 				if (result.error || !result.key) {
-					setError(result.error ?? "Der Wiederherstellungsschlüssel konnte nicht gelesen werden.");
+					setError(result.error ?? t("setup.errors.recoveryKeyRead"));
 				} else {
 					setRecoveryKey(result.key);
 				}
 			})
 			.catch(() => {
-				if (!cancelled) setError("Der Wiederherstellungsschlüssel konnte nicht gelesen werden.");
+				if (!cancelled) setError(t("setup.errors.recoveryKeyRead"));
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [active, recoveryKey]);
+	}, [active, recoveryKey, t]);
 
 	async function handleCopy(): Promise<void> {
 		if (!recoveryKey) return;
@@ -418,27 +418,22 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<KeyRound className="size-5" />
-					Wiederherstellungsschlüssel sichern
+					{t("setup.recovery.title")}
 				</CardTitle>
 				<CardDescription>
-					ImmoBase verschlüsselt Ihre Datenbank, abgelegte Dateien und gespeicherte Zugangsdaten auf diesem Gerät
-					(AES-256). Der Schlüssel dazu ist an dieses Gerät gebunden.
+					{t("setup.recovery.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className={`${STEP_CONTENT} space-y-4 text-sm`}>
 				<p className="text-muted-foreground">
-					Mit dem folgenden Wiederherstellungsschlüssel können Sie Ihre Daten entschlüsseln, falls der
-					Geräteschlüssel verloren geht (z. B. nach einer Neuinstallation des Betriebssystems). Verwahren Sie ihn
-					wie ein Passwort an einem sicheren Ort – ohne ihn sind die verschlüsselten Daten in diesem Fall
-					unwiederbringlich verloren. Wer den Schlüssel besitzt, kann sämtliche Daten entschlüsseln: zeigen Sie
-					ihn niemandem.
+					{t("setup.recovery.explanation")}
 				</p>
 
 				{error ? <p className="text-sm text-destructive">{error}</p> : null}
 				{recoveryKey === null && !error ? (
 					<p className="flex items-center gap-2 text-muted-foreground">
 						<Loader2 className="size-4 animate-spin" />
-						Schlüssel wird geladen …
+						{t("setup.recovery.loading")}
 					</p>
 				) : null}
 				{recoveryKey !== null ? (
@@ -446,7 +441,7 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 						<code className="block break-all rounded-md border bg-muted p-3 text-xs select-all">{recoveryKey}</code>
 						<Button type="button" variant="outline" size="sm" onClick={handleCopy}>
 							{copied ? <Check /> : <Copy />}
-							{copied ? "Kopiert" : "In die Zwischenablage kopieren"}
+							{copied ? t("setup.recovery.copied") : t("setup.recovery.copy")}
 						</Button>
 					</div>
 				) : null}
@@ -458,21 +453,20 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 						checked={confirmed}
 						onChange={(event) => setConfirmed(event.target.checked)}
 					/>
-					Ich habe den Wiederherstellungsschlüssel sicher außerhalb dieses Geräts verwahrt (z. B. notiert oder in
-					einem Passwort-Manager).
+					{t("setup.recovery.confirm")}
 				</label>
 
 				<p className="text-xs text-muted-foreground">
-					Der Schlüssel ist später jederzeit unter „Einstellungen“ → „Lokale Datenverschlüsselung“ erneut einsehbar.
+					{t("setup.recovery.laterHint")}
 				</p>
 			</CardContent>
 			<CardFooter className="justify-between">
 				<Button type="button" variant="ghost" onClick={onBack}>
 					<ChevronLeft />
-					Zurück
+					{t("common.back")}
 				</Button>
 				<Button type="button" onClick={onDone} disabled={recoveryKey === null || !confirmed}>
-					Weiter
+					{t("common.next")}
 					<ChevronRight />
 				</Button>
 			</CardFooter>
@@ -481,6 +475,7 @@ function RecoveryKeyStep({ active, onDone, onBack }: { active: boolean; onDone: 
 }
 
 function AccountStep({ onBack }: { onBack: () => void }) {
+	const { t } = useI18n();
 	// Bei Erfolg leitet die Action selbst weiter ("/" bei direkter Anmeldung
 	// bzw. "/login?...&emailSent=1" bei konfiguriertem SMTP).
 	const [state, formAction, isPending] = useActionState(setupAccountAction, initialActionState);
@@ -489,22 +484,22 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 		<Card>
 			<form action={formAction}>
 				<CardHeader>
-					<CardTitle>Administratorkonto anlegen</CardTitle>
+					<CardTitle>{t("setup.account.title")}</CardTitle>
 					<CardDescription>
-						Zum Abschluss wird Ihr Benutzerkonto angelegt. Das erste Konto erhält automatisch Administrator-Rechte.
+						{t("setup.account.description")}
 					</CardDescription>
 				</CardHeader>
 				<CardContent className={`${STEP_CONTENT} grid gap-4`}>
 					<div className="grid gap-2">
-						<Label htmlFor="setup-email">E-Mail-Adresse</Label>
+						<Label htmlFor="setup-email">{t("auth.fields.email")}</Label>
 						<Input id="setup-email" name="email" type="email" autoComplete="email" required />
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="setup-password">Passwort</Label>
+						<Label htmlFor="setup-password">{t("auth.fields.password")}</Label>
 						<Input id="setup-password" name="password" type="password" autoComplete="new-password" minLength={8} required />
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="setup-passwordConfirm">Passwort wiederholen</Label>
+						<Label htmlFor="setup-passwordConfirm">{t("auth.register.passwordConfirm")}</Label>
 						<Input
 							id="setup-passwordConfirm"
 							name="passwordConfirm"
@@ -519,11 +514,11 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 				<CardFooter className="justify-between">
 					<Button type="button" variant="ghost" onClick={onBack}>
 						<ChevronLeft />
-						Zurück
+						{t("common.back")}
 					</Button>
 					<Button type="submit" disabled={isPending}>
 						{isPending ? <Loader2 className="animate-spin" /> : null}
-						Konto erstellen und Einrichtung abschließen
+						{t("setup.account.submit")}
 					</Button>
 				</CardFooter>
 			</form>

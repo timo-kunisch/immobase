@@ -13,14 +13,16 @@ import { GenerateDocumentForm } from "@/components/vorlagen/generate-document-fo
 import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
 import { formatDate } from "@/lib/format";
 import { formatFileSize } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
-import { documentTemplateCategoryLabels } from "@/lib/templates";
+import { documentTemplateCategoryLabelKeys } from "@/lib/templates";
 
 import { deleteGeneratedDocumentAction, sendGeneratedDocumentByPostAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function VorlageDetailPage({ params }: { params: Promise<{ id: string }> }) {
+	const t = await getT();
 	const { id } = await params;
 
 	const template = getDocumentTemplate(id);
@@ -36,47 +38,47 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader
-				title={template.title}
-				description="Schreiben aus dieser Vorlage erzeugen."
-				actions={
-					<div className="flex items-center gap-2">
-						<Button variant="outline" size="sm" asChild>
-							<Link href="/vorlagen">
-								<ChevronLeft />
-								Zurück
-							</Link>
-						</Button>
-						<Badge variant="secondary">{documentTemplateCategoryLabels[template.category]}</Badge>
-					</div>
-				}
-			/>
-
-			<div className="flex-1 space-y-6 p-4 sm:p-6">
-				<div>
-					<h2 className="mb-3 text-base font-semibold">Schreiben erzeugen</h2>
-					<GenerateDocumentForm templateId={template.id} leases={leaseList} />
+		<SiteHeader
+			title={template.title}
+			description={t("templates.detail.description")}
+			actions={
+				<div className="flex items-center gap-2">
+					<Button variant="outline" size="sm" asChild>
+						<Link href="/vorlagen">
+							<ChevronLeft />
+							{t("common.back")}
+						</Link>
+					</Button>
+					<Badge variant="secondary">{t(documentTemplateCategoryLabelKeys[template.category])}</Badge>
 				</div>
+			}
+		/>
 
-				<div>
-					<h2 className="mb-3 text-base font-semibold">Bereits erzeugte Schreiben</h2>
-					<Card>
-						<CardContent className="p-0">
-							{generatedDocumentList.length === 0 ? (
-								<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
-									<FileText className="size-8" />
-									<p>Für diese Vorlage wurden noch keine Schreiben erzeugt.</p>
-								</div>
-							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>Betreff</TableHead>
-											<TableHead>Mieter</TableHead>
-											<TableHead>Erzeugt am</TableHead>
-											<TableHead className="w-[100px] text-right">Aktionen</TableHead>
-										</TableRow>
-									</TableHeader>
+		<div className="flex-1 space-y-6 p-4 sm:p-6">
+			<div>
+				<h2 className="mb-3 text-base font-semibold">{t("templates.detail.generateHeading")}</h2>
+				<GenerateDocumentForm templateId={template.id} leases={leaseList} />
+			</div>
+
+			<div>
+				<h2 className="mb-3 text-base font-semibold">{t("templates.detail.generatedHeading")}</h2>
+				<Card>
+					<CardContent className="p-0">
+						{generatedDocumentList.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
+								<FileText className="size-8" />
+								<p>{t("templates.generated.emptyForTemplate")}</p>
+							</div>
+						) : (
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead>{t("templates.generated.table.subject")}</TableHead>
+										<TableHead>{t("common.tenant")}</TableHead>
+										<TableHead>{t("templates.generated.table.createdAt")}</TableHead>
+										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
+									</TableRow>
+								</TableHeader>
 									<TableBody>
 										{generatedDocumentList.map((document) => (
 											<TableRow key={document.id}>
@@ -99,8 +101,8 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
 												<TableCell className="text-muted-foreground">{formatDate(document.createdAt)}</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
-														<SendByPostButton sendAction={sendGeneratedDocumentByPostAction.bind(null, document.id)} disabled={!postalConfigured} disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)" />
-														<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage="Dieses erzeugte Schreiben wirklich löschen?" />
+													<SendByPostButton sendAction={sendGeneratedDocumentByPostAction.bind(null, document.id)} disabled={!postalConfigured} disabledReason={t("postal.notConfiguredShort")} />
+													<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage={t("templates.generated.confirmDelete")} />
 													</div>
 												</TableCell>
 											</TableRow>

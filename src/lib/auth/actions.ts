@@ -9,6 +9,7 @@ import { destroySession } from "@/lib/auth/session";
 import { createVerificationToken } from "@/lib/auth/tokens";
 import { isSmtpConfigured, sendVerificationEmail } from "@/lib/email/mailer";
 import { normalizeEmail } from "@/lib/auth/validation";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 
 /** Meldet den aktuellen Nutzer ab (löscht Session in DB + Cookie). */
@@ -29,9 +30,10 @@ export async function logoutAction(): Promise<void> {
  * E-Mail-Adresse tatsächlich registriert ist.
  */
 export async function resendVerificationAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const t = await getT();
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 	if (!email) {
-		return { error: "Bitte geben Sie Ihre E-Mail-Adresse an." };
+		return { error: t("auth.messages.emailRequired") };
 	}
 
 	const user = getUserByEmail(email);
@@ -50,13 +52,12 @@ export async function resendVerificationAction(_prevState: ActionState, formData
 	if (!isSmtpConfigured()) {
 		return {
 			success: true,
-			message:
-				"Falls ein Konto mit dieser E-Mail-Adresse existiert und noch nicht bestätigt war, wurde die Adresse jetzt bestätigt. Sie können sich anmelden.",
+			message: t("auth.messages.resendWithoutSmtp"),
 		};
 	}
 
 	return {
 		success: true,
-		message: "Falls ein Konto mit dieser E-Mail-Adresse existiert und noch nicht bestätigt wurde, haben wir eine neue Bestätigungs-E-Mail versendet.",
+		message: t("auth.messages.resendWithSmtp"),
 	};
 }

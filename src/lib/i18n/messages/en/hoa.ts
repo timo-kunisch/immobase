@@ -1,0 +1,122 @@
+import { hoa as deHoa } from "../de/hoa";
+
+/** Englische Übersetzungen des Namespace "hoa" (Parität per Typ erzwungen). */
+export const hoa: typeof deHoa = {
+	// HOA overview (/weg)
+	title: "HOA management",
+	description: "Manage homeowners' associations.",
+	empty: "No HOA created yet.",
+	noHoa: "Create an HOA under “HOA management” first.",
+	"table.name": "Name",
+	"table.property": "Property",
+	"table.linked": "Linked",
+	// CountLinkBadge labels (linked records)
+	"badge.units": "Units",
+	"badge.ownerships": "Ownership records",
+	// Delete confirmation (ConfirmDeleteButton)
+	"confirm.delete": "Really delete HOA \"{name}\"?",
+	// HOA form dialog
+	"actions.create": "New HOA",
+	"dialog.createTitle": "New homeowners' association",
+	"dialog.editTitle": "Edit HOA",
+	"dialog.description": "An HOA is always assigned to exactly one existing property.",
+	"fields.name": "Name",
+	"fields.totalShares": "Total co-ownership shares (MEA)",
+	"fields.totalSharesHint": "Denominator according to the declaration of division; common values are e.g. 1000 or 10000. The share per unit is maintained on the unit itself.",
+	"fields.bankIban": "IBAN (joint account)",
+	"fields.bankBic": "BIC",
+	"placeholder.name": "e.g. HOA Sample Street 12",
+	"placeholder.property": "Select property",
+	"placeholder.bankIban": "DE...",
+	"placeholder.notes": "Optional internal notes",
+	// Server action error messages
+	"errors.requiredFields": "Please provide a property, a name and a valid total of co-ownership shares.",
+	"errors.saveFailed": "The HOA could not be saved. Is the property already assigned to another HOA?",
+	"errors.deleteFailed": "Deletion failed. Please remove all associated economic plans/annual statements/meetings first.",
+
+	// Owners (/weg/eigentuemer)
+	"owners.title": "Owners",
+	"owners.description": "All owners at a glance.",
+	"owners.empty": "No owners created yet.",
+	"owners.table.address": "Address",
+	"owners.table.contact": "Contact",
+	"owners.confirm.delete": "Really delete owner \"{name}\"?",
+	// Owner form dialog
+	"owners.actions.create": "New owner",
+	"owners.dialog.createTitle": "New owner",
+	"owners.dialog.editTitle": "Edit owner",
+	"owners.dialog.description": "Master data of the owner for HOA management.",
+	"owners.fields.isCompany": "Institutional owner (e.g. limited company)",
+	"owners.fields.companyName": "Company name",
+	"owners.fields.contactFirstName": "Contact person (first name)",
+	"owners.fields.contactLastName": "Contact person (last name)",
+	"owners.fields.street": "Street & house number",
+	"owners.fields.zipCode": "Postal code",
+	"owners.fields.city": "City",
+	"owners.fields.country": "Country",
+	"owners.errors.requiredFields": "Please provide the owner's name and full address.",
+	"owners.errors.saveFailed": "The owner could not be saved.",
+	"owners.errors.deleteFailed": "Deletion failed. Please remove all associated ownership records first.",
+
+	// Ownership records (/weg/eigentumsverhaeltnisse)
+	"ownerships.title": "Ownership",
+	"ownerships.description": "Owners per unit, time-versioned on change of ownership.",
+	"ownerships.empty": "No ownership record entered yet.",
+	"ownerships.noUnits": "Create units for this property under “Units” first.",
+	"ownerships.table.period": "Period",
+	"ownerships.meaValue": "Co-ownership share: {share} / {total}",
+	"ownerships.livingSpaceSuffix": " · {value} m²",
+	"ownerships.coOwnerValue": "Co-owner: {name}",
+	"ownerships.ongoing": "ongoing",
+	// Status badges (values of OwnershipStatusValue from src/lib/hoa-ownership.ts)
+	"ownerships.status.ACTIVE": "Current",
+	"ownerships.status.UPCOMING": "Upcoming",
+	"ownerships.status.ENDED": "Ended",
+	"ownerships.confirm.delete": "Really delete this ownership record?",
+	// Ownership record form dialog
+	"ownerships.actions.create": "Ownership record",
+	"ownerships.dialog.createTitle": "Record ownership",
+	"ownerships.dialog.editTitle": "Edit ownership record",
+	"ownerships.dialog.createDescription": "On a change of ownership, the previously running ownership record of this unit is automatically ended on the day before.",
+	"ownerships.dialog.editDescription": "Changes to an existing row.",
+	"ownerships.fields.coOwner": "Co-owner (e.g. spouse)",
+	"ownerships.fields.noCoOwner": "No co-owner",
+	"ownerships.fields.startDate": "Start",
+	"ownerships.fields.startDateCreate": "Start (transfer of ownership)",
+	"ownerships.placeholder.unit": "Select unit",
+	"ownerships.placeholder.owner": "Select owner",
+	"ownerships.placeholder.notes": "e.g. notary, purchase contract date",
+	"ownerships.errors.requiredFields": "Please provide unit, owner and start date.",
+	"ownerships.errors.coOwnerSame": "Owner and co-owner must not be identical.",
+	"ownerships.errors.startDateNotAfterCurrent": "The start date must be after the start of the currently running ownership record of this unit.",
+	"ownerships.errors.saveFailed": "The ownership record could not be saved.",
+	"ownerships.errors.deleteFailed": "The ownership record could not be deleted.",
+
+	// Allocation keys (/weg/verteilerschluessel)
+	"allocationKeys.title": "Allocation keys",
+	"allocationKeys.description": "Freely defined allocation keys per HOA.",
+	"allocationKeys.info": "In addition to the fixed allocation keys (co-ownership shares, living space, number of units, consumption, direct allocation), additional freely defined allocation keys can be created here (e.g. “number of parking spaces”). They are then available for selection on cost items in the economic plan and the annual statement.",
+	"allocationKeys.selectHoa": "Select an HOA above to create or edit allocation keys.",
+	"allocationKeys.empty": "No freely defined allocation keys created yet.",
+	"allocationKeys.confirm.delete": "Really delete allocation key \"{name}\"?",
+	// Allocation key form dialog
+	"allocationKeys.actions.create": "New allocation key",
+	"allocationKeys.dialog.createTitle": "New freely defined allocation key",
+	"allocationKeys.dialog.editTitle": "Edit allocation key",
+	"allocationKeys.dialog.description": "The weights per unit are entered after saving.",
+	"allocationKeys.placeholder.label": "e.g. number of parking spaces",
+	// Weights dialog (one weight per unit)
+	"allocationKeys.weights.open": "Enter weights per unit",
+	"allocationKeys.weights.title": "Weights: {name}",
+	"allocationKeys.weights.description": "Freely assignable weight per unit for this allocation key.",
+	"allocationKeys.weights.noUnits": "This property does not have any units yet.",
+	"allocationKeys.errors.requiredFields": "Please enter a name for the allocation key.",
+	"allocationKeys.errors.saveFailed": "The allocation key could not be saved.",
+	"allocationKeys.errors.deleteFailed": "Deletion failed. Is this key still used by a cost item?",
+	"allocationKeys.errors.invalidKey": "Invalid allocation key.",
+	"allocationKeys.errors.weightsSaveFailed": "The weights could not be saved.",
+
+	// Cross-module HOA filter (HoaFilter)
+	"filter.placeholder": "Select HOA",
+	"filter.all": "All HOAs",
+};

@@ -10,6 +10,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { isSmtpConfigured } from "@/lib/email/mailer";
+import { getT } from "@/lib/i18n/server";
 import { sendTicketEmail } from "@/lib/ticket-mailer";
 
 const TICKET_STATUSES: TicketStatus[] = ["OPEN", "IN_PROGRESS", "DONE"];
@@ -33,6 +34,7 @@ function getString(formData: FormData, key: string): string {
 
 export async function saveTicketAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const propertyId = getString(formData, "propertyId");
 	const unitIdRaw = getString(formData, "unitId");
@@ -44,7 +46,7 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 
 	if (!propertyId || !title) {
 		return {
-			error: "Bitte wählen Sie eine Liegenschaft und vergeben Sie einen Titel.",
+			error: t("tickets.errors.missingPropertyOrTitle"),
 		};
 	}
 
@@ -70,7 +72,7 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 		}
 	} catch (error) {
 		console.error("saveTicketAction failed", error);
-		return { error: "Das Ticket konnte nicht gespeichert werden." };
+		return { error: t("tickets.errors.saveFailed") };
 	}
 
 	if (id) revalidatePath(`/tickets/${id}`);
@@ -82,13 +84,14 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 /** Schneller Status-Wechsel direkt aus der Kanban-Ansicht (ohne Dialog). */
 export async function updateTicketStatusAction(id: string, status: TicketStatus): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung für den Log-Eintrag ermitteln.
 	const ticket = findTicket(id);
 	try {
 		updateTicketStatus(id, status, status === "DONE" ? new Date().toISOString() : null);
 	} catch (error) {
 		console.error("updateTicketStatusAction failed", error);
-		return { error: "Status konnte nicht geändert werden." };
+		return { error: t("tickets.errors.statusFailed") };
 	}
 
 	logActivity(user, "UPDATE", "tickets", `Ticket „${ticket ? ticket.title : id}“ auf „${TICKET_STATUS_LABELS[status] ?? status}“ gesetzt`, id);
@@ -101,13 +104,14 @@ export async function updateTicketStatusAction(id: string, status: TicketStatus)
 
 export async function deleteTicketAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const ticket = findTicket(id);
 	try {
 		deleteTicket(id);
 	} catch (error) {
 		console.error("deleteTicketAction failed", error);
-		return { error: "Das Ticket konnte nicht gelöscht werden." };
+		return { error: t("tickets.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "tickets", `Ticket „${ticket ? ticket.title : id}“ gelöscht`, id);
@@ -126,15 +130,16 @@ export async function deleteTicketAction(id: string): Promise<ActionState> {
 /** Fügt eine interne Notiz zum Ticket-Verlauf hinzu (immer verfügbar - Basis-Funktion). */
 export async function addTicketNoteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const ticketId = getString(formData, "ticketId");
 	const body = getString(formData, "body");
 
 	if (!ticketId || !body) {
-		return { error: "Bitte geben Sie einen Notiztext ein." };
+		return { error: t("tickets.errors.noteRequired") };
 	}
 	const ticket = getTicket(ticketId);
 	if (!ticket) {
-		return { error: "Das Ticket wurde nicht gefunden." };
+		return { error: t("tickets.errors.ticketNotFound") };
 	}
 
 	try {
@@ -148,7 +153,7 @@ export async function addTicketNoteAction(_prevState: ActionState, formData: For
 		logActivity(user, "CREATE", "tickets", `Interne Notiz zum Ticket „${ticket.title}“ hinzugefügt`, ticketId);
 	} catch (error) {
 		console.error("addTicketNoteAction failed", error);
-		return { error: "Die Notiz konnte nicht gespeichert werden." };
+		return { error: t("tickets.errors.noteFailed") };
 	}
 
 	revalidatePath(`/tickets/${ticketId}`);
@@ -164,20 +169,21 @@ export async function addTicketNoteAction(_prevState: ActionState, formData: For
  */
 export async function sendTicketEmailAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const ticketId = getString(formData, "ticketId");
 	const to = getString(formData, "to");
 	const subject = getString(formData, "subject");
 	const body = getString(formData, "body");
 
 	if (!ticketId || !to || !subject || !body) {
-		return { error: "Bitte füllen Sie Empfänger, Betreff und Nachricht aus." };
+		return { error: t("tickets.errors.replyRequired") };
 	}
 	const ticket = getTicket(ticketId);
 	if (!ticket) {
-		return { error: "Das Ticket wurde nicht gefunden." };
+		return { error: t("tickets.errors.ticketNotFound") };
 	}
 	if (!isSmtpConfigured()) {
-		return { error: "Der E-Mail-Versand ist nicht konfiguriert (SMTP, siehe Einstellungen)." };
+		return { error: t("tickets.errors.smtpNotConfigured") };
 	}
 
 	try {
@@ -186,7 +192,7 @@ export async function sendTicketEmailAction(_prevState: ActionState, formData: F
 	} catch (error) {
 		console.error("sendTicketEmailAction failed", error);
 		const detail = error instanceof Error ? error.message : String(error);
-		return { error: `Die E-Mail konnte nicht versendet werden (${detail}).` };
+		return { error: t("tickets.errors.replyFailed", { detail }) };
 	}
 
 	revalidatePath(`/tickets/${ticketId}`);
@@ -200,9 +206,10 @@ export async function sendTicketEmailAction(_prevState: ActionState, formData: F
  */
 export async function unlinkTicketMessageAction(messageId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const message = getTicketMessage(messageId);
 	if (!message || message.direction !== "INBOUND" || !message.ticketId) {
-		return { error: "Die E-Mail wurde nicht gefunden." };
+		return { error: t("tickets.errors.emailNotFound") };
 	}
 	const ticket = getTicket(message.ticketId);
 
@@ -217,7 +224,7 @@ export async function unlinkTicketMessageAction(messageId: string): Promise<Acti
 		);
 	} catch (error) {
 		console.error("unlinkTicketMessageAction failed", error);
-		return { error: "Die Zuordnung konnte nicht aufgehoben werden." };
+		return { error: t("tickets.errors.unlinkFailed") };
 	}
 
 	revalidatePath(`/tickets/${message.ticketId}`);
@@ -229,24 +236,25 @@ export async function unlinkTicketMessageAction(messageId: string): Promise<Acti
 /** Ordnet eine bereits verknüpfte eingehende E-Mail einem anderen Ticket zu. */
 export async function reassignTicketMessageAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const messageId = getString(formData, "messageId");
 	const ticketId = getString(formData, "ticketId");
 
 	if (!messageId || !ticketId) {
-		return { error: "Bitte wählen Sie ein Ticket aus." };
+		return { error: t("tickets.errors.selectTicket") };
 	}
 
 	const message = getTicketMessage(messageId);
 	if (!message || message.direction !== "INBOUND" || !message.ticketId) {
-		return { error: "Die E-Mail wurde nicht gefunden." };
+		return { error: t("tickets.errors.emailNotFound") };
 	}
 	if (message.ticketId === ticketId) {
-		return { error: "Die E-Mail ist bereits diesem Ticket zugeordnet." };
+		return { error: t("tickets.errors.alreadyAssigned") };
 	}
 	const sourceTicketId = message.ticketId;
 	const targetTicket = getTicket(ticketId);
 	if (!targetTicket) {
-		return { error: "Das ausgewählte Ticket wurde nicht gefunden." };
+		return { error: t("tickets.errors.targetTicketNotFound") };
 	}
 
 	try {
@@ -260,7 +268,7 @@ export async function reassignTicketMessageAction(_prevState: ActionState, formD
 		);
 	} catch (error) {
 		console.error("reassignTicketMessageAction failed", error);
-		return { error: "Die E-Mail konnte nicht neu zugeordnet werden." };
+		return { error: t("tickets.errors.reassignFailed") };
 	}
 
 	revalidatePath(`/tickets/${sourceTicketId}`);

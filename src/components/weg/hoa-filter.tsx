@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Hoa } from "@/data/types";
+import { useI18n } from "@/lib/i18n/provider";
 
 const ALL_VALUE = "all";
 
@@ -17,6 +18,7 @@ const ALL_VALUE = "all";
  */
 export function HoaFilter({ hoas, value, basePath }: { hoas: Hoa[]; value?: string; basePath: string }) {
 	const router = useRouter();
+	const { t } = useI18n();
 
 	return (
 		<Select
@@ -26,10 +28,10 @@ export function HoaFilter({ hoas, value, basePath }: { hoas: Hoa[]; value?: stri
 			}}
 		>
 			<SelectTrigger className="w-full sm:w-64">
-				<SelectValue placeholder="WEG auswählen" />
+				<SelectValue placeholder={t("hoa.filter.placeholder")} />
 			</SelectTrigger>
 			<SelectContent>
-				<SelectItem value={ALL_VALUE}>Alle WEGs</SelectItem>
+				<SelectItem value={ALL_VALUE}>{t("hoa.filter.all")}</SelectItem>
 				{hoas.map((hoa) => (
 					<SelectItem key={hoa.id} value={hoa.id}>
 						{hoa.name}

@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getOptionalFloat } from "@/lib/form-data";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * CRUD für frei definierbare Verteilerschlüssel (allocationKey "CUSTOM") -
@@ -17,13 +18,14 @@ import { getString, getOptionalFloat } from "@/lib/form-data";
 
 export async function saveCustomAllocationKeyAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const label = getString(formData, "label");
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !label) {
-		return { error: "Bitte eine Bezeichnung für den Verteilerschlüssel angeben." };
+		return { error: t("hoa.allocationKeys.errors.requiredFields") };
 	}
 
 	try {
@@ -36,7 +38,7 @@ export async function saveCustomAllocationKeyAction(_prevState: ActionState, for
 		}
 	} catch (error) {
 		console.error("saveCustomAllocationKeyAction failed", error);
-		return { error: "Der Verteilerschlüssel konnte nicht gespeichert werden." };
+		return { error: t("hoa.allocationKeys.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/verteilerschluessel`);
@@ -45,13 +47,14 @@ export async function saveCustomAllocationKeyAction(_prevState: ActionState, for
 
 export async function deleteCustomAllocationKeyAction(id: string, hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const allocationKey = listCustomAllocationKeysWithWeights(hoaId).find((key) => key.id === id) ?? null;
 	try {
 		deleteCustomAllocationKey(id);
 	} catch (error) {
 		console.error("deleteCustomAllocationKeyAction failed", error);
-		return { error: "Löschen fehlgeschlagen. Wird dieser Schlüssel noch von einer Kostenposition verwendet?" };
+		return { error: t("hoa.allocationKeys.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "verteilerschluessel", `Verteilerschlüssel „${allocationKey ? allocationKey.label : id}“ gelöscht`, id);
@@ -62,9 +65,10 @@ export async function deleteCustomAllocationKeyAction(id: string, hoaId: string)
 
 export async function saveCustomAllocationWeightsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const customAllocationKeyId = getString(formData, "customAllocationKeyId");
 	if (!customAllocationKeyId) {
-		return { error: "Ungültiger Verteilerschlüssel." };
+		return { error: t("hoa.allocationKeys.errors.invalidKey") };
 	}
 
 	const unitIds: string[] = [];
@@ -83,7 +87,7 @@ export async function saveCustomAllocationWeightsAction(_prevState: ActionState,
 		logActivity(user, "UPDATE", "verteilerschluessel", `Gewichte des Verteilerschlüssels „${customAllocationKeyId}“ aktualisiert`, customAllocationKeyId);
 	} catch (error) {
 		console.error("saveCustomAllocationWeightsAction failed", error);
-		return { error: "Die Gewichte konnten nicht gespeichert werden." };
+		return { error: t("hoa.allocationKeys.errors.weightsSaveFailed") };
 	}
 
 	revalidatePath(`/weg/verteilerschluessel`);

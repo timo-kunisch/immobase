@@ -1,0 +1,95 @@
+/**
+ * Namespace "templates" (Deutsch): Dokumentvorlagen-Modul /vorlagen -
+ * Vorlagen-Übersicht, Editor-Dialog inkl. Platzhalter-Hilfe
+ * (AVAILABLE_PLACEHOLDERS in src/lib/templates.ts), Detailseite mit
+ * Live-Vorschau/Erzeugung, Liste der erzeugten Schreiben und die
+ * zugehörigen Server Actions. Die Platzhalter-Schlüssel selbst
+ * ("{{mieter.vorname}}" u. a.) sind Teil der Vorlagen-Syntax und bleiben
+ * bewusst deutsch.
+ */
+export const templates = {
+	title: "Dokumentvorlagen",
+	description: "Vorlagen für Schreiben an Mieter (Abmahnungen, Abrechnungen, allgemeine Briefe).",
+	empty: "Noch keine Vorlagen angelegt.",
+	"filter.filteredBy": "Gefiltert nach:",
+	"table.title": "Titel",
+	"table.category": "Kategorie",
+	"table.generatedCount": "Erzeugte Schreiben",
+	"actions.create": "Neue Vorlage",
+	"actions.apply": "Anwenden / Schreiben erzeugen",
+	"actions.generatePdf": "PDF erzeugen",
+	"confirm.deleteTemplate": 'Vorlage "{title}" wirklich löschen? Bereits erzeugte Schreiben bleiben erhalten.',
+	// Vorlagen-Kategorien (DocumentTemplateCategory)
+	"category.WARNING": "Abmahnung",
+	"category.BILLING": "Abrechnung / Zahlungsaufforderung",
+	"category.GENERAL": "Allgemeines Schreiben",
+	"category.TERMINATION": "Kündigung",
+	"category.OTHER": "Sonstiges",
+	// Editor-Dialog (TemplateFormDialog)
+	"dialog.createTitle": "Neue Dokumentvorlage",
+	"dialog.editTitle": "Vorlage bearbeiten",
+	"dialog.description": "Text der Vorlage inkl. Platzhaltern, die beim Erzeugen eines konkreten Schreibens automatisch ersetzt werden.",
+	"fields.title": "Titel",
+	"fields.titlePlaceholder": "z. B. Mahnung Mietzahlung",
+	"fields.category": "Kategorie",
+	"fields.subject": "Betreff",
+	"fields.subjectPlaceholder": "z. B. Abmahnung wegen ausstehender Mietzahlung",
+	"fields.body": "Text",
+	"fields.bodyPlaceholder": "Sehr geehrte/r {{mieter.vorname}} {{mieter.nachname}},\n\n...",
+	// Platzhalter-Hilfe im Editor (Anzeige-Labels der AVAILABLE_PLACEHOLDERS)
+	"placeholders.hint": "Verfügbare Platzhalter (zum Einfügen anklicken):",
+	"placeholders.group.mieter": "Mieter",
+	"placeholders.group.einheit": "Mieteinheit",
+	"placeholders.group.liegenschaft": "Liegenschaft",
+	"placeholders.group.vertrag": "Mietvertrag",
+	"placeholders.group.heute": "Aktuelles Datum",
+	"placeholders.mieter.vorname": "Vorname",
+	"placeholders.mieter.nachname": "Nachname",
+	"placeholders.mieter.name": "Vor- und Nachname",
+	"placeholders.mieter.email": "E-Mail-Adresse",
+	"placeholders.mieter.telefon": "Telefonnummer",
+	"placeholders.einheit.bezeichnung": 'Bezeichnung (z. B. "1. OG links")',
+	"placeholders.einheit.wohnflaeche": "Wohnfläche (m²)",
+	"placeholders.liegenschaft.name": "Name",
+	"placeholders.liegenschaft.strasse": "Straße",
+	"placeholders.liegenschaft.plz": "Postleitzahl",
+	"placeholders.liegenschaft.ort": "Ort",
+	"placeholders.liegenschaft.adresse": "Vollständige Adresse (Straße, PLZ Ort)",
+	"placeholders.vertrag.mietbeginn": "Mietbeginn",
+	"placeholders.vertrag.mietende": 'Mietende (oder "unbefristet")',
+	"placeholders.vertrag.kaltmiete": "Aktuelle Kaltmiete",
+	"placeholders.vertrag.nebenkosten": "Aktuelle Nebenkosten",
+	"placeholders.vertrag.gesamtmiete": "Aktuelle Gesamtmiete (Kalt + NK)",
+	"placeholders.heute.datum": "Heutiges Datum",
+	// Detailseite /vorlagen/[id]
+	"detail.description": "Schreiben aus dieser Vorlage erzeugen.",
+	"detail.generateHeading": "Schreiben erzeugen",
+	"detail.generatedHeading": "Bereits erzeugte Schreiben",
+	// Erzeugungs-Formular (GenerateDocumentForm)
+	"generate.leaseLabel": "Mietvertrag auswählen",
+	"generate.leaseHint": "Optional: Ohne Auswahl wird ein allgemeines Schreiben ohne Empfänger-Anschrift und ohne vertragsbezogene Platzhalter erzeugt.",
+	"generate.subjectPlaceholder": "Betreff (optional)",
+	"generate.bodyHint": "Platzhalter wurden bereits durch die Daten des gewählten Mietvertrags ersetzt. Sie können den Text vor der Erzeugung noch anpassen.",
+	"generate.success": "Das Schreiben wurde erzeugt und gespeichert.",
+	// Erzeugte Schreiben (Listen auf /vorlagen und /vorlagen/[id])
+	"generated.title": "Erzeugte Schreiben",
+	"generated.description": "Aus Dokumentvorlagen erzeugte, gespeicherte Schreiben.",
+	"generated.empty": "Keine erzeugten Schreiben für diese Auswahl gefunden.",
+	"generated.emptyForTemplate": "Für diese Vorlage wurden noch keine Schreiben erzeugt.",
+	"generated.countLabel": "Schreiben",
+	"generated.table.subject": "Betreff",
+	"generated.table.template": "Vorlage",
+	"generated.table.createdAt": "Erzeugt am",
+	"generated.confirmDelete": "Dieses erzeugte Schreiben wirklich löschen?",
+	// Server Actions
+	"errors.titleBodyRequired": "Bitte geben Sie Titel und Text der Vorlage an.",
+	"errors.saveFailed": "Die Vorlage konnte nicht gespeichert werden.",
+	"errors.deleteFailed": "Die Vorlage konnte nicht gelöscht werden.",
+	"errors.templateNotFound": "Die Vorlage wurde nicht gefunden.",
+	"errors.leaseNotFound": "Der gewählte Mietvertrag wurde nicht gefunden.",
+	"errors.pdfFailed": "Das PDF konnte nicht erzeugt werden.",
+	"errors.generatedSaveFailed": "Das erzeugte Dokument konnte nicht gespeichert werden.",
+	"errors.documentNotFound": "Dokument nicht gefunden.",
+	"errors.documentNotFoundDetailed": "Das Dokument wurde nicht gefunden.",
+	"errors.documentDeleteFailed": "Das Dokument konnte nicht gelöscht werden.",
+};

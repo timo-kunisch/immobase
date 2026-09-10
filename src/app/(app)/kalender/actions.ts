@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -15,6 +16,7 @@ function getString(formData: FormData, key: string): string {
 
 export async function saveCalendarEventAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const title = getString(formData, "title");
 	const startDate = getString(formData, "startDate");
@@ -22,12 +24,12 @@ export async function saveCalendarEventAction(_prevState: ActionState, formData:
 	const description = getString(formData, "description");
 
 	if (!title || !startDate) {
-		return { error: "Bitte vergeben Sie einen Titel und ein Startdatum." };
+		return { error: t("calendar.errors.titleAndStartRequired") };
 	}
 
 	const endDate = endDateRaw || null;
 	if (endDate && endDate < startDate) {
-		return { error: "Das Enddatum darf nicht vor dem Startdatum liegen." };
+		return { error: t("calendar.errors.endBeforeStart") };
 	}
 
 	const data = { title, description: description || null, startDate, endDate };
@@ -42,7 +44,7 @@ export async function saveCalendarEventAction(_prevState: ActionState, formData:
 		}
 	} catch (error) {
 		console.error("saveCalendarEventAction failed", error);
-		return { error: "Das Ereignis konnte nicht gespeichert werden." };
+		return { error: t("calendar.errors.saveFailed") };
 	}
 
 	revalidatePath("/kalender");
@@ -51,13 +53,14 @@ export async function saveCalendarEventAction(_prevState: ActionState, formData:
 
 export async function deleteCalendarEventAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const event = getCalendarEvent(id);
 	try {
 		deleteCalendarEvent(id);
 	} catch (error) {
 		console.error("deleteCalendarEventAction failed", error);
-		return { error: "Das Ereignis konnte nicht gelöscht werden." };
+		return { error: t("calendar.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "kalender", `Kalender-Ereignis „${event ? event.title : id}“ gelöscht`, id);

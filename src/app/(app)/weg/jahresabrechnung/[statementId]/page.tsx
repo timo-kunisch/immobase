@@ -18,9 +18,8 @@ import { HoaConsumptionValuesDialog } from "@/components/weg/hoa-consumption-val
 import { FinalizeAnnualStatementButton } from "@/components/weg/finalize-annual-statement-button";
 import { BridgeToBetrKvDialog } from "@/components/weg/bridge-to-betrkv-dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { annualStatementStatusLabels, annualStatementStatusStyles, calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
-import { hoaAllocationKeyLabels } from "@/lib/hoa-allocation";
-import { hoaCostCategoryLabels } from "@/lib/hoa-economic-plan";
+import { annualStatementStatusStyles, calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteAnnualStatementCostItemAction, saveAnnualStatementCostItemAction } from "../actions";
 
@@ -28,6 +27,7 @@ export const dynamic = "force-dynamic";
 
 export default async function AnnualStatementDetailPage({ params }: { params: Promise<{ statementId: string }> }) {
 	const { statementId } = await params;
+	const t = await getT();
 
 	const detail = getAnnualStatementDetail(statementId);
 
@@ -85,24 +85,24 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title={`Jahresabrechnung: ${hoa.name}`}
+				title={t("hoaStatement.detail.title", { name: hoa.name })}
 				description={`${formatDate(statement.periodFrom)} – ${formatDate(statement.periodTo)}`}
 				actions={
 					<div className="flex items-center gap-2">
 						<Button variant="outline" size="sm" asChild>
 							<Link href={`/weg/jahresabrechnung?hoaId=${statement.hoaId}`}>
 								<ChevronLeft />
-								Zurück
+								{t("common.back")}
 							</Link>
 						</Button>
-						<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${annualStatementStatusStyles[statement.status]}`}>{annualStatementStatusLabels[statement.status]}</span>
+						<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${annualStatementStatusStyles[statement.status]}`}>{t(`hoaStatement.status.${statement.status}`)}</span>
 					</div>
 				}
 			/>
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<div className="flex items-center justify-between">
 					<h2 className="text-base font-semibold">
-						Kostenpositionen ({formatDate(statement.periodFrom)} – {formatDate(statement.periodTo)})
+						{t("hoaStatement.costItems.heading", { from: formatDate(statement.periodFrom), to: formatDate(statement.periodTo) })}
 					</h2>
 					{isDraft ? <HoaCostItemFormDialog action={saveAnnualStatementCostItemAction} parentIdFieldName="annualStatementId" parentId={statement.id} hoaId={statement.hoaId} units={units} customAllocationKeys={customAllocationKeys} showApportionable /> : null}
 				</div>
@@ -112,18 +112,18 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 						{costItems.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Noch keine Kostenpositionen erfasst.</p>
+								<p>{t("hoaStatement.costItems.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Bezeichnung</TableHead>
-										<TableHead>Kostenart</TableHead>
-										<TableHead>Umlageschlüssel</TableHead>
-										<TableHead>Umlagefähig</TableHead>
-										<TableHead className="text-right">Betrag</TableHead>
-										<TableHead className="w-[130px] text-right">Aktionen</TableHead>
+										<TableHead>{t("hoaStatement.table.label")}</TableHead>
+										<TableHead>{t("hoaStatement.table.category")}</TableHead>
+										<TableHead>{t("hoaStatement.table.allocationKey")}</TableHead>
+										<TableHead>{t("hoaStatement.table.apportionable")}</TableHead>
+										<TableHead className="text-right">{t("common.amount")}</TableHead>
+										<TableHead className="w-[130px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -133,19 +133,19 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 												{costItem.label}
 												{costItem.allocationKey === "DIRECT" && costItem.directUnitId ? <span className="block text-xs text-muted-foreground">{unitById.get(costItem.directUnitId)?.label}</span> : null}
 											</TableCell>
-											<TableCell className="text-muted-foreground">{hoaCostCategoryLabels[costItem.category]}</TableCell>
-											<TableCell className="text-muted-foreground">{hoaAllocationKeyLabels[costItem.allocationKey]}</TableCell>
-											<TableCell className="text-muted-foreground">{costItem.isApportionable ? "Ja" : "Nein"}</TableCell>
+											<TableCell className="text-muted-foreground">{t(`hoaStatement.category.${costItem.category}`)}</TableCell>
+											<TableCell className="text-muted-foreground">{t(`hoaStatement.allocationKey.${costItem.allocationKey}`)}</TableCell>
+											<TableCell className="text-muted-foreground">{costItem.isApportionable ? t("common.yes") : t("common.no")}</TableCell>
 											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
 											<TableCell>
 												{isDraft ? (
 													<div className="flex items-center justify-end gap-1">
 														{costItem.allocationKey === "CONSUMPTION" ? <HoaConsumptionValuesDialog hoaId={statement.hoaId} costItemId={costItem.id} costItemLabel={costItem.label} units={units} consumptionValues={costItem.consumptionValues} /> : null}
 														<HoaCostItemFormDialog action={saveAnnualStatementCostItemAction} parentIdFieldName="annualStatementId" parentId={statement.id} hoaId={statement.hoaId} costItem={costItem} units={units} customAllocationKeys={customAllocationKeys} showApportionable />
-														<ConfirmDeleteButton action={deleteAnnualStatementCostItemAction.bind(null, costItem.id, statement.hoaId, statement.id)} confirmMessage={`Kostenposition "${costItem.label}" wirklich löschen?`} />
+														<ConfirmDeleteButton action={deleteAnnualStatementCostItemAction.bind(null, costItem.id, statement.hoaId, statement.id)} confirmMessage={t("hoaStatement.confirm.deleteCostItem", { label: costItem.label })} />
 													</div>
 												) : (
-													<span className="text-xs text-muted-foreground">Finalisiert</span>
+													<span className="text-xs text-muted-foreground">{t("hoaStatement.status.FINALIZED")}</span>
 												)}
 											</TableCell>
 										</TableRow>
@@ -165,7 +165,7 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 									<div key={`${warning.costItemId}-${index}`} className="flex items-center gap-3">
 										<AlertTriangle className="size-5 shrink-0 text-amber-600" />
 										<p className="text-sm">
-											<span className="font-semibold">{costItem?.label ?? "Kostenposition"}</span> konnte nicht umgelegt werden: Es liegt keine gültige Verteilungsgrundlage vor.
+											<span className="font-semibold">{costItem?.label ?? t("hoaStatement.costItems.fallbackLabel")}</span> {t("hoaStatement.warnings.noBasis")}
 										</p>
 									</div>
 								);
@@ -175,7 +175,7 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 				) : null}
 
 				<div className="flex items-center justify-between">
-					<h2 className="text-base font-semibold">Einzelabrechnung je Eigentümer-Zeitanteil</h2>
+					<h2 className="text-base font-semibold">{t("hoaStatement.results.heading")}</h2>
 					{isDraft ? <FinalizeAnnualStatementButton annualStatementId={statement.id} hoaId={statement.hoaId} /> : null}
 				</div>
 
@@ -185,17 +185,17 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 							!liveResult || liveResult.ownerResults.length === 0 ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 									<Calculator className="size-8" />
-									<p>Für den gewählten Zeitraum wurden keine Eigentumsverhältnisse gefunden.</p>
+									<p>{t("hoaStatement.results.emptyDraft")}</p>
 								</div>
 							) : (
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Eigentümer / Einheit</TableHead>
-											<TableHead>Zeitanteil</TableHead>
-											<TableHead className="text-right">Umgelegte Kosten</TableHead>
-											<TableHead className="text-right">Vorauszahlungen</TableHead>
-											<TableHead className="text-right">Saldo</TableHead>
+											<TableHead>{t("hoaStatement.table.ownerUnit")}</TableHead>
+											<TableHead>{t("hoaStatement.table.timeShare")}</TableHead>
+											<TableHead className="text-right">{t("hoaStatement.table.allocatedCosts")}</TableHead>
+											<TableHead className="text-right">{t("hoaStatement.table.prepayments")}</TableHead>
+											<TableHead className="text-right">{t("hoaStatement.table.balance")}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -208,11 +208,11 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 														<span className="block text-xs text-muted-foreground">{unitById.get(ownerResult.unitId)?.label}</span>
 													</TableCell>
 													<TableCell className="text-muted-foreground">
-														{formatDate(ownerResult.ownedFrom)} – {formatDate(ownerResult.ownedTo)} ({ownerResult.ownedDays} Tage)
+														{formatDate(ownerResult.ownedFrom)} – {formatDate(ownerResult.ownedTo)} ({t("hoaStatement.results.days", { days: ownerResult.ownedDays })})
 													</TableCell>
 													<TableCell className="text-right">{formatCurrency(ownerResult.totalAllocatedCostsCents / 100)}</TableCell>
 													<TableCell className="text-right">{formatCurrency(ownerResult.totalPrepaymentsCents / 100)}</TableCell>
-													<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? `Nachzahlung ${formatCurrency(balanceEuros)}` : balanceEuros < 0 ? `Guthaben ${formatCurrency(Math.abs(balanceEuros))}` : formatCurrency(0)}</TableCell>
+													<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? t("hoaStatement.results.balanceDue", { amount: formatCurrency(balanceEuros) }) : balanceEuros < 0 ? t("hoaStatement.results.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) }) : formatCurrency(0)}</TableCell>
 												</TableRow>
 											);
 										})}
@@ -222,18 +222,18 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 						) : unitResults.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Keine Abrechnungsergebnisse vorhanden.</p>
+								<p>{t("hoaStatement.results.emptyFinalized")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Eigentümer / Einheit</TableHead>
-										<TableHead>Zeitanteil</TableHead>
-										<TableHead className="text-right">Umgelegte Kosten</TableHead>
-										<TableHead className="text-right">Vorauszahlungen</TableHead>
-										<TableHead className="text-right">Saldo</TableHead>
-										<TableHead className="w-[80px] text-right">BetrKV</TableHead>
+										<TableHead>{t("hoaStatement.table.ownerUnit")}</TableHead>
+										<TableHead>{t("hoaStatement.table.timeShare")}</TableHead>
+										<TableHead className="text-right">{t("hoaStatement.table.allocatedCosts")}</TableHead>
+										<TableHead className="text-right">{t("hoaStatement.table.prepayments")}</TableHead>
+										<TableHead className="text-right">{t("hoaStatement.table.balance")}</TableHead>
+										<TableHead className="w-[80px] text-right">{t("hoaStatement.table.betrkv")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -247,11 +247,11 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 													<span className="block text-xs text-muted-foreground">{result.unit.label}</span>
 												</TableCell>
 												<TableCell className="text-muted-foreground">
-													{formatDate(result.ownedFrom)} – {formatDate(result.ownedTo)} ({result.ownedDays} Tage)
+													{formatDate(result.ownedFrom)} – {formatDate(result.ownedTo)} ({t("hoaStatement.results.days", { days: result.ownedDays })})
 												</TableCell>
 												<TableCell className="text-right">{formatCurrency(result.totalAllocatedCosts)}</TableCell>
 												<TableCell className="text-right">{formatCurrency(result.totalPrepayments)}</TableCell>
-												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? `Nachzahlung ${formatCurrency(balanceEuros)}` : balanceEuros < 0 ? `Guthaben ${formatCurrency(Math.abs(balanceEuros))}` : formatCurrency(0)}</TableCell>
+												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? t("hoaStatement.results.balanceDue", { amount: formatCurrency(balanceEuros) }) : balanceEuros < 0 ? t("hoaStatement.results.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) }) : formatCurrency(0)}</TableCell>
 												<TableCell>
 													<div className="flex justify-end">
 														<BridgeToBetrKvDialog unitResultId={result.id} hoaId={statement.hoaId} availableBillingPeriods={availablePeriods} />

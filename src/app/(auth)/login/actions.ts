@@ -9,13 +9,15 @@ import { createSession } from "@/lib/auth/session";
 import { isSmtpConfigured } from "@/lib/email/mailer";
 import { normalizeEmail } from "@/lib/auth/validation";
 import type { LoginState } from "@/lib/auth/login-state";
+import { getT } from "@/lib/i18n/server";
 
 export async function loginAction(_prevState: LoginState, formData: FormData): Promise<LoginState> {
+	const t = await getT();
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 	const password = String(formData.get("password") ?? "");
 
 	if (!email || !password) {
-		return { error: "Bitte geben Sie E-Mail-Adresse und Passwort an." };
+		return { error: t("auth.errors.credentialsRequired") };
 	}
 
 	const user = getUserByEmail(email);
@@ -26,13 +28,13 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 	const passwordValid = await verifyPasswordTimingSafe(password, user?.passwordHash);
 
 	if (!user || !passwordValid) {
-		return { error: "E-Mail-Adresse oder Passwort ist falsch." };
+		return { error: t("auth.errors.invalidCredentials") };
 	}
 
 	if (!user.emailVerified) {
 		if (isSmtpConfigured()) {
 			return {
-				error: "Ihre E-Mail-Adresse wurde noch nicht bestätigt.",
+				error: t("auth.errors.emailNotVerified"),
 				unverifiedEmail: user.email,
 			};
 		}
@@ -50,7 +52,7 @@ export async function loginAction(_prevState: LoginState, formData: FormData): P
 
 	if (!user.isApproved) {
 		return {
-			error: "Ihr Konto wartet noch auf die Freigabe durch einen Administrator.",
+			error: t("auth.errors.notApproved"),
 		};
 	}
 

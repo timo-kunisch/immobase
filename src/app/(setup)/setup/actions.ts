@@ -7,8 +7,9 @@ import { countUsers, getUserByEmail } from "@/data/users";
 import { ActionState } from "@/lib/action-state";
 import { provisionUserAccount } from "@/lib/auth/bootstrap";
 import { createSession } from "@/lib/auth/session";
-import { isValidEmail, normalizeEmail, validatePassword } from "@/lib/auth/validation";
+import { isValidEmail, MIN_PASSWORD_LENGTH, normalizeEmail, validatePassword } from "@/lib/auth/validation";
 import { getDataKeyBase64 } from "@/lib/data-key";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Guard für alle Setup-Actions (Defense-in-Depth): Die Ersteinrichtung ist
@@ -32,6 +33,7 @@ function getString(formData: FormData, key: string): string {
 /** Setup-Schritt „Absenderdaten“ (Briefkopf für erzeugte PDFs). Überspringbar – leere Angaben sind zulässig. */
 export async function setupCompanySettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	ensureSetupAllowed();
+	const t = await getT();
 
 	try {
 		saveCompanySettings({
@@ -43,7 +45,7 @@ export async function setupCompanySettingsAction(_prevState: ActionState, formDa
 		});
 	} catch (error) {
 		console.error("setupCompanySettingsAction failed", error);
-		return { error: "Die Angaben konnten nicht gespeichert werden." };
+		return { error: t("setup.errors.saveCompany") };
 	}
 
 	return { success: true };
@@ -60,11 +62,12 @@ export async function setupCompanySettingsAction(_prevState: ActionState, formDa
  */
 export async function getSetupRecoveryKeyAction(): Promise<{ key?: string; error?: string }> {
 	ensureSetupAllowed();
+	const t = await getT();
 	try {
 		return { key: getDataKeyBase64() };
 	} catch (error) {
 		console.error("getSetupRecoveryKeyAction failed", error);
-		return { error: "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." };
+		return { error: t("setup.errors.recoveryKeyRead") };
 	}
 }
 
@@ -80,22 +83,23 @@ export async function getSetupRecoveryKeyAction(): Promise<{ key?: string; error
  */
 export async function setupAccountAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	ensureSetupAllowed();
+	const t = await getT();
 
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 	const password = String(formData.get("password") ?? "");
 	const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
 	if (!isValidEmail(email)) {
-		return { error: "Bitte geben Sie eine gültige E-Mail-Adresse an." };
+		return { error: t("auth.errors.invalidEmail") };
 	}
 
 	const passwordError = validatePassword(password);
 	if (passwordError) {
-		return { error: passwordError };
+		return { error: t(passwordError, { min: MIN_PASSWORD_LENGTH }) };
 	}
 
 	if (password !== passwordConfirm) {
-		return { error: "Die Passwörter stimmen nicht überein." };
+		return { error: t("auth.errors.passwordMismatch") };
 	}
 
 	// Duplikat-Prüfung ist hier defensiv: ensureSetupAllowed() garantiert
@@ -108,7 +112,7 @@ export async function setupAccountAction(_prevState: ActionState, formData: Form
 
 	const user = getUserByEmail(email);
 	if (!user) {
-		return { error: "Das Konto konnte nicht angelegt werden." };
+		return { error: t("setup.errors.accountCreate") };
 	}
 	await createSession(user.id);
 	redirect("/");

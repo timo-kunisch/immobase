@@ -23,12 +23,6 @@ import type { DocumentType } from "@/data/types";
 
 export type DocumentSourceType = "DOCUMENT" | "GENERATED_DOCUMENT" | "TENANT_STATEMENT";
 
-export const documentSourceTypeLabels: Record<DocumentSourceType, string> = {
-	DOCUMENT: "Hochgeladenes Dokument",
-	GENERATED_DOCUMENT: "Vorlagen-Schreiben",
-	TENANT_STATEMENT: "Nebenkostenabrechnung",
-};
-
 type LinkedEntity = { id: string; label: string };
 
 export type UnifiedDocument = {

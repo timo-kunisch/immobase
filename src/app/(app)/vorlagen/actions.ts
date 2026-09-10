@@ -15,6 +15,7 @@ import {
 import type { DocumentTemplateCategory } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { deleteUploadedFile, saveGeneratedFile } from "@/lib/storage";
 import { generateLetterPdf } from "@/lib/pdf/document";
@@ -36,6 +37,7 @@ function getString(formData: FormData, key: string): string {
 
 export async function saveDocumentTemplateAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const title = getString(formData, "title");
 	const categoryRaw = getString(formData, "category") as DocumentTemplateCategory;
@@ -43,7 +45,7 @@ export async function saveDocumentTemplateAction(_prevState: ActionState, formDa
 	const body = getString(formData, "body");
 
 	if (!title || !body) {
-		return { error: "Bitte geben Sie Titel und Text der Vorlage an." };
+		return { error: t("templates.errors.titleBodyRequired") };
 	}
 
 	const category: DocumentTemplateCategory = DOCUMENT_TEMPLATE_CATEGORIES.includes(categoryRaw) ? categoryRaw : "GENERAL";
@@ -65,7 +67,7 @@ export async function saveDocumentTemplateAction(_prevState: ActionState, formDa
 		}
 	} catch (error) {
 		console.error("saveDocumentTemplateAction failed", error);
-		return { error: "Die Vorlage konnte nicht gespeichert werden." };
+		return { error: t("templates.errors.saveFailed") };
 	}
 
 	revalidatePath("/vorlagen");
@@ -74,6 +76,7 @@ export async function saveDocumentTemplateAction(_prevState: ActionState, formDa
 
 export async function deleteDocumentTemplateAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const template = getDocumentTemplate(id);
 	try {
@@ -83,7 +86,7 @@ export async function deleteDocumentTemplateAction(id: string): Promise<ActionSt
 		deleteDocumentTemplate(id);
 	} catch (error) {
 		console.error("deleteDocumentTemplateAction failed", error);
-		return { error: "Die Vorlage konnte nicht gelöscht werden." };
+		return { error: t("templates.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "vorlagen", `Vorlage „${template ? template.title : id}“ gelöscht`, id);
@@ -101,12 +104,13 @@ export async function deleteDocumentTemplateAction(id: string): Promise<ActionSt
 
 export async function previewTemplateAction(_prevState: TemplatePreviewState, formData: FormData): Promise<TemplatePreviewState> {
 	await requireUser();
+	const t = await getT();
 	const templateId = getString(formData, "templateId");
 	const leaseId = getString(formData, "leaseId");
 
 	const template = getDocumentTemplate(templateId);
 	if (!template) {
-		return { error: "Die Vorlage wurde nicht gefunden." };
+		return { error: t("templates.errors.templateNotFound") };
 	}
 
 	const leaseContext = leaseId ? getLeaseTemplateContext(leaseId) : null;
@@ -130,6 +134,7 @@ export async function previewTemplateAction(_prevState: TemplatePreviewState, fo
 
 export async function generateDocumentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const templateId = getString(formData, "templateId");
 	const leaseId = getString(formData, "leaseId");
 	const subjectOverride = getString(formData, "subject");
@@ -137,13 +142,13 @@ export async function generateDocumentAction(_prevState: ActionState, formData: 
 
 	const template = getDocumentTemplate(templateId);
 	if (!template) {
-		return { error: "Die Vorlage wurde nicht gefunden." };
+		return { error: t("templates.errors.templateNotFound") };
 	}
 
 	const leaseContext = leaseId ? getLeaseTemplateContext(leaseId) : null;
 
 	if (leaseId && !leaseContext) {
-		return { error: "Der gewählte Mietvertrag wurde nicht gefunden." };
+		return { error: t("templates.errors.leaseNotFound") };
 	}
 
 	// Die Live-Vorschau im Dialog erlaubt es, den gerenderten Text vor der
@@ -179,7 +184,7 @@ export async function generateDocumentAction(_prevState: ActionState, formData: 
 		});
 	} catch (error) {
 		console.error("generateDocumentAction: PDF-Erzeugung fehlgeschlagen", error);
-		return { error: "Das PDF konnte nicht erzeugt werden." };
+		return { error: t("templates.errors.pdfFailed") };
 	}
 
 	try {
@@ -198,7 +203,7 @@ export async function generateDocumentAction(_prevState: ActionState, formData: 
 		logActivity(user, "CREATE", "vorlagen", `Dokument „${renderedSubject ?? template.title}“ aus Vorlage „${template.title}“ generiert`, document.id);
 	} catch (error) {
 		console.error("generateDocumentAction: Speichern fehlgeschlagen", error);
-		return { error: "Das erzeugte Dokument konnte nicht gespeichert werden." };
+		return { error: t("templates.errors.generatedSaveFailed") };
 	}
 
 	revalidatePath("/vorlagen");
@@ -212,12 +217,13 @@ export async function generateDocumentAction(_prevState: ActionState, formData: 
 
 export async function sendGeneratedDocumentByPostAction(generatedDocumentId: string): Promise<PostalShipmentActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const document = getGeneratedDocument(generatedDocumentId);
 	if (!document) {
-		return { error: "Das Dokument wurde nicht gefunden." };
+		return { error: t("templates.errors.documentNotFoundDetailed") };
 	}
 
-	const result = await sendPdfByPostForSource("GENERATED_DOCUMENT", generatedDocumentId, user.id);
+	const result = await sendPdfByPostForSource("GENERATED_DOCUMENT", generatedDocumentId, user.id, t);
 
 	if ("success" in result) {
 		logActivity(user, "CREATE", "postversand", `Dokument „${document.subject ?? document.templateTitle}“ per Post versendet`, generatedDocumentId);
@@ -229,15 +235,16 @@ export async function sendGeneratedDocumentByPostAction(generatedDocumentId: str
 
 export async function deleteGeneratedDocumentAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		const document = getGeneratedDocument(id);
-		if (!document) return { error: "Dokument nicht gefunden." };
+		if (!document) return { error: t("templates.errors.documentNotFound") };
 		deleteGeneratedDocument(id);
 		await deleteUploadedFile(document.filePath);
 		logActivity(user, "DELETE", "vorlagen", `Dokument „${document.subject ?? document.templateTitle}“ gelöscht`, id);
 	} catch (error) {
 		console.error("deleteGeneratedDocumentAction failed", error);
-		return { error: "Das Dokument konnte nicht gelöscht werden." };
+		return { error: t("templates.errors.documentDeleteFailed") };
 	}
 
 	revalidatePath("/vorlagen");

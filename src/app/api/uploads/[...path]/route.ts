@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireUser } from "@/lib/auth/dal";
+import { getT } from "@/lib/i18n/server";
 import { getMimeType, getUploadedFile } from "@/lib/storage";
 
 /**
@@ -19,13 +20,14 @@ import { getMimeType, getUploadedFile } from "@/lib/storage";
  */
 export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
 	await requireUser();
+	const t = await getT();
 
 	const { path: segments } = await params;
 	const relativePath = segments.join("/");
 
 	const file = await getUploadedFile(relativePath);
 	if (!file) {
-		return NextResponse.json({ error: "Datei nicht gefunden." }, { status: 404 });
+		return NextResponse.json({ error: t("settings.uploads.errors.notFound") }, { status: 404 });
 	}
 
 	const fileName = file.fileName;

@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate } from "@/lib/format";
+import type { MessageKey } from "@/lib/i18n/translator";
 import { getRentForDate } from "@/lib/rent-history";
 
 /**
@@ -51,57 +52,58 @@ export type TemplateContext = {
 
 type PlaceholderGroup = {
 	group: string;
-	groupLabel: string;
-	placeholders: { key: string; label: string }[];
+	/** i18n-Schlüssel der Gruppenbezeichnung (Anzeige im Editor via t()). */
+	groupLabelKey: MessageKey;
+	placeholders: { key: string; labelKey: MessageKey }[];
 };
 
 /** Für die Anzeige im Vorlagen-Editor: alle verfügbaren Platzhalter, gruppiert. */
 export const AVAILABLE_PLACEHOLDERS: PlaceholderGroup[] = [
 	{
 		group: "mieter",
-		groupLabel: "Mieter",
+		groupLabelKey: "templates.placeholders.group.mieter",
 		placeholders: [
-			{ key: "mieter.vorname", label: "Vorname" },
-			{ key: "mieter.nachname", label: "Nachname" },
-			{ key: "mieter.name", label: "Vor- und Nachname" },
-			{ key: "mieter.email", label: "E-Mail-Adresse" },
-			{ key: "mieter.telefon", label: "Telefonnummer" },
+			{ key: "mieter.vorname", labelKey: "templates.placeholders.mieter.vorname" },
+			{ key: "mieter.nachname", labelKey: "templates.placeholders.mieter.nachname" },
+			{ key: "mieter.name", labelKey: "templates.placeholders.mieter.name" },
+			{ key: "mieter.email", labelKey: "templates.placeholders.mieter.email" },
+			{ key: "mieter.telefon", labelKey: "templates.placeholders.mieter.telefon" },
 		],
 	},
 	{
 		group: "einheit",
-		groupLabel: "Mieteinheit",
+		groupLabelKey: "templates.placeholders.group.einheit",
 		placeholders: [
-			{ key: "einheit.bezeichnung", label: 'Bezeichnung (z. B. "1. OG links")' },
-			{ key: "einheit.wohnflaeche", label: "Wohnfläche (m²)" },
+			{ key: "einheit.bezeichnung", labelKey: "templates.placeholders.einheit.bezeichnung" },
+			{ key: "einheit.wohnflaeche", labelKey: "templates.placeholders.einheit.wohnflaeche" },
 		],
 	},
 	{
 		group: "liegenschaft",
-		groupLabel: "Liegenschaft",
+		groupLabelKey: "templates.placeholders.group.liegenschaft",
 		placeholders: [
-			{ key: "liegenschaft.name", label: "Name" },
-			{ key: "liegenschaft.strasse", label: "Straße" },
-			{ key: "liegenschaft.plz", label: "Postleitzahl" },
-			{ key: "liegenschaft.ort", label: "Ort" },
-			{ key: "liegenschaft.adresse", label: "Vollständige Adresse (Straße, PLZ Ort)" },
+			{ key: "liegenschaft.name", labelKey: "templates.placeholders.liegenschaft.name" },
+			{ key: "liegenschaft.strasse", labelKey: "templates.placeholders.liegenschaft.strasse" },
+			{ key: "liegenschaft.plz", labelKey: "templates.placeholders.liegenschaft.plz" },
+			{ key: "liegenschaft.ort", labelKey: "templates.placeholders.liegenschaft.ort" },
+			{ key: "liegenschaft.adresse", labelKey: "templates.placeholders.liegenschaft.adresse" },
 		],
 	},
 	{
 		group: "vertrag",
-		groupLabel: "Mietvertrag",
+		groupLabelKey: "templates.placeholders.group.vertrag",
 		placeholders: [
-			{ key: "vertrag.mietbeginn", label: "Mietbeginn" },
-			{ key: "vertrag.mietende", label: 'Mietende (oder "unbefristet")' },
-			{ key: "vertrag.kaltmiete", label: "Aktuelle Kaltmiete" },
-			{ key: "vertrag.nebenkosten", label: "Aktuelle Nebenkosten" },
-			{ key: "vertrag.gesamtmiete", label: "Aktuelle Gesamtmiete (Kalt + NK)" },
+			{ key: "vertrag.mietbeginn", labelKey: "templates.placeholders.vertrag.mietbeginn" },
+			{ key: "vertrag.mietende", labelKey: "templates.placeholders.vertrag.mietende" },
+			{ key: "vertrag.kaltmiete", labelKey: "templates.placeholders.vertrag.kaltmiete" },
+			{ key: "vertrag.nebenkosten", labelKey: "templates.placeholders.vertrag.nebenkosten" },
+			{ key: "vertrag.gesamtmiete", labelKey: "templates.placeholders.vertrag.gesamtmiete" },
 		],
 	},
 	{
 		group: "heute",
-		groupLabel: "Aktuelles Datum",
-		placeholders: [{ key: "heute.datum", label: "Heutiges Datum" }],
+		groupLabelKey: "templates.placeholders.group.heute",
+		placeholders: [{ key: "heute.datum", labelKey: "templates.placeholders.heute.datum" }],
 	},
 ];
 
@@ -151,10 +153,11 @@ export function renderTemplateText(text: string, context: TemplateContext): stri
 	});
 }
 
-export const documentTemplateCategoryLabels: Record<string, string> = {
-	WARNING: "Abmahnung",
-	BILLING: "Abrechnung / Zahlungsaufforderung",
-	GENERAL: "Allgemeines Schreiben",
-	TERMINATION: "Kündigung",
-	OTHER: "Sonstiges",
+/** i18n-Schlüssel der Kategorie-Bezeichnungen (Anzeige via t() auflösen). */
+export const documentTemplateCategoryLabelKeys: Record<string, MessageKey> = {
+	WARNING: "templates.category.WARNING",
+	BILLING: "templates.category.BILLING",
+	GENERAL: "templates.category.GENERAL",
+	TERMINATION: "templates.category.TERMINATION",
+	OTHER: "templates.category.OTHER",
 };

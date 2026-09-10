@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 
 import { RegisterForm } from "@/components/auth/register-form";
 import { countUsers } from "@/data/users";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-	title: "Registrieren – ImmoBase",
-};
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getT();
+	return { title: t("auth.meta.register") };
+}
 
 // WICHTIG: Ohne dynamic="force-dynamic" prerendert Next.js diese Seite
 // (kein searchParams/DB-Zugriff) statisch zur Build-Zeit – inkl. der darin

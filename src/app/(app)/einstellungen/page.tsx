@@ -5,6 +5,7 @@ import { ConnectionCard } from "@/components/einstellungen/connection-card";
 import { DataExportCard } from "@/components/einstellungen/data-export-card";
 import { DropboxBackupCard } from "@/components/einstellungen/dropbox-backup-card";
 import { ImapCard } from "@/components/einstellungen/imap-card";
+import { LanguageCard } from "@/components/einstellungen/language-card";
 import { LetterXpressCard } from "@/components/einstellungen/letterxpress-card";
 import { McpCard } from "@/components/einstellungen/mcp-card";
 import { ResetAppCard } from "@/components/einstellungen/reset-app-card";
@@ -18,12 +19,14 @@ import { isAiConfigured } from "@/lib/ai/config";
 import { getDataKeySource } from "@/lib/data-key";
 import { getDropboxUiState } from "@/lib/dropbox-backup";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
+import { getT } from "@/lib/i18n/server";
 import { hasMcpToken, isMcpEnabled } from "@/lib/mcp/auth";
 import fs from "node:fs";
 
 export const dynamic = "force-dynamic";
 
 export default async function EinstellungenPage() {
+	const t = await getT();
 	const settings = getCompanySettings();
 	// Gespeicherte Geheimnisse werden NICHT an den Client gegeben - nur die
 	// Information, ob sie gesetzt sind (Platzhalter im Formular).
@@ -67,8 +70,8 @@ export default async function EinstellungenPage() {
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Einstellungen"
-				description="Absenderdaten für erzeugte PDFs, Datensicherung, Integrationen & KI und Sicherheit - thematisch gruppiert in Bereichen."
+				title={t("settings.title")}
+				description={t("settings.description")}
 			/>
 
 			<div className="flex-1 p-4 sm:p-6">
@@ -76,9 +79,10 @@ export default async function EinstellungenPage() {
 					tabs={[
 						{
 							value: "allgemein",
-							label: "Allgemein",
+							label: t("settings.tabs.allgemein"),
 							content: (
 								<>
+									<LanguageCard />
 									<CompanySettingsForm settings={settings} />
 									<ConnectionCard />
 								</>
@@ -86,7 +90,7 @@ export default async function EinstellungenPage() {
 						},
 						{
 							value: "datensicherung",
-							label: "Datensicherung",
+							label: t("settings.tabs.datensicherung"),
 							content: (
 								<>
 									<DataExportCard />
@@ -96,12 +100,11 @@ export default async function EinstellungenPage() {
 						},
 						{
 							value: "integrationen",
-							label: "Integrationen & KI",
+							label: t("settings.tabs.integrationen"),
 							content: (
 								<>
 									<p className="max-w-xl text-sm text-muted-foreground">
-										Die App läuft vollständig offline. Alle Dienste in diesem Bereich sind optional und lassen sich einzeln
-										einrichten.
+										{t("settings.integrationsHint")}
 									</p>
 									<SmtpCard settings={smtpSettings} />
 									<ImapCard settings={imapSettings} />
@@ -122,7 +125,7 @@ export default async function EinstellungenPage() {
 						},
 						{
 							value: "sicherheit",
-							label: "Sicherheit",
+							label: t("settings.tabs.sicherheit"),
 							content: (
 								<>
 									<SecurityCard status={securityStatus} />

@@ -6,6 +6,7 @@ import { createUnit, deleteUnit, getUnit, updateUnit } from "@/data/units";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -21,6 +22,7 @@ function getOptionalFloat(formData: FormData, key: string): number | null {
 
 export async function saveUnitAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const propertyId = getString(formData, "propertyId");
 	const label = getString(formData, "label");
@@ -33,7 +35,7 @@ export async function saveUnitAction(_prevState: ActionState, formData: FormData
 	const coOwnershipShare = getOptionalFloat(formData, "coOwnershipShare");
 
 	if (!propertyId || !label) {
-		return { error: "Bitte wählen Sie eine Liegenschaft und vergeben Sie eine Bezeichnung." };
+		return { error: t("units.errors.requiredFields") };
 	}
 
 	const data = {
@@ -55,7 +57,7 @@ export async function saveUnitAction(_prevState: ActionState, formData: FormData
 		}
 	} catch (error) {
 		console.error("saveUnitAction failed", error);
-		return { error: "Die Einheit konnte nicht gespeichert werden." };
+		return { error: t("units.errors.saveFailed") };
 	}
 
 	revalidatePath("/einheiten");
@@ -66,6 +68,7 @@ export async function saveUnitAction(_prevState: ActionState, formData: FormData
 
 export async function deleteUnitAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const unit = getUnit(id);
 	try {
@@ -73,7 +76,7 @@ export async function deleteUnitAction(id: string): Promise<ActionState> {
 	} catch (error) {
 		console.error("deleteUnitAction failed", error);
 		return {
-			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Mietverträge.",
+			error: t("units.errors.deleteFailed"),
 		};
 	}
 

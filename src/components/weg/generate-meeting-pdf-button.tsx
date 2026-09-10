@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { FileDown, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n/provider";
 import { formatFileSize } from "@/lib/format";
 import { formatDate } from "@/lib/format";
 
@@ -29,6 +30,7 @@ export function GenerateMeetingPdfButton({
 	pdfFileSize: number | null;
 	pdfGeneratedAt: string | null;
 }) {
+	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 	const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +53,7 @@ export function GenerateMeetingPdfButton({
 			) : null}
 			<Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={isPending}>
 				{isPending ? <Loader2 className="animate-spin" /> : <FileDown />}
-				{pdfPath ? `${label} erneuern` : label}
+				{pdfPath ? t("hoaMeetings.actions.regenerate", { label }) : label}
 			</Button>
 			{error ? <span className="text-xs text-destructive">{error}</span> : null}
 		</div>

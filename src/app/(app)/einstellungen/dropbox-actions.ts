@@ -17,6 +17,7 @@ import { ActionState } from "@/lib/action-state";
 import { requireAdmin } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { MIN_BACKUP_PASSWORD_LENGTH } from "@/lib/backup-crypto";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Server Actions für die Dropbox-Cloud-Sicherung (Einstellungen →
@@ -37,15 +38,16 @@ function getString(formData: FormData, key: string): string {
  */
 export async function startDropboxConnectAction(appKey: string): Promise<{ url?: string; error?: string }> {
 	await requireAdmin();
+	const t = await getT();
 	const key = (appKey ?? "").trim() || getDropboxAppKey();
 	if (!key) {
-		return { error: "Bitte zuerst den Dropbox-App-Schlüssel eintragen (siehe Hinweis im Formular)." };
+		return { error: t("settings.cards.dropbox.errors.appKeyMissing") };
 	}
 	try {
 		return { url: beginDropboxConnect(key) };
 	} catch (error) {
 		console.error("startDropboxConnectAction failed", error);
-		return { error: "Der Verbindungsvorgang konnte nicht gestartet werden." };
+		return { error: t("settings.cards.dropbox.errors.connectStartFailed") };
 	}
 }
 
@@ -55,8 +57,9 @@ export async function startDropboxConnectAction(appKey: string): Promise<{ url?:
  */
 export async function completeDropboxConnectAction(code: string): Promise<{ email?: string; error?: string }> {
 	const admin = await requireAdmin();
+	const t = await getT();
 	if (!code || !code.trim()) {
-		return { error: "Bitte den von Dropbox angezeigten Code eingeben." };
+		return { error: t("settings.cards.dropbox.errors.codeMissing") };
 	}
 	try {
 		const result = await completeDropboxConnect(code);
@@ -65,7 +68,7 @@ export async function completeDropboxConnectAction(code: string): Promise<{ emai
 		return { email: result.email };
 	} catch (error) {
 		console.error("completeDropboxConnectAction failed", error);
-		return { error: error instanceof Error ? error.message : "Die Verbindung konnte nicht abgeschlossen werden." };
+		return { error: error instanceof Error ? error.message : t("settings.cards.dropbox.errors.connectCompleteFailed") };
 	}
 }
 
@@ -80,12 +83,13 @@ export async function cancelDropboxConnectAction(): Promise<ActionState> {
 /** Trennt die Dropbox-Verbindung (löscht Tokens + Kontoinfo, behält die Backup-Konfiguration). */
 export async function disconnectDropboxAction(): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 	try {
 		disconnectDropbox();
 		logActivity(admin, "DELETE", "einstellungen", "Dropbox-Verbindung getrennt");
 	} catch (error) {
 		console.error("disconnectDropboxAction failed", error);
-		return { error: "Die Verbindung konnte nicht getrennt werden." };
+		return { error: t("settings.cards.dropbox.errors.disconnectFailed") };
 	}
 	revalidatePath("/einstellungen");
 	return { success: true };
@@ -99,6 +103,7 @@ export async function disconnectDropboxAction(): Promise<ActionState> {
  */
 export async function saveDropboxBackupSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	const enabled = formData.get("enabled") === "on";
 	const interval = formData.get("interval") === "weekly" ? ("weekly" as const) : ("daily" as const);
@@ -110,17 +115,17 @@ export async function saveDropboxBackupSettingsAction(_prevState: ActionState, f
 
 	if (encrypt && password) {
 		if (password.length < MIN_BACKUP_PASSWORD_LENGTH) {
-			return { error: `Das Passwort muss mindestens ${MIN_BACKUP_PASSWORD_LENGTH} Zeichen lang sein.` };
+			return { error: t("settings.errors.passwordTooShort", { min: MIN_BACKUP_PASSWORD_LENGTH }) };
 		}
 		if (password !== passwordConfirm) {
-			return { error: "Die Passwörter stimmen nicht überein." };
+			return { error: t("settings.errors.passwordMismatch") };
 		}
 	}
 	if (encrypt && !password && !getDropboxBackupSettings().passwordSet) {
-		return { error: "Bitte ein Passwort für die Verschlüsselung vergeben (min. 8 Zeichen)." };
+		return { error: t("settings.cards.dropbox.errors.passwordRequired") };
 	}
 	if (enabled && !isDropboxConnected()) {
-		return { error: "Dropbox ist nicht verbunden - bitte zuerst das Konto verbinden." };
+		return { error: t("settings.cards.dropbox.errors.notConnected") };
 	}
 
 	try {
@@ -128,7 +133,7 @@ export async function saveDropboxBackupSettingsAction(_prevState: ActionState, f
 		logActivity(admin, "UPDATE", "einstellungen", "Dropbox-Backup-Einstellungen aktualisiert");
 	} catch (error) {
 		console.error("saveDropboxBackupSettingsAction failed", error);
-		return { error: "Die Einstellungen konnten nicht gespeichert werden." };
+		return { error: t("settings.errors.saveFailed") };
 	}
 
 	revalidatePath("/einstellungen");
@@ -138,13 +143,14 @@ export async function saveDropboxBackupSettingsAction(_prevState: ActionState, f
 /** Löst sofort einen Backup-Durchlauf aus (unabhängig vom Scheduler-Fahrplan). */
 export async function runDropboxBackupNowAction(): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 	const result = await runDropboxBackup("manual");
 	if (result.ok) {
 		logActivity(admin, "CREATE", "system", `Datensicherung „${result.fileName}“ nach Dropbox hochgeladen`);
 	}
 	revalidatePath("/einstellungen");
 	if (!result.ok) {
-		return { error: `Das Dropbox-Backup ist fehlgeschlagen: ${result.error}` };
+		return { error: t("settings.cards.dropbox.errors.backupFailed", { error: result.error }) };
 	}
-	return { success: true, message: `Die Sicherung „${result.fileName}“ wurde nach Dropbox hochgeladen.` };
+	return { success: true, message: t("settings.cards.dropbox.success.backupUploaded", { fileName: result.fileName }) };
 }

@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/auth/login-form";
 import { countUsers } from "@/data/users";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-	title: "Anmelden – ImmoBase",
-};
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getT();
+	return { title: t("auth.meta.login") };
+}
 
 // WICHTIG: force-dynamic ist hier aus zwei Gründen Pflicht (siehe auch den
 // ausführlichen Kommentar in register/page.tsx):
@@ -38,6 +40,7 @@ export default async function LoginPage({
 		redirect("/setup");
 	}
 
+	const t = await getT();
 	const { registered, firstAdmin, emailSent, email, from, passwordReset } = await searchParams;
 
 	// emailSent=1 signalisiert, dass die Registrierung eine Verifizierungs-
@@ -47,16 +50,12 @@ export default async function LoginPage({
 	let infoMessage: string | undefined;
 	if (registered) {
 		if (firstAdmin) {
-			infoMessage = emailSent
-				? "Konto erstellt! Sie sind der erste Nutzer und wurden automatisch als Administrator freigeschaltet. Bitte bestätigen Sie zunächst Ihre E-Mail-Adresse, um sich anzumelden."
-				: "Konto erstellt! Sie sind der erste Nutzer und wurden automatisch als Administrator freigeschaltet. Sie können sich jetzt anmelden.";
+			infoMessage = emailSent ? t("auth.info.firstAdminWithEmail") : t("auth.info.firstAdmin");
 		} else {
-			infoMessage = emailSent
-				? "Konto erstellt! Bitte bestätigen Sie Ihre E-Mail-Adresse. Danach muss ein Administrator Ihr Konto noch freischalten."
-				: "Konto erstellt! Sobald ein Administrator Ihr Konto freigeschaltet hat, können Sie sich anmelden.";
+			infoMessage = emailSent ? t("auth.info.registeredWithEmail") : t("auth.info.registered");
 		}
 	} else if (passwordReset) {
-		infoMessage = "Ihr Passwort wurde erfolgreich geändert. Bitte melden Sie sich mit dem neuen Passwort an.";
+		infoMessage = t("auth.info.passwordReset");
 	}
 
 	// Nur relative Pfade als Redirect-Ziel zulassen (kein Open-Redirect auf

@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getOptionalFloat } from "@/lib/form-data";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Stammdaten-CRUD für WEGs (hoas) - eine WEG ist immer 1:1 an eine
@@ -17,6 +18,7 @@ import { getString, getOptionalFloat } from "@/lib/form-data";
 
 export async function saveHoaAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const propertyId = getString(formData, "propertyId");
 	const name = getString(formData, "name");
@@ -26,7 +28,7 @@ export async function saveHoaAction(_prevState: ActionState, formData: FormData)
 	const notes = getString(formData, "notes");
 
 	if (!propertyId || !name || totalShares === null || totalShares <= 0) {
-		return { error: "Bitte Liegenschaft, Bezeichnung und eine gültige Gesamtsumme der Miteigentumsanteile angeben." };
+		return { error: t("hoa.errors.requiredFields") };
 	}
 
 	const data = {
@@ -48,7 +50,7 @@ export async function saveHoaAction(_prevState: ActionState, formData: FormData)
 		}
 	} catch (error) {
 		console.error("saveHoaAction failed", error);
-		return { error: "Die WEG konnte nicht gespeichert werden. Ist die Liegenschaft bereits einer anderen WEG zugeordnet?" };
+		return { error: t("hoa.errors.saveFailed") };
 	}
 
 	revalidatePath("/weg");
@@ -57,6 +59,7 @@ export async function saveHoaAction(_prevState: ActionState, formData: FormData)
 
 export async function deleteHoaAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const hoa = getHoa(id);
 	try {
@@ -64,7 +67,7 @@ export async function deleteHoaAction(id: string): Promise<ActionState> {
 	} catch (error) {
 		console.error("deleteHoaAction failed", error);
 		return {
-			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Wirtschaftspläne/Jahresabrechnungen/Versammlungen.",
+			error: t("hoa.errors.deleteFailed"),
 		};
 	}
 

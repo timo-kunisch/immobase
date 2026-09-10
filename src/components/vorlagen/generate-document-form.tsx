@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { generateDocumentAction, previewTemplateAction } from "@/app/(app)/vorlagen/actions";
 import { initialPreviewState } from "@/app/(app)/vorlagen/preview-state";
@@ -22,11 +23,12 @@ type LeaseOption = {
 };
 
 function GenerateSubmitButton() {
+	const { t } = useI18n();
 	const { pending } = useFormStatus();
 	return (
 		<Button type="submit" disabled={pending}>
 			{pending ? <Loader2 className="animate-spin" /> : <FileDown />}
-			PDF erzeugen
+			{t("templates.actions.generatePdf")}
 		</Button>
 	);
 }
@@ -38,6 +40,7 @@ function GenerateSubmitButton() {
  * PDF-Erzeugung noch bearbeiten kann.
  */
 export function GenerateDocumentForm({ templateId, leases }: { templateId: string; leases: LeaseOption[] }) {
+	const { t } = useI18n();
 	const [selectedLeaseId, setSelectedLeaseId] = useState<string>("");
 	const [previewState, previewAction, isPreviewPending] = useActionState(previewTemplateAction, initialPreviewState);
 	const [generateState, generateAction] = useActionState(generateDocumentAction, initialActionState);
@@ -77,10 +80,10 @@ export function GenerateDocumentForm({ templateId, leases }: { templateId: strin
 			</form>
 
 			<div className="grid gap-2 sm:max-w-md">
-				<Label htmlFor="leaseSelect">Mietvertrag auswählen</Label>
+				<Label htmlFor="leaseSelect">{t("templates.generate.leaseLabel")}</Label>
 				<Select value={selectedLeaseId} onValueChange={handleLeaseChange}>
 					<SelectTrigger id="leaseSelect" className="w-full">
-						<SelectValue placeholder="Mietvertrag auswählen" />
+						<SelectValue placeholder={t("templates.generate.leaseLabel")} />
 					</SelectTrigger>
 					<SelectContent>
 						{leases.map((lease) => (
@@ -90,7 +93,7 @@ export function GenerateDocumentForm({ templateId, leases }: { templateId: strin
 						))}
 					</SelectContent>
 				</Select>
-				<p className="text-xs text-muted-foreground">Optional: Ohne Auswahl wird ein allgemeines Schreiben ohne Empfänger-Anschrift und ohne vertragsbezogene Platzhalter erzeugt.</p>
+				<p className="text-xs text-muted-foreground">{t("templates.generate.leaseHint")}</p>
 			</div>
 
 			<Card>
@@ -100,19 +103,19 @@ export function GenerateDocumentForm({ templateId, leases }: { templateId: strin
 						<input type="hidden" name="leaseId" value={selectedLeaseId} />
 
 						<div className="grid gap-2">
-							<Label htmlFor="subject">Betreff {isPreviewPending ? <Loader2 className="inline size-3 animate-spin" /> : null}</Label>
-							<Input id="subject" name="subject" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder="Betreff (optional)" />
+							<Label htmlFor="subject">{t("templates.fields.subject")} {isPreviewPending ? <Loader2 className="inline size-3 animate-spin" /> : null}</Label>
+							<Input id="subject" name="subject" value={subject} onChange={(event) => setSubject(event.target.value)} placeholder={t("templates.generate.subjectPlaceholder")} />
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="body">Text</Label>
+							<Label htmlFor="body">{t("templates.fields.body")}</Label>
 							<Textarea id="body" name="body" value={body} onChange={(event) => setBody(event.target.value)} className="min-h-64" />
-							<p className="text-xs text-muted-foreground">Platzhalter wurden bereits durch die Daten des gewählten Mietvertrags ersetzt. Sie können den Text vor der Erzeugung noch anpassen.</p>
+							<p className="text-xs text-muted-foreground">{t("templates.generate.bodyHint")}</p>
 						</div>
 
 						{previewState.error ? <p className="text-sm text-destructive">{previewState.error}</p> : null}
 						{generateState.error ? <p className="text-sm text-destructive">{generateState.error}</p> : null}
-						{generateState.success ? <p className="text-sm text-emerald-600">Das Schreiben wurde erzeugt und gespeichert.</p> : null}
+						{generateState.success ? <p className="text-sm text-emerald-600">{t("templates.generate.success")}</p> : null}
 
 						<div className="flex justify-end">
 							<GenerateSubmitButton />

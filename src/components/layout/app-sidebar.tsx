@@ -43,6 +43,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChatbotDialog } from "@/components/layout/chatbot-dialog";
 import { logoutAction } from "@/lib/auth/actions";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n/translator";
 import { cn } from "@/lib/utils";
 
 /**
@@ -55,41 +57,44 @@ import { cn } from "@/lib/utils";
  * beiden Fachbereiche darunter enthalten ausschließlich Module, die
  * jeweils nur für Mietverhältnisse bzw. nur für WEGs Sinn ergeben.
  */
-const generalNavItems = [
-	{ title: "Dashboard", href: "/", icon: LayoutDashboard },
-	{ title: "Liegenschaften", href: "/liegenschaften", icon: Building2 },
-	{ title: "Einheiten", href: "/einheiten", icon: DoorOpen },
-	{ title: "Tickets", href: "/tickets", icon: Wrench },
-	{ title: "Dokumente", href: "/dokumente", icon: FolderOpen },
-	{ title: "Kalender", href: "/kalender", icon: CalendarRange },
-	{ title: "Wissen", href: "/wissen", icon: BookOpen },
+// Die Titel liegen als Übersetzungsschlüssel vor (Namespace "nav") und
+// werden erst im Komponenten-Rumpf über t() aufgelöst, weil die Arrays hier
+// auf Modulebene stehen (kein Hook-Zugriff außerhalb der Komponente).
+const generalNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutDashboard }[] = [
+	{ titleKey: "nav.item.dashboard", href: "/", icon: LayoutDashboard },
+	{ titleKey: "nav.item.properties", href: "/liegenschaften", icon: Building2 },
+	{ titleKey: "nav.item.units", href: "/einheiten", icon: DoorOpen },
+	{ titleKey: "nav.item.tickets", href: "/tickets", icon: Wrench },
+	{ titleKey: "nav.item.documents", href: "/dokumente", icon: FolderOpen },
+	{ titleKey: "nav.item.calendar", href: "/kalender", icon: CalendarRange },
+	{ titleKey: "nav.item.knowledge", href: "/wissen", icon: BookOpen },
 ];
 
-const rentalNavItems = [
-	{ title: "Mieter", href: "/mieter", icon: Users },
-	{ title: "Verträge", href: "/vertraege", icon: FileSignature },
-	{ title: "Finanzen", href: "/finanzen", icon: Wallet },
-	{ title: "Abrechnung", href: "/abrechnung", icon: Calculator },
-	{ title: "Vorlagen", href: "/vorlagen", icon: FileText },
+const rentalNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutDashboard }[] = [
+	{ titleKey: "nav.item.tenants", href: "/mieter", icon: Users },
+	{ titleKey: "nav.item.leases", href: "/vertraege", icon: FileSignature },
+	{ titleKey: "nav.item.finances", href: "/finanzen", icon: Wallet },
+	{ titleKey: "nav.item.billing", href: "/abrechnung", icon: Calculator },
+	{ titleKey: "nav.item.templates", href: "/vorlagen", icon: FileText },
 ];
 
-const wegNavItems = [
-	{ title: "WEGs", href: "/weg", icon: Building2 },
-	{ title: "Eigentümer", href: "/weg/eigentuemer", icon: UserSquare2 },
-	{ title: "Eigentumsverhältnisse", href: "/weg/eigentumsverhaeltnisse", icon: Users },
-	{ title: "Verteilerschlüssel", href: "/weg/verteilerschluessel", icon: Scale },
-	{ title: "Wirtschaftsplan", href: "/weg/wirtschaftsplan", icon: Calculator },
-	{ title: "Jahresabrechnung", href: "/weg/jahresabrechnung", icon: FileText },
-	{ title: "Hausgeld", href: "/weg/hausgeld", icon: Wallet },
-	{ title: "Rücklage", href: "/weg/ruecklage", icon: PiggyBank },
-	{ title: "Versammlungen", href: "/weg/versammlungen", icon: CalendarDays },
-	{ title: "Beschluss-Sammlung", href: "/weg/beschluesse", icon: Gavel },
+const wegNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutDashboard }[] = [
+	{ titleKey: "nav.item.hoas", href: "/weg", icon: Building2 },
+	{ titleKey: "nav.item.owners", href: "/weg/eigentuemer", icon: UserSquare2 },
+	{ titleKey: "nav.item.ownerships", href: "/weg/eigentumsverhaeltnisse", icon: Users },
+	{ titleKey: "nav.item.allocationKeys", href: "/weg/verteilerschluessel", icon: Scale },
+	{ titleKey: "nav.item.economicPlan", href: "/weg/wirtschaftsplan", icon: Calculator },
+	{ titleKey: "nav.item.annualStatements", href: "/weg/jahresabrechnung", icon: FileText },
+	{ titleKey: "nav.item.housingCharges", href: "/weg/hausgeld", icon: Wallet },
+	{ titleKey: "nav.item.reserveFund", href: "/weg/ruecklage", icon: PiggyBank },
+	{ titleKey: "nav.item.meetings", href: "/weg/versammlungen", icon: CalendarDays },
+	{ titleKey: "nav.item.resolutions", href: "/weg/beschluesse", icon: Gavel },
 ];
 
-const adminNavItems = [
-	{ title: "Nutzerverwaltung", href: "/admin/users", icon: ShieldCheck },
-	{ title: "Aktivitätsprotokoll", href: "/admin/logs", icon: ScrollText },
-	{ title: "Einstellungen", href: "/einstellungen", icon: Settings },
+const adminNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutDashboard }[] = [
+	{ titleKey: "nav.item.users", href: "/admin/users", icon: ShieldCheck },
+	{ titleKey: "nav.item.auditLog", href: "/admin/logs", icon: ScrollText },
+	{ titleKey: "nav.item.settings", href: "/einstellungen", icon: Settings },
 ];
 
 export function AppSidebar({
@@ -102,11 +107,12 @@ export function AppSidebar({
 	mailboxEnabled: boolean;
 }) {
 	const pathname = usePathname();
+	const { t } = useI18n();
 
 	// Das Postfach (E-Mail-Eingang per IMAP) erscheint nur, wenn der Admin
 	// einen IMAP-Server konfiguriert hat (optionale Online-Funktion).
 	const generalItems = mailboxEnabled
-		? [...generalNavItems.slice(0, 4), { title: "Postfach", href: "/postfach", icon: Inbox }, ...generalNavItems.slice(4)]
+		? [...generalNavItems.slice(0, 4), { titleKey: "nav.item.mailbox" as MessageKey, href: "/postfach", icon: Inbox }, ...generalNavItems.slice(4)]
 		: generalNavItems;
 
 	// "/" und "/weg" sind exakte Matches (sonst wäre der Dashboard- bzw.
@@ -153,7 +159,7 @@ export function AppSidebar({
 					href="https://immobase.app"
 					target="_blank"
 					rel="noopener noreferrer"
-					title="immobase.app im Browser öffnen"
+					title={t("nav.openWebsite")}
 					className="flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-sidebar-accent"
 				>
 					<div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
@@ -161,7 +167,7 @@ export function AppSidebar({
 					</div>
 					<div className="flex flex-col leading-tight group-data-[collapsible=icon]:hidden">
 						<span className="text-sm font-semibold">ImmoBase</span>
-						<span className="text-xs text-muted-foreground">Verwaltungssoftware</span>
+						<span className="text-xs text-muted-foreground">{t("nav.appTagline")}</span>
 					</div>
 				</a>
 			</SidebarHeader>
@@ -171,15 +177,15 @@ export function AppSidebar({
 			<div className="relative flex min-h-0 flex-1 flex-col">
 				<SidebarContent ref={scrollRef} onScroll={updateScrollState}>
 					<SidebarGroup>
-						<SidebarGroupLabel>Allgemein</SidebarGroupLabel>
+						<SidebarGroupLabel>{t("nav.group.general")}</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<SidebarMenu>
 								{generalItems.map((item) => (
 									<SidebarMenuItem key={item.href}>
-										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={t(item.titleKey)}>
 											<Link href={item.href}>
 												<item.icon />
-												<span>{item.title}</span>
+												<span>{t(item.titleKey)}</span>
 											</Link>
 										</SidebarMenuButton>
 									</SidebarMenuItem>
@@ -188,15 +194,15 @@ export function AppSidebar({
 						</SidebarGroupContent>
 					</SidebarGroup>
 					<SidebarGroup>
-						<SidebarGroupLabel>Mietverwaltung</SidebarGroupLabel>
+						<SidebarGroupLabel>{t("nav.group.rental")}</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<SidebarMenu>
 								{rentalNavItems.map((item) => (
 									<SidebarMenuItem key={item.href}>
-										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={t(item.titleKey)}>
 											<Link href={item.href}>
 												<item.icon />
-												<span>{item.title}</span>
+												<span>{t(item.titleKey)}</span>
 											</Link>
 										</SidebarMenuButton>
 									</SidebarMenuItem>
@@ -205,15 +211,15 @@ export function AppSidebar({
 						</SidebarGroupContent>
 					</SidebarGroup>
 					<SidebarGroup>
-						<SidebarGroupLabel>WEG-Verwaltung</SidebarGroupLabel>
+						<SidebarGroupLabel>{t("nav.group.hoa")}</SidebarGroupLabel>
 						<SidebarGroupContent>
 							<SidebarMenu>
 								{wegNavItems.map((item) => (
 									<SidebarMenuItem key={item.href}>
-										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+										<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={t(item.titleKey)}>
 											<Link href={item.href}>
 												<item.icon />
-												<span>{item.title}</span>
+												<span>{t(item.titleKey)}</span>
 											</Link>
 										</SidebarMenuButton>
 									</SidebarMenuItem>
@@ -223,15 +229,15 @@ export function AppSidebar({
 					</SidebarGroup>
 					{user.role === "ADMIN" ? (
 						<SidebarGroup>
-							<SidebarGroupLabel>Administration</SidebarGroupLabel>
+							<SidebarGroupLabel>{t("nav.group.admin")}</SidebarGroupLabel>
 							<SidebarGroupContent>
 								<SidebarMenu>
 									{adminNavItems.map((item) => (
 										<SidebarMenuItem key={item.href}>
-											<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={item.title}>
+											<SidebarMenuButton asChild isActive={isItemActive(item.href)} tooltip={t(item.titleKey)}>
 												<Link href={item.href}>
 													<item.icon />
-													<span>{item.title}</span>
+													<span>{t(item.titleKey)}</span>
 												</Link>
 											</SidebarMenuButton>
 										</SidebarMenuItem>
@@ -263,11 +269,11 @@ export function AppSidebar({
 				<div className="flex items-center gap-2 px-1 py-1">
 					<div className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
 						<span className="truncate text-xs font-medium">{user.email}</span>
-						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? "Administrator" : "Nutzer"}</span>
+						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? t("nav.role.admin") : t("nav.role.user")}</span>
 					</div>
 					<ChatbotDialog aiConfigured={aiConfigured} />
 					<form action={logoutAction}>
-						<Button type="submit" variant="ghost" size="icon-sm" title="Abmelden" aria-label="Abmelden">
+						<Button type="submit" variant="ghost" size="icon-sm" title={t("nav.logout")} aria-label={t("nav.logout")}>
 							<LogOut className="size-4" />
 						</Button>
 					</form>

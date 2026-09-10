@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { ACCEPTED_FILE_TYPES, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS_PER_MESSAGE } from "@/lib/ai/attachment-types";
 import { CHAT_HISTORY_HARD_LIMIT_CHARS } from "@/lib/ai/chat-limits";
+import { useI18n } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 
 /**
@@ -99,6 +100,7 @@ const MAX_VISIBLE_TOOL_CALLS = 3;
  * klappt die restlichen Aufrufe auf bzw. wieder zu.
  */
 function ToolCallList({ toolCalls }: { toolCalls: ToolCallInfo[] }) {
+	const { t } = useI18n();
 	const [expanded, setExpanded] = useState(false);
 	const visibleCalls = expanded ? toolCalls : toolCalls.slice(0, MAX_VISIBLE_TOOL_CALLS);
 	const hiddenCount = toolCalls.length - visibleCalls.length;
@@ -113,7 +115,7 @@ function ToolCallList({ toolCalls }: { toolCalls: ToolCallInfo[] }) {
 						"rounded border px-1 py-0.5 font-mono",
 						call.ok ? "border-border" : "border-destructive/50 text-destructive"
 					)}
-					title={call.ok ? "Werkzeug erfolgreich ausgeführt" : "Werkzeug-Aufruf fehlgeschlagen"}
+					title={call.ok ? t("chat.toolOk") : t("chat.toolFailed")}
 				>
 					{call.name}
 				</span>
@@ -122,10 +124,10 @@ function ToolCallList({ toolCalls }: { toolCalls: ToolCallInfo[] }) {
 				<button
 					type="button"
 					onClick={() => setExpanded((value) => !value)}
-					title={expanded ? "Weniger Werkzeug-Aufrufe anzeigen" : `Alle ${toolCalls.length} Werkzeug-Aufrufe anzeigen`}
+					title={expanded ? t("chat.showFewerTools") : t("chat.showAllTools", { count: toolCalls.length })}
 					className="rounded border border-border px-1 py-0.5 font-mono hover:bg-muted"
 				>
-					{expanded ? "weniger" : `+${hiddenCount} …`}
+					{expanded ? t("chat.showLessLabel") : `+${hiddenCount} …`}
 				</button>
 			) : null}
 		</p>
@@ -155,6 +157,7 @@ function formatCharCount(count: number): string {
 }
 
 export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	const [messages, setMessages] = useState<ChatMessage[]>([]);
 	const [historyLoaded, setHistoryLoaded] = useState(false);
@@ -190,8 +193,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 	}
 
 	const enabled = aiConfigured;
-	const disabledHint =
-		"Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren";
+	const disabledHint = t("chat.disabledHint");
 
 	// Gesamtlänge des Verlaufs - steuert die Größen-Warnung und die harte
 	// Grenze (der komplette Verlauf fließt bei jeder Anfrage in den
@@ -211,12 +213,12 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				const response = await fetch("/api/chat/history");
 				const data = (await response.json().catch(() => null)) as { messages?: ChatMessage[]; error?: string } | null;
 				if (!response.ok || data === null || !Array.isArray(data.messages)) {
-					throw new Error(data?.error ?? `Der Chat-Verlauf konnte nicht geladen werden (HTTP ${response.status}).`);
+					throw new Error(data?.error ?? t("chat.loadFailedHttp", { status: response.status }));
 				}
 				if (!cancelled) setMessages(data.messages);
 			} catch (cause) {
 				if (!cancelled) {
-					setError(cause instanceof Error ? cause.message : "Der Chat-Verlauf konnte nicht geladen werden.");
+					setError(cause instanceof Error ? cause.message : t("chat.loadFailed"));
 				}
 			} finally {
 				if (!cancelled) setHistoryLoaded(true);
@@ -225,7 +227,9 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+		// t: nur für die Fehlermeldungen; ändert sich praktisch nur beim
+		// Sprachwechsel - ein erneutes Laden des Verlaufs ist dann harmlos.
+	}, [t]);
 
 	// Beim Öffnen des Dialogs direkt ans Ende (neueste Nachricht) scrollen:
 	// Radix unmountet den Dialog-INHALT beim Schließen, der Scroll-Container
@@ -252,19 +256,19 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		const next = [...attachments];
 		for (const file of Array.from(fileList)) {
 			if (next.length >= MAX_ATTACHMENTS) {
-				setError(`Es sind höchstens ${MAX_ATTACHMENTS} Anhänge pro Nachricht erlaubt.`);
+				setError(t("chat.maxAttachments", { max: MAX_ATTACHMENTS }));
 				break;
 			}
 			if (file.size > MAX_ATTACHMENT_BYTES) {
 				setError(
-					`Die Datei "${file.name}" ist zu groß (${formatBytes(file.size)} - erlaubt sind höchstens ${formatBytes(MAX_ATTACHMENT_BYTES)}).`
+					t("chat.fileTooLarge", { name: file.name, size: formatBytes(file.size), max: formatBytes(MAX_ATTACHMENT_BYTES) })
 				);
 				continue;
 			}
 			try {
 				next.push({ name: file.name, size: file.size, dataBase64: await fileToBase64(file) });
 			} catch {
-				setError(`Die Datei "${file.name}" konnte nicht gelesen werden.`);
+				setError(t("chat.fileUnreadable", { name: file.name }));
 			}
 		}
 		setAttachments(next);
@@ -276,7 +280,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 		const text = input.trim();
 		if (pending || historyHardLimitReached || (!text && attachments.length === 0)) return;
 
-		const userMessage: ChatMessage = { role: "user", content: text || "(Datei-Anhang ohne Begleittext)" };
+		const userMessage: ChatMessage = { role: "user", content: text || t("chat.attachmentOnly") };
 		const nextMessages = [...messages, userMessage];
 		const sentAttachments = attachments.map(({ name, dataBase64 }) => ({ name, dataBase64 }));
 
@@ -312,24 +316,25 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				data = null;
 			}
 			if (!response.ok || data === null) {
-				const serverSnippet = responseText && !responseText.startsWith("<") ? ` Antwort des Servers: ${responseText.slice(0, 300)}` : "";
-				throw new Error(data?.error ?? `Die Anfrage ist fehlgeschlagen (HTTP ${response.status}).${serverSnippet}`);
+				const serverSnippet =
+					responseText && !responseText.startsWith("<") ? t("chat.serverResponseSnippet", { snippet: responseText.slice(0, 300) }) : "";
+				throw new Error(data?.error ?? `${t("chat.requestFailedHttp", { status: response.status })}${serverSnippet}`);
 			}
 			setMessages([...nextMessages, { role: "assistant", content: data.reply ?? "", toolCalls: data.toolCalls ?? [] }]);
 			// Bei geschlossenem Dialog auf die fertige Antwort hinweisen
 			// (Benachrichtigungs-Karte + Hinweispunkt am Button).
-			notifyIfClosed({ kind: "success", text: "Die Antwort auf Ihre Nachricht ist fertig." });
+			notifyIfClosed({ kind: "success", text: t("chat.replyReady") });
 		} catch (cause) {
 			// Der Fehlschlag wird Teil des Verlaufs (farblich markierte
 			// Fehler-Nachricht). Vom Server verarbeitete Fehler (ChatError/
 			// AiClientError) hat die Route bereits serverseitig persistiert;
 			// der lokale Eintrag spiegelt denselben Text.
-			const errorText = cause instanceof Error ? cause.message : "Die Anfrage ist fehlgeschlagen.";
+			const errorText = cause instanceof Error ? cause.message : t("chat.requestFailed");
 			setMessages([...nextMessages, { role: "error", content: errorText }]);
 			// Auch über den Fehlschlag bei geschlossenem Dialog informieren
 			// (Text gekürzt, die volle Meldung steht im Verlauf).
 			const shortError = errorText.length > 160 ? `${errorText.slice(0, 160)}…` : errorText;
-			notifyIfClosed({ kind: "error", text: `Die Anfrage ist fehlgeschlagen: ${shortError}` });
+			notifyIfClosed({ kind: "error", text: t("chat.replyFailedPrefix", { message: shortError }) });
 		} finally {
 			setPending(false);
 			textareaRef.current?.focus();
@@ -349,13 +354,13 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			const response = await fetch("/api/chat/history", { method: "DELETE" });
 			if (!response.ok) {
 				const data = (await response.json().catch(() => null)) as { error?: string } | null;
-				throw new Error(data?.error ?? `Der Chat-Verlauf konnte nicht gelöscht werden (HTTP ${response.status}).`);
+				throw new Error(data?.error ?? t("chat.deleteFailedHttp", { status: response.status }));
 			}
 			setMessages([]);
 			setAttachments([]);
 			setInput("");
 		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : "Der Chat-Verlauf konnte nicht gelöscht werden.");
+			setError(cause instanceof Error ? cause.message : t("chat.deleteFailed"));
 		} finally {
 			setClearing(false);
 			textareaRef.current?.focus();
@@ -368,10 +373,10 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 			    in manchen Browsern keine Mouse-Events (und damit kein Tooltip)
 			    aus. Der innere span verankert den Hinweispunkt für eine
 			    ungelesene fertige Antwort (replyNotice) positionsfest am Button. */}
-			<span title={enabled ? "KI-Assistent" : disabledHint}>
+			<span title={enabled ? t("chat.title") : disabledHint}>
 				<span className="relative inline-flex">
 					<DialogTrigger asChild>
-						<Button type="button" variant="ghost" size="icon-sm" disabled={!enabled} aria-label="KI-Assistent">
+						<Button type="button" variant="ghost" size="icon-sm" disabled={!enabled} aria-label={t("chat.title")}>
 							<MessageCircle className="size-4" />
 						</Button>
 					</DialogTrigger>
@@ -390,32 +395,22 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 				<DialogHeader className="border-b px-4 py-3">
 					<DialogTitle className="flex items-center gap-2">
 						<Bot className="size-5" />
-						KI-Assistent
+						{t("chat.title")}
 					</DialogTitle>
-					<DialogDescription>
-						Beantwortet Fragen zu Ihren Daten und kann auf Wunsch Änderungen vornehmen (über die Werkzeuge des
-						MCP-Servers). Dateien (PDF, Office-Dokumente, Excel, Bilder, Text/Code) können angehängt werden.
-					</DialogDescription>
+					<DialogDescription>{t("chat.description")}</DialogDescription>
 				</DialogHeader>
 
 				<div ref={setScrollRef} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
 					{!historyLoaded && messages.length === 0 ? (
 						<div className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground">
 							<Loader2 className="size-4 animate-spin" />
-							Der gespeicherte Chatverlauf wird geladen…
+							{t("chat.loadingHistory")}
 						</div>
 					) : messages.length === 0 ? (
 						<div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
 							<Bot className="size-8" />
-							<p>
-								Stellen Sie eine Frage zu Ihren Daten oder bitten Sie um Änderungen,
-								<br />
-								z. B. „Welche Mietverträge laufen 2026 aus?“ oder „Lege die Mieter aus der angehängten
-								Excel-Tabelle an“.
-							</p>
-							<p className="text-xs">
-								Der Verlauf bleibt gespeichert, bis Sie ihn über den Papierkorb-Button löschen.
-							</p>
+							<p className="whitespace-pre-line">{t("chat.emptyGreeting")}</p>
+							<p className="text-xs">{t("chat.emptyPersistenceHint")}</p>
 						</div>
 					) : (
 						messages.map((message, index) => (
@@ -453,7 +448,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 					{pending ? (
 						<div className="flex items-center gap-2 text-sm text-muted-foreground">
 							<Loader2 className="size-4 animate-spin" />
-							Die KI arbeitet (Werkzeug-Aufrufe können einen Moment dauern)…
+							{t("chat.aiWorking")}
 						</div>
 					) : null}
 				</div>
@@ -464,20 +459,19 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
 							<div className="space-y-1">
 								<p className="font-medium">
-									Der Chatverlauf hat die maximale Größe von {formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen
-									erreicht ({formatCharCount(totalHistoryChars)} Zeichen).
+									{t("chat.hardLimitReached", {
+										max: formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS),
+										current: formatCharCount(totalHistoryChars),
+									})}
 								</p>
-								<p>
-									Bevor Sie weitermachen können, muss der Verlauf gelöscht werden - der gesamte Verlauf wird bei
-									jeder Nachricht an die KI mitgesendet.
-								</p>
+								<p>{t("chat.hardLimitHint")}</p>
 								<button
 									type="button"
 									onClick={() => void handleClearHistory()}
 									disabled={pending || clearing}
 									className="font-medium underline underline-offset-2 hover:no-underline disabled:pointer-events-none disabled:opacity-50"
 								>
-									{clearing ? "Verlauf wird gelöscht…" : "Verlauf jetzt löschen"}
+									{clearing ? t("chat.clearingHistory") : t("chat.clearHistoryNow")}
 								</button>
 							</div>
 						</div>
@@ -485,22 +479,15 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 						<div className="flex items-start gap-2 rounded-md border border-amber-500/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
 							<TriangleAlert className="mt-0.5 size-4 shrink-0" />
 							<div className="space-y-1">
-								<p className="font-medium">
-									Der Chatverlauf ist sehr groß geworden ({formatCharCount(totalHistoryChars)} Zeichen).
-								</p>
-								<p>
-									Da der gesamte Verlauf bei jeder Nachricht an die KI mitgesendet wird, steigt der
-									Token-Verbrauch (und damit Kosten und Antwortzeit) spürbar. Es wird empfohlen, den Verlauf
-									zu löschen und ein neues Gespräch zu beginnen. Ab{" "}
-									{formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS)} Zeichen wird das Fortsetzen gesperrt.
-								</p>
+								<p className="font-medium">{t("chat.historyLarge", { current: formatCharCount(totalHistoryChars) })}</p>
+								<p>{t("chat.historyLargeHint", { max: formatCharCount(CHAT_HISTORY_HARD_LIMIT_CHARS) })}</p>
 								<button
 									type="button"
 									onClick={() => void handleClearHistory()}
 									disabled={pending || clearing}
 									className="font-medium underline underline-offset-2 hover:no-underline disabled:pointer-events-none disabled:opacity-50"
 								>
-									Verlauf jetzt löschen
+									{t("chat.clearHistoryNow")}
 								</button>
 							</div>
 						</div>
@@ -514,7 +501,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 									<button
 										type="button"
 										onClick={() => setAttachments(attachments.filter((_, i) => i !== index))}
-										aria-label={`Anhang ${attachment.name} entfernen`}
+										aria-label={t("chat.removeAttachment", { name: attachment.name })}
 										className="text-muted-foreground hover:text-foreground"
 									>
 										<X className="size-3" />
@@ -539,8 +526,8 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title="Datei anhängen (PDF, Office, Excel, Bilder, Text/Code)"
-							aria-label="Datei anhängen"
+							title={t("chat.attachTitle")}
+							aria-label={t("chat.attachAria")}
 							disabled={pending || historyHardLimitReached || attachments.length >= MAX_ATTACHMENTS}
 							onClick={() => fileInputRef.current?.click()}
 						>
@@ -556,11 +543,7 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 									void handleSend();
 								}
 							}}
-							placeholder={
-								historyHardLimitReached
-									? "Maximale Verlaufsgröße erreicht - bitte zuerst den Verlauf löschen."
-									: "Nachricht an die KI… (Enter sendet, Umschalt+Enter für Zeilenumbruch)"
-							}
+							placeholder={historyHardLimitReached ? t("chat.placeholderHardLimit") : t("chat.placeholderDefault")}
 							rows={2}
 							disabled={pending || historyHardLimitReached}
 							className="min-h-10 flex-1 resize-none"
@@ -568,8 +551,8 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 						<Button
 							type="button"
 							size="icon-sm"
-							title="Senden"
-							aria-label="Senden"
+							title={t("chat.sendTitle")}
+							aria-label={t("chat.sendTitle")}
 							disabled={pending || historyHardLimitReached || (!input.trim() && attachments.length === 0)}
 							onClick={() => void handleSend()}
 						>
@@ -579,8 +562,8 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 							type="button"
 							variant="ghost"
 							size="icon-sm"
-							title="Chatverlauf löschen (neues Gespräch beginnen)"
-							aria-label="Chatverlauf löschen"
+							title={t("chat.clearTitle")}
+							aria-label={t("chat.clearAria")}
 							disabled={pending || clearing || messages.length === 0}
 							onClick={() => void handleClearHistory()}
 						>
@@ -609,21 +592,21 @@ export function ChatbotDialog({ aiConfigured }: { aiConfigured: boolean }) {
 						<Bot className="mt-0.5 size-4 shrink-0 text-primary" />
 					)}
 					<div className="min-w-0 flex-1 space-y-1">
-						<p className="text-sm font-medium">KI-Assistent</p>
+						<p className="text-sm font-medium">{t("chat.title")}</p>
 						<p className="text-xs break-words text-muted-foreground">{replyNotice.text}</p>
 						<button
 							type="button"
 							onClick={() => handleOpenChange(true)}
 							className="text-xs font-medium underline underline-offset-2 hover:no-underline"
 						>
-							Chat öffnen
+							{t("chat.openChat")}
 						</button>
 					</div>
 					<button
 						type="button"
 						onClick={() => setReplyNotice(null)}
-						aria-label="Benachrichtigung schließen"
-						title="Benachrichtigung schließen"
+						aria-label={t("chat.closeNotice")}
+						title={t("chat.closeNotice")}
 						className="shrink-0 text-muted-foreground hover:text-foreground"
 					>
 						<X className="size-4" />

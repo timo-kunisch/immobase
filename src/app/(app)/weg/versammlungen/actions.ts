@@ -26,6 +26,7 @@ import {
 import type { OwnerMeetingStatus, OwnerMeetingType, ResolutionVotingResult } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { getString, getOptionalFloat, getOptionalInt } from "@/lib/form-data";
 import { calculateContestationDeadline } from "@/lib/hoa-meetings";
@@ -44,6 +45,7 @@ const VOTING_RESULTS: ResolutionVotingResult[] = ["ACCEPTED", "REJECTED"];
 
 export async function saveOwnerMeetingAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const title = getString(formData, "title");
@@ -54,7 +56,7 @@ export async function saveOwnerMeetingAction(_prevState: ActionState, formData: 
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !title) {
-		return { error: "Bitte einen Titel für die Versammlung angeben." };
+		return { error: t("hoaMeetings.meetings.errors.titleRequired") };
 	}
 
 	const type: OwnerMeetingType = MEETING_TYPES.includes(typeRaw) ? typeRaw : "ORDINARY";
@@ -80,7 +82,7 @@ export async function saveOwnerMeetingAction(_prevState: ActionState, formData: 
 		}
 	} catch (error) {
 		console.error("saveOwnerMeetingAction failed", error);
-		return { error: "Die Versammlung konnte nicht gespeichert werden." };
+		return { error: t("hoaMeetings.meetings.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/versammlungen`);
@@ -89,8 +91,9 @@ export async function saveOwnerMeetingAction(_prevState: ActionState, formData: 
 
 export async function deleteOwnerMeetingAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	if (countResolutionsForMeeting(id) > 0) {
-		return { error: "Diese Versammlung enthält bereits Beschlüsse und kann daher nicht mehr gelöscht werden (Beschluss-Sammlung, § 24 Abs. 6 WEG)." };
+		return { error: t("hoaMeetings.meetings.errors.hasResolutions") };
 	}
 
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
@@ -99,7 +102,7 @@ export async function deleteOwnerMeetingAction(id: string, _hoaId: string): Prom
 		deleteOwnerMeeting(id);
 	} catch (error) {
 		console.error("deleteOwnerMeetingAction failed", error);
-		return { error: "Die Versammlung konnte nicht gelöscht werden." };
+		return { error: t("hoaMeetings.meetings.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "versammlungen", `Eigentümerversammlung „${meeting ? meeting.title : id}“ gelöscht`, id);
@@ -114,6 +117,7 @@ export async function deleteOwnerMeetingAction(id: string, _hoaId: string): Prom
 
 export async function saveAgendaItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const meetingId = getString(formData, "meetingId");
 	const title = getString(formData, "title");
@@ -121,7 +125,7 @@ export async function saveAgendaItemAction(_prevState: ActionState, formData: Fo
 	const position = getOptionalInt(formData, "position") ?? 1;
 
 	if (!meetingId || !title) {
-		return { error: "Bitte einen Titel für den Tagesordnungspunkt angeben." };
+		return { error: t("hoaMeetings.agenda.errors.titleRequired") };
 	}
 
 	const data = { meetingId, title, description: description || null, position };
@@ -136,7 +140,7 @@ export async function saveAgendaItemAction(_prevState: ActionState, formData: Fo
 		}
 	} catch (error) {
 		console.error("saveAgendaItemAction failed", error);
-		return { error: "Der Tagesordnungspunkt konnte nicht gespeichert werden." };
+		return { error: t("hoaMeetings.agenda.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
@@ -145,13 +149,14 @@ export async function saveAgendaItemAction(_prevState: ActionState, formData: Fo
 
 export async function deleteAgendaItemAction(id: string, _hoaId: string, meetingId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const agendaItem = listAgendaItemsForMeeting(meetingId).find((item) => item.id === id) ?? null;
 	try {
 		deleteAgendaItem(id);
 	} catch (error) {
 		console.error("deleteAgendaItemAction failed", error);
-		return { error: "Der Tagesordnungspunkt konnte nicht gelöscht werden." };
+		return { error: t("hoaMeetings.agenda.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "versammlungen", `Tagesordnungspunkt „${agendaItem ? agendaItem.title : id}“ gelöscht`, id);
@@ -166,6 +171,7 @@ export async function deleteAgendaItemAction(id: string, _hoaId: string, meeting
 
 export async function saveResolutionAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const meetingId = getString(formData, "meetingId");
@@ -181,10 +187,10 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !meetingId || !title || !content || !resolvedAtRaw) {
-		return { error: "Bitte Titel, Beschlusstext und Beschlussdatum angeben." };
+		return { error: t("hoaMeetings.resolutions.errors.requiredFields") };
 	}
 	if (!VOTING_RESULTS.includes(votingResultRaw)) {
-		return { error: "Ungültiges Abstimmungsergebnis." };
+		return { error: t("hoaMeetings.resolutions.errors.invalidVotingResult") };
 	}
 
 	const resolvedAt = new Date(resolvedAtRaw);
@@ -211,7 +217,7 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 			logActivity(user, "UPDATE", "beschluesse", `Beschluss „${title}“ bearbeitet`, id);
 		} catch (error) {
 			console.error("saveResolutionAction (update) failed", error);
-			return { error: "Der Beschluss konnte nicht gespeichert werden." };
+			return { error: t("hoaMeetings.resolutions.errors.saveFailed") };
 		}
 	} else {
 		const data = {
@@ -235,7 +241,7 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
 			logActivity(user, "CREATE", "beschluesse", `Beschluss Nr. ${resolution.sequenceNumber} „${title}“ angelegt`, resolution.id);
 		} catch (error) {
 			console.error("saveResolutionAction (insert) failed", error);
-			return { error: "Der Beschluss konnte nicht gespeichert werden." };
+			return { error: t("hoaMeetings.resolutions.errors.saveFailed") };
 		}
 	}
 
@@ -252,21 +258,22 @@ export async function saveResolutionAction(_prevState: ActionState, formData: Fo
  */
 export async function deleteResolutionAction(id: string, hoaId: string, meetingId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const resolution = getOwnerResolution(id);
 	if (!resolution) {
-		return { error: "Der Beschluss wurde nicht gefunden." };
+		return { error: t("hoaMeetings.resolutions.errors.notFound") };
 	}
 
 	const maxNumber = Math.max(...listResolutionSequenceNumbersForHoa(hoaId));
 	if (resolution.sequenceNumber !== maxNumber) {
-		return { error: "Nur der zuletzt erfasste Beschluss kann gelöscht werden, um Lücken in der fortlaufenden Beschluss-Sammlung zu vermeiden." };
+		return { error: t("hoaMeetings.resolutions.errors.deleteOnlyLast") };
 	}
 
 	try {
 		deleteResolution(id);
 	} catch (error) {
 		console.error("deleteResolutionAction failed", error);
-		return { error: "Der Beschluss konnte nicht gelöscht werden." };
+		return { error: t("hoaMeetings.resolutions.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "beschluesse", `Beschluss Nr. ${resolution.sequenceNumber} „${resolution.title}“ gelöscht`, id);
@@ -282,9 +289,10 @@ export async function deleteResolutionAction(id: string, hoaId: string, meetingI
 
 export async function generateInvitationPdfAction(meetingId: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const meeting = getOwnerMeetingWithHoaAndProperty(meetingId);
 	if (!meeting) {
-		return { error: "Die Versammlung wurde nicht gefunden." };
+		return { error: t("hoaMeetings.meetings.errors.notFound") };
 	}
 	const agendaItems = listAgendaItemsForMeeting(meetingId);
 
@@ -315,7 +323,7 @@ export async function generateInvitationPdfAction(meetingId: string, _hoaId: str
 		});
 	} catch (error) {
 		console.error("generateInvitationPdfAction: PDF-Erzeugung fehlgeschlagen", error);
-		return { error: "Die Einladung konnte nicht erzeugt werden." };
+		return { error: t("hoaMeetings.invitation.errors.generateFailed") };
 	}
 
 	const previousPdfPath = meeting.invitationPdfPath;
@@ -334,7 +342,7 @@ export async function generateInvitationPdfAction(meetingId: string, _hoaId: str
 		}
 	} catch (error) {
 		console.error("generateInvitationPdfAction: Speichern fehlgeschlagen", error);
-		return { error: "Die Einladung konnte nicht gespeichert werden." };
+		return { error: t("hoaMeetings.invitation.errors.saveFailed") };
 	}
 
 	logActivity(user, "UPDATE", "versammlungen", `Einladung zur Eigentümerversammlung „${meeting.title}“ erzeugt`, meetingId);
@@ -346,11 +354,12 @@ export async function generateInvitationPdfAction(meetingId: string, _hoaId: str
 
 export async function saveMinutesTextAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const meetingId = getString(formData, "meetingId");
 	const minutesText = getString(formData, "minutesText");
 
 	if (!meetingId) {
-		return { error: "Ungültige Versammlung." };
+		return { error: t("hoaMeetings.meetings.errors.invalid") };
 	}
 
 	// Titel für den Log-Eintrag auflösen.
@@ -360,7 +369,7 @@ export async function saveMinutesTextAction(_prevState: ActionState, formData: F
 		logActivity(user, "UPDATE", "versammlungen", `Protokolltext der Eigentümerversammlung „${meeting ? meeting.title : meetingId}“ gespeichert`, meetingId);
 	} catch (error) {
 		console.error("saveMinutesTextAction failed", error);
-		return { error: "Das Protokoll konnte nicht gespeichert werden." };
+		return { error: t("hoaMeetings.minutes.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/versammlungen/${meetingId}`);
@@ -369,12 +378,13 @@ export async function saveMinutesTextAction(_prevState: ActionState, formData: F
 
 export async function generateMinutesPdfAction(meetingId: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const meeting = getOwnerMeetingWithHoaAndProperty(meetingId);
 	if (!meeting) {
-		return { error: "Die Versammlung wurde nicht gefunden." };
+		return { error: t("hoaMeetings.meetings.errors.notFound") };
 	}
 	if (!meeting.minutesText) {
-		return { error: "Bitte erfassen Sie zunächst den Protokolltext." };
+		return { error: t("hoaMeetings.minutes.errors.textRequired") };
 	}
 	const resolutions = listResolutionsForMeeting(meetingId);
 
@@ -395,7 +405,7 @@ export async function generateMinutesPdfAction(meetingId: string, _hoaId: string
 		});
 	} catch (error) {
 		console.error("generateMinutesPdfAction: PDF-Erzeugung fehlgeschlagen", error);
-		return { error: "Das Protokoll konnte nicht erzeugt werden." };
+		return { error: t("hoaMeetings.minutes.errors.generateFailed") };
 	}
 
 	const previousPdfPath = meeting.minutesPdfPath;
@@ -416,7 +426,7 @@ export async function generateMinutesPdfAction(meetingId: string, _hoaId: string
 		}
 	} catch (error) {
 		console.error("generateMinutesPdfAction: Speichern fehlgeschlagen", error);
-		return { error: "Das Protokoll konnte nicht gespeichert werden." };
+		return { error: t("hoaMeetings.minutes.errors.saveFailed") };
 	}
 
 	logActivity(user, "UPDATE", "versammlungen", `Protokoll der Eigentümerversammlung „${meeting.title}“ erzeugt`, meetingId);
@@ -432,15 +442,16 @@ export async function generateMinutesPdfAction(meetingId: string, _hoaId: string
 
 export async function sendInvitationByPostAction(meetingId: string, _hoaId: string): Promise<PostalShipmentActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const meeting = getOwnerMeeting(meetingId);
 	if (!meeting) {
-		return { error: "Die Versammlung wurde nicht gefunden." };
+		return { error: t("hoaMeetings.meetings.errors.notFound") };
 	}
 	if (!meeting.invitationPdfPath) {
-		return { error: "Bitte erzeugen Sie zunächst die Einladung als PDF." };
+		return { error: t("hoaMeetings.invitation.errors.pdfRequired") };
 	}
 
-	const result = await sendPdfByPostForSource("HOA_MEETING_INVITATION", meetingId, user.id);
+	const result = await sendPdfByPostForSource("HOA_MEETING_INVITATION", meetingId, user.id, await getT());
 	if ("success" in result) {
 		logActivity(user, "CREATE", "postversand", `Einladung zur Eigentümerversammlung „${meeting.title}“ per Post versendet`, meetingId);
 	}
@@ -450,15 +461,16 @@ export async function sendInvitationByPostAction(meetingId: string, _hoaId: stri
 
 export async function sendMinutesByPostAction(meetingId: string, _hoaId: string): Promise<PostalShipmentActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const meeting = getOwnerMeeting(meetingId);
 	if (!meeting) {
-		return { error: "Die Versammlung wurde nicht gefunden." };
+		return { error: t("hoaMeetings.meetings.errors.notFound") };
 	}
 	if (!meeting.minutesPdfPath) {
-		return { error: "Bitte erzeugen Sie zunächst das Protokoll als PDF." };
+		return { error: t("hoaMeetings.minutes.errors.pdfRequired") };
 	}
 
-	const result = await sendPdfByPostForSource("HOA_MEETING_MINUTES", meetingId, user.id);
+	const result = await sendPdfByPostForSource("HOA_MEETING_MINUTES", meetingId, user.id, await getT());
 	if ("success" in result) {
 		logActivity(user, "CREATE", "postversand", `Protokoll der Eigentümerversammlung „${meeting.title}“ per Post versendet`, meetingId);
 	}

@@ -10,17 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 import { getTotalRentForDate } from "@/lib/rent-history";
 
 import { saveTransactionAction } from "@/app/(app)/finanzen/actions";
-import type { Lease, Property, RentAdjustment, Tenant, Transaction, Unit } from "@/data/types";
+import type { Lease, Property, RentAdjustment, Tenant, Transaction, TransactionStatus, Unit } from "@/data/types";
 
-const statusLabels: Record<string, string> = {
-	OPEN: "Fällig",
-	PAID: "Bezahlt",
-	OVERDUE: "Überfällig",
-	CANCELLED: "Storniert",
-};
+const TRANSACTION_STATUSES: TransactionStatus[] = ["OPEN", "PAID", "OVERDUE", "CANCELLED"];
 
 type LeaseOption = Lease & {
 	tenant: Tenant;
@@ -29,6 +25,7 @@ type LeaseOption = Lease & {
 };
 
 export function TransactionFormDialog({ transaction, leases }: { transaction?: Transaction; leases: LeaseOption[] }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(transaction);
 	const [open, setOpen] = useState(false);
 	const [leaseId, setLeaseId] = useState(transaction?.leaseId ?? leases[0]?.id ?? "");
@@ -80,31 +77,31 @@ export function TransactionFormDialog({ transaction, leases }: { transaction?: T
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Bearbeiten" title="Bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("common.edit")} title={t("common.edit")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button" disabled={leases.length === 0}>
 						<Plus />
-						Zahlung erfassen
+						{t("finances.transactionDialog.createTitle")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Zahlung bearbeiten" : "Zahlung erfassen"}</DialogTitle>
-						<DialogDescription>Manuell erfasster Mieteingang bzw. fällige Zahlung.</DialogDescription>
+						<DialogTitle>{isEdit ? t("finances.transactionDialog.editTitle") : t("finances.transactionDialog.createTitle")}</DialogTitle>
+						<DialogDescription>{t("finances.transactionDialog.description")}</DialogDescription>
 					</DialogHeader>
 
 					{isEdit ? <input type="hidden" name="id" value={transaction!.id} /> : null}
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="leaseId">Mietvertrag *</Label>
+							<Label htmlFor="leaseId">{t("finances.fields.lease")} *</Label>
 							<Select name="leaseId" value={leaseId} onValueChange={handleLeaseChange} required>
 								<SelectTrigger id="leaseId" className="w-full">
-									<SelectValue placeholder="Mietvertrag auswählen" />
+									<SelectValue placeholder={t("finances.fields.leasePlaceholder")} />
 								</SelectTrigger>
 								<SelectContent>
 									{leases.map((lease) => (
@@ -115,36 +112,36 @@ export function TransactionFormDialog({ transaction, leases }: { transaction?: T
 								</SelectContent>
 							</Select>
 							{selectedLease && suggestedTotal !== null ? (
-								<p className="text-xs text-muted-foreground">Miete gesamt zum Fälligkeitsdatum (Kalt + NK): {suggestedTotal.toFixed(2)} €</p>
+								<p className="text-xs text-muted-foreground">{t("finances.transactionDialog.suggestedTotal", { total: suggestedTotal.toFixed(2) })}</p>
 							) : null}
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="amount">Betrag (€) *</Label>
+								<Label htmlFor="amount">{t("finances.fields.amount")} *</Label>
 								<Input id="amount" name="amount" type="number" step="0.01" min="0" value={amount} onChange={(event) => setAmount(event.target.value)} required />
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="dueDate">Fällig am *</Label>
+								<Label htmlFor="dueDate">{t("finances.fields.dueDate")} *</Label>
 								<Input id="dueDate" name="dueDate" type="date" value={dueDate} onChange={(event) => handleDueDateChange(event.target.value)} required />
 							</div>
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="purpose">Verwendungszweck</Label>
-							<Input id="purpose" name="purpose" placeholder="z. B. Miete Januar 2026" defaultValue={transaction?.purpose ?? ""} />
+							<Label htmlFor="purpose">{t("finances.fields.purpose")}</Label>
+							<Input id="purpose" name="purpose" placeholder={t("finances.fields.purposePlaceholder")} defaultValue={transaction?.purpose ?? ""} />
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="status">Status</Label>
+							<Label htmlFor="status">{t("common.status")}</Label>
 							<Select name="status" defaultValue={transaction?.status ?? "OPEN"}>
 								<SelectTrigger id="status" className="w-full">
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{Object.entries(statusLabels).map(([value, label]) => (
+									{TRANSACTION_STATUSES.map((value) => (
 										<SelectItem key={value} value={value}>
-											{label}
+											{t(`finances.status.${value}`)}
 										</SelectItem>
 									))}
 								</SelectContent>
@@ -156,11 +153,11 @@ export function TransactionFormDialog({ transaction, leases }: { transaction?: T
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

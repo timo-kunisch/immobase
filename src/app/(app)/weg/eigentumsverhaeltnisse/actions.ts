@@ -9,6 +9,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString } from "@/lib/form-data";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * CRUD für Eigentumsverhältnisse (unit_ownerships) - zeitversioniert, um
@@ -23,6 +24,7 @@ import { getString } from "@/lib/form-data";
 
 export async function saveUnitOwnershipAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const unitId = getString(formData, "unitId");
 	const ownerId = getString(formData, "ownerId");
@@ -32,10 +34,10 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 	const notes = getString(formData, "notes");
 
 	if (!unitId || !ownerId || !startDateRaw) {
-		return { error: "Bitte Einheit, Eigentümer und Beginn-Datum angeben." };
+		return { error: t("hoa.ownerships.errors.requiredFields") };
 	}
 	if (coOwnerId === ownerId) {
-		return { error: "Eigentümer und Miteigentümer dürfen nicht identisch sein." };
+		return { error: t("hoa.ownerships.errors.coOwnerSame") };
 	}
 
 	const startDate = new Date(startDateRaw);
@@ -67,7 +69,7 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 			const previousOpenOwnership = getOpenUnitOwnership(unitId);
 			if (previousOpenOwnership) {
 				if (new Date(previousOpenOwnership.startDate) >= startDate) {
-					return { error: "Das Beginn-Datum muss nach dem Beginn des aktuell laufenden Eigentumsverhältnisses dieser Einheit liegen." };
+					return { error: t("hoa.ownerships.errors.startDateNotAfterCurrent") };
 				}
 				const endDate = new Date(startDate);
 				endDate.setDate(endDate.getDate() - 1);
@@ -79,7 +81,7 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 		}
 	} catch (error) {
 		console.error("saveUnitOwnershipAction failed", error);
-		return { error: "Das Eigentumsverhältnis konnte nicht gespeichert werden." };
+		return { error: t("hoa.ownerships.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/eigentumsverhaeltnisse`);
@@ -88,11 +90,12 @@ export async function saveUnitOwnershipAction(_prevState: ActionState, formData:
 
 export async function deleteUnitOwnershipAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		deleteUnitOwnership(id);
 	} catch (error) {
 		console.error("deleteUnitOwnershipAction failed", error);
-		return { error: "Das Eigentumsverhältnis konnte nicht gelöscht werden." };
+		return { error: t("hoa.ownerships.errors.deleteFailed") };
 	}
 
 	// Es gibt keine getX-Funktion für eine einzelne Zeile - Fallback auf die ID.

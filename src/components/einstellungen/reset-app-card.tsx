@@ -9,6 +9,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { resetApplicationAction } from "@/app/(app)/einstellungen/actions";
 import { RESET_CONFIRMATION_PHRASE } from "@/app/(app)/einstellungen/reset-confirmation";
@@ -22,6 +23,7 @@ import { RESET_CONFIRMATION_PHRASE } from "@/app/(app)/einstellungen/reset-confi
  * Action prüft requireAdmin() zusätzlich selbst.
  */
 export function ResetAppCard() {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 
 	return (
@@ -29,12 +31,10 @@ export function ResetAppCard() {
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-destructive">
 					<TriangleAlert className="size-5" />
-					Anwendung zurücksetzen
+					{t("settings.cards.reset.title")}
 				</CardTitle>
 				<CardDescription>
-					Löscht die komplette Datenbank (inkl. Benutzerkonten und Einstellungen), alle abgelegten Dateien und die
-					lokal gespeicherten Sicherungen unwiderruflich und versetzt die Anwendung in den Auslieferungszustand.
-					Falls Sie die Daten später noch benötigen, exportieren Sie vorher ein Backup über die Datensicherung.
+					{t("settings.cards.reset.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -42,7 +42,7 @@ export function ResetAppCard() {
 					<DialogTrigger asChild>
 						<Button type="button" variant="destructive">
 							<TriangleAlert />
-							Anwendung zurücksetzen …
+							{t("settings.cards.reset.button")}
 						</Button>
 					</DialogTrigger>
 					<DialogContent className="sm:max-w-lg">
@@ -58,6 +58,7 @@ export function ResetAppCard() {
 }
 
 function ResetAppDialogContent() {
+	const { t } = useI18n();
 	const [state, formAction, isPending] = useActionState(resetApplicationAction, initialActionState);
 	const [confirmation, setConfirmation] = useState("");
 
@@ -77,12 +78,12 @@ function ResetAppDialogContent() {
 		return (
 			<>
 				<DialogHeader>
-					<DialogTitle>Anwendung zurückgesetzt</DialogTitle>
+					<DialogTitle>{t("settings.cards.reset.doneTitle")}</DialogTitle>
 					<DialogDescription>{state.message}</DialogDescription>
 				</DialogHeader>
 				<p className="flex items-center gap-2 text-sm text-muted-foreground">
 					<Loader2 className="size-4 animate-spin" />
-					Sie werden zur Ersteinrichtung weitergeleitet …
+					{t("settings.cards.reset.redirecting")}
 				</p>
 			</>
 		);
@@ -91,28 +92,27 @@ function ResetAppDialogContent() {
 	return (
 		<form action={formAction}>
 			<DialogHeader>
-				<DialogTitle>Anwendung endgültig zurücksetzen?</DialogTitle>
-				<DialogDescription>Diese Aktion kann nicht rückgängig gemacht werden.</DialogDescription>
+				<DialogTitle>{t("settings.cards.reset.dialogTitle")}</DialogTitle>
+				<DialogDescription>{t("settings.cards.reset.dialogDescription")}</DialogDescription>
 			</DialogHeader>
 
 			<div className="grid gap-4 py-4">
 				<div className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
-					<p className="mb-1 font-medium text-destructive">Folgende Daten werden unwiderruflich gelöscht:</p>
+					<p className="mb-1 font-medium text-destructive">{t("settings.cards.reset.deletedIntro")}</p>
 					<ul className="list-disc space-y-0.5 pl-5 text-muted-foreground">
 						<li>
-							die gesamte Datenbank: Liegenschaften, Einheiten, Mieter, Verträge, Tickets, Finanzen, Abrechnungen,
-							WEG-Verwaltung, Dokumente, Vorlagen
+							{t("settings.cards.reset.deletedDatabase")}
 						</li>
-						<li>alle Benutzerkonten, Freigaben und Sitzungen (alle Nutzer werden abgemeldet)</li>
-						<li>alle Einstellungen inkl. gespeicherter Zugangsdaten (SMTP, LetterXpress, Dropbox)</li>
-						<li>alle abgelegten Dateien (Uploads und erzeugte Dokumente)</li>
-						<li>die lokal gespeicherten Sicherungen (backups/)</li>
+						<li>{t("settings.cards.reset.deletedAccounts")}</li>
+						<li>{t("settings.cards.reset.deletedSettings")}</li>
+						<li>{t("settings.cards.reset.deletedFiles")}</li>
+						<li>{t("settings.cards.reset.deletedBackups")}</li>
 					</ul>
 				</div>
 
 				<div className="grid gap-2">
 					<Label htmlFor="reset-confirmation">
-						Zur Bestätigung bitte exakt „{RESET_CONFIRMATION_PHRASE}“ eingeben
+						{t("settings.cards.reset.confirmLabel", { phrase: RESET_CONFIRMATION_PHRASE })}
 					</Label>
 					<Input
 						id="reset-confirmation"
@@ -131,12 +131,12 @@ function ResetAppDialogContent() {
 			<DialogFooter>
 				<DialogClose asChild>
 					<Button type="button" variant="outline" disabled={isPending}>
-						Abbrechen
+						{t("common.cancel")}
 					</Button>
 				</DialogClose>
 				<Button type="submit" variant="destructive" disabled={!confirmed || isPending}>
 					{isPending ? <Loader2 className="animate-spin" /> : <TriangleAlert />}
-					Endgültig löschen
+					{t("settings.cards.reset.confirmButton")}
 				</Button>
 			</DialogFooter>
 		</form>

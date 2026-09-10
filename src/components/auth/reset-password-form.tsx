@@ -8,27 +8,29 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { resetPasswordAction } from "@/app/(auth)/reset-password/actions";
 
 export function ResetPasswordForm({ token }: { token: string }) {
+	const { t } = useI18n();
 	const [state, formAction, isPending] = useActionState(resetPasswordAction, initialActionState);
 
 	return (
 		<Card>
 			<form action={formAction}>
 				<CardHeader>
-					<CardTitle>Neues Passwort vergeben</CardTitle>
-					<CardDescription>Bitte vergeben Sie ein neues Passwort für Ihr Konto.</CardDescription>
+					<CardTitle>{t("auth.reset.title")}</CardTitle>
+					<CardDescription>{t("auth.reset.description")}</CardDescription>
 				</CardHeader>
 				<CardContent className="grid gap-4">
 					<input type="hidden" name="token" value={token} />
 					<div className="grid gap-2">
-						<Label htmlFor="password">Neues Passwort</Label>
+						<Label htmlFor="password">{t("auth.reset.newPassword")}</Label>
 						<Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="passwordConfirm">Passwort wiederholen</Label>
+						<Label htmlFor="passwordConfirm">{t("auth.register.passwordConfirm")}</Label>
 						<Input id="passwordConfirm" name="passwordConfirm" type="password" autoComplete="new-password" minLength={8} required />
 					</div>
 					{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -36,7 +38,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
 				<CardFooter>
 					<Button type="submit" className="w-full" disabled={isPending}>
 						{isPending ? <Loader2 className="animate-spin" /> : null}
-						Passwort speichern
+						{t("auth.reset.submit")}
 					</Button>
 				</CardFooter>
 			</form>

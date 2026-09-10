@@ -11,13 +11,15 @@ import { LeaseFormDialog } from "@/components/vertraege/lease-form-dialog";
 import { RentHistoryDialog } from "@/components/vertraege/rent-history-dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getRentForDate } from "@/lib/rent-history";
-import { getLeaseStatus, leaseStatusLabels, leaseStatusStyles } from "@/lib/lease-status";
+import { getLeaseStatus, leaseStatusStyles } from "@/lib/lease-status";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteLeaseAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function VertraegePage({ searchParams }: { searchParams: Promise<{ unitId?: string; tenantId?: string }> }) {
+	const t = await getT();
 	const { unitId, tenantId } = await searchParams;
 
 	const leaseList = listLeasesWithDetails({ unitId, tenantId });
@@ -30,14 +32,14 @@ export default async function VertraegePage({ searchParams }: { searchParams: Pr
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Mietverträge" description="Alle Mietverträge inkl. Kaltmiete und Nebenkosten." actions={<LeaseFormDialog units={unitList} tenants={tenantList} />} />
+			<SiteHeader title={t("leases.title")} description={t("leases.description")} actions={<LeaseFormDialog units={unitList} tenants={tenantList} />} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				{filterLabel ? (
 					<p className="text-sm text-muted-foreground">
-						Gefiltert nach: <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
+						{t("leases.filter.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
 						<Link href="/vertraege" className="text-primary hover:underline">
-							Filter zurücksetzen
+							{t("common.resetFilters")}
 						</Link>
 					</p>
 				) : null}
@@ -46,19 +48,19 @@ export default async function VertraegePage({ searchParams }: { searchParams: Pr
 						{leaseList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<FileSignature className="size-8" />
-								<p>{filterLabel ? "Keine Mietverträge für diese Auswahl gefunden." : "Noch keine Mietverträge angelegt."}</p>
+								<p>{filterLabel ? t("leases.emptyFiltered") : t("leases.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Einheit</TableHead>
-										<TableHead>Mieter</TableHead>
-										<TableHead>Zeitraum</TableHead>
-										<TableHead className="text-right">Kaltmiete (aktuell)</TableHead>
-										<TableHead className="text-right">Nebenkosten (aktuell)</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="w-[140px] text-right">Aktionen</TableHead>
+										<TableHead>{t("common.unit")}</TableHead>
+										<TableHead>{t("common.tenant")}</TableHead>
+										<TableHead>{t("leases.table.period")}</TableHead>
+										<TableHead className="text-right">{t("leases.table.coldRentCurrent")}</TableHead>
+										<TableHead className="text-right">{t("leases.table.serviceChargesCurrent")}</TableHead>
+										<TableHead>{t("common.status")}</TableHead>
+										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -79,28 +81,40 @@ export default async function VertraegePage({ searchParams }: { searchParams: Pr
 													</Link>
 												</TableCell>
 												<TableCell className="text-muted-foreground">
-													{formatDate(lease.startDate)} – {lease.endDate ? formatDate(lease.endDate) : "offen"}
+													{formatDate(lease.startDate)} – {lease.endDate ? formatDate(lease.endDate) : t("leases.period.open")}
 												</TableCell>
 												<TableCell className="text-right">{formatCurrency(currentRent.coldRent)}</TableCell>
 												<TableCell className="text-right">{formatCurrency(currentRent.serviceCharges)}</TableCell>
 												<TableCell>
-													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${leaseStatusStyles[status]}`}>{leaseStatusLabels[status]}</span>
+													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${leaseStatusStyles[status]}`}>{t(`leases.status.${status}`)}</span>
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
 														<RentHistoryDialog lease={lease} adjustments={lease.rentAdjustments} hasAdjustments={hasAdjustments} />
-														<Button variant="ghost" size="icon-sm" aria-label="Finanzen zu diesem Vertrag" title="Finanzen zu diesem Vertrag" asChild>
+														<Button
+															variant="ghost"
+															size="icon-sm"
+															aria-label={t("leases.actions.finances")}
+															title={t("leases.actions.finances")}
+															asChild
+														>
 															<Link href={`/finanzen?leaseId=${lease.id}`}>
 																<Wallet className="size-4" />
 															</Link>
 														</Button>
-														<Button variant="ghost" size="icon-sm" aria-label="Schreiben zu diesem Vertrag" title="Schreiben zu diesem Vertrag" asChild>
+														<Button
+															variant="ghost"
+															size="icon-sm"
+															aria-label={t("leases.actions.letters")}
+															title={t("leases.actions.letters")}
+															asChild
+														>
 															<Link href={`/vorlagen?leaseId=${lease.id}`}>
 																<FileText className="size-4" />
 															</Link>
 														</Button>
 														<LeaseFormDialog lease={lease} units={unitList} tenants={tenantList} />
-														<ConfirmDeleteButton action={deleteLeaseAction.bind(null, lease.id)} confirmMessage="Diesen Mietvertrag wirklich löschen?" />
+														<ConfirmDeleteButton action={deleteLeaseAction.bind(null, lease.id)} confirmMessage={t("leases.confirm.delete")} />
 													</div>
 												</TableCell>
 											</TableRow>

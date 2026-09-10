@@ -7,11 +7,13 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString } from "@/lib/form-data";
+import { getT } from "@/lib/i18n/server";
 
 /** Stammdaten-CRUD für Eigentümer (owners) - analog zu src/app/(app)/mieter/actions.ts. */
 
 export async function saveOwnerAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const firstName = getString(formData, "firstName");
 	const lastName = getString(formData, "lastName");
@@ -26,7 +28,7 @@ export async function saveOwnerAction(_prevState: ActionState, formData: FormDat
 	const notes = getString(formData, "notes");
 
 	if (!firstName || !lastName || !street || !zipCode || !city) {
-		return { error: "Bitte geben Sie Name und vollständige Anschrift des Eigentümers an." };
+		return { error: t("hoa.owners.errors.requiredFields") };
 	}
 
 	const data = {
@@ -53,7 +55,7 @@ export async function saveOwnerAction(_prevState: ActionState, formData: FormDat
 		}
 	} catch (error) {
 		console.error("saveOwnerAction failed", error);
-		return { error: "Der Eigentümer konnte nicht gespeichert werden." };
+		return { error: t("hoa.owners.errors.saveFailed") };
 	}
 
 	revalidatePath("/weg/eigentuemer");
@@ -62,6 +64,7 @@ export async function saveOwnerAction(_prevState: ActionState, formData: FormDat
 
 export async function deleteOwnerAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const owner = getOwner(id);
 	try {
@@ -69,7 +72,7 @@ export async function deleteOwnerAction(id: string): Promise<ActionState> {
 	} catch (error) {
 		console.error("deleteOwnerAction failed", error);
 		return {
-			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Eigentumsverhältnisse.",
+			error: t("hoa.owners.errors.deleteFailed"),
 		};
 	}
 

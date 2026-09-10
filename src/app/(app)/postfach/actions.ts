@@ -7,6 +7,7 @@ import { getTicket } from "@/data/tickets";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -25,14 +26,15 @@ function revalidateMailbox() {
  */
 export async function syncMailboxAction(): Promise<ActionState> {
 	await requireUser();
+	const t = await getT();
 	const { syncImapMailbox } = await import("@/lib/email/imap-sync");
 	const result = await syncImapMailbox();
 	revalidateMailbox();
 	if (result.error) {
-		return { error: `Abruf fehlgeschlagen: ${result.error}` };
+		return { error: t("tickets.mailbox.errors.syncFailed", { detail: result.error }) };
 	}
-	const linked = result.linked > 0 ? ` (${result.linked} automatisch einem Ticket zugeordnet)` : "";
-	return { success: true, message: `${result.imported} neue E-Mail(s) abgerufen${linked}.` };
+	const linked = result.linked > 0 ? t("tickets.mailbox.success.syncedLinked", { count: result.linked }) : "";
+	return { success: true, message: t("tickets.mailbox.success.synced", { imported: result.imported, linked }) };
 }
 
 /**
@@ -41,6 +43,7 @@ export async function syncMailboxAction(): Promise<ActionState> {
  */
 export async function convertMessageToTicketAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const messageId = getString(formData, "messageId");
 	const propertyId = getString(formData, "propertyId");
 	const unitIdRaw = getString(formData, "unitId");
@@ -49,15 +52,15 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 	const description = getString(formData, "description");
 
 	if (!messageId || !propertyId || !title) {
-		return { error: "Bitte wählen Sie eine Liegenschaft und vergeben Sie einen Titel." };
+		return { error: t("tickets.errors.missingPropertyOrTitle") };
 	}
 
 	const message = getTicketMessage(messageId);
 	if (!message || message.direction !== "INBOUND") {
-		return { error: "Die E-Mail wurde nicht gefunden." };
+		return { error: t("tickets.errors.emailNotFound") };
 	}
 	if (message.ticketId) {
-		return { error: "Diese E-Mail ist bereits einem Ticket zugeordnet." };
+		return { error: t("tickets.mailbox.errors.alreadyLinked") };
 	}
 
 	try {
@@ -73,7 +76,7 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 		logActivity(user, "CREATE", "tickets", `Ticket „${title}“ aus E-Mail „${message.subject ?? "(ohne Betreff)"}“ angelegt`, ticket.id);
 	} catch (error) {
 		console.error("convertMessageToTicketAction failed", error);
-		return { error: "Die E-Mail konnte nicht in ein Ticket umgewandelt werden." };
+		return { error: t("tickets.mailbox.errors.convertFailed") };
 	}
 
 	revalidateMailbox();
@@ -83,23 +86,24 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 /** Heftet eine Postfach-Nachricht an ein bestehendes Ticket an. */
 export async function linkMessageToTicketAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const messageId = getString(formData, "messageId");
 	const ticketId = getString(formData, "ticketId");
 
 	if (!messageId || !ticketId) {
-		return { error: "Bitte wählen Sie ein Ticket aus." };
+		return { error: t("tickets.errors.selectTicket") };
 	}
 
 	const message = getTicketMessage(messageId);
 	if (!message || message.direction !== "INBOUND") {
-		return { error: "Die E-Mail wurde nicht gefunden." };
+		return { error: t("tickets.errors.emailNotFound") };
 	}
 	if (message.ticketId) {
-		return { error: "Diese E-Mail ist bereits einem Ticket zugeordnet." };
+		return { error: t("tickets.mailbox.errors.alreadyLinked") };
 	}
 	const ticket = getTicket(ticketId);
 	if (!ticket) {
-		return { error: "Das ausgewählte Ticket wurde nicht gefunden." };
+		return { error: t("tickets.errors.targetTicketNotFound") };
 	}
 
 	try {
@@ -107,7 +111,7 @@ export async function linkMessageToTicketAction(_prevState: ActionState, formDat
 		logActivity(user, "UPDATE", "tickets", `E-Mail „${message.subject ?? "(ohne Betreff)"}“ dem Ticket „${ticket.title}“ zugeordnet`, ticketId);
 	} catch (error) {
 		console.error("linkMessageToTicketAction failed", error);
-		return { error: "Die E-Mail konnte nicht zugeordnet werden." };
+		return { error: t("tickets.mailbox.errors.linkFailed") };
 	}
 
 	revalidateMailbox();
@@ -121,13 +125,14 @@ export async function linkMessageToTicketAction(_prevState: ActionState, formDat
  */
 export async function deleteMailboxMessageAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const message = getTicketMessage(id);
 	try {
 		deleteMailboxMessage(id);
 	} catch (error) {
 		console.error("deleteMailboxMessageAction failed", error);
-		return { error: "Die E-Mail konnte nicht gelöscht werden." };
+		return { error: t("tickets.mailbox.errors.deleteFailed") };
 	}
 
 	if (message) {

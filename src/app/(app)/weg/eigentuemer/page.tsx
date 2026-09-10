@@ -7,18 +7,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CountLinkBadge } from "@/components/ui/count-link-badge";
 import { OwnerFormDialog } from "@/components/weg/owner-form-dialog";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteOwnerAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function EigentuemerPage() {
+	const t = await getT();
 	const ownerList = listOwners();
 	const ownershipCountMap = getOwnershipCountsByOwner();
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Eigentümer" description="Alle Eigentümer im Überblick." actions={<OwnerFormDialog />} />
+			<SiteHeader title={t("hoa.owners.title")} description={t("hoa.owners.description")} actions={<OwnerFormDialog />} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<Card>
@@ -26,17 +28,17 @@ export default async function EigentuemerPage() {
 						{ownerList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Users className="size-8" />
-								<p>Noch keine Eigentümer angelegt.</p>
+								<p>{t("hoa.owners.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Name</TableHead>
-										<TableHead>Anschrift</TableHead>
-										<TableHead>Kontakt</TableHead>
-										<TableHead>Verknüpft</TableHead>
-										<TableHead className="w-[100px] text-right">Aktionen</TableHead>
+										<TableHead>{t("common.name")}</TableHead>
+										<TableHead>{t("hoa.owners.table.address")}</TableHead>
+										<TableHead>{t("hoa.owners.table.contact")}</TableHead>
+										<TableHead>{t("hoa.table.linked")}</TableHead>
+										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -51,12 +53,12 @@ export default async function EigentuemerPage() {
 											</TableCell>
 											<TableCell className="text-muted-foreground">{[owner.email, owner.phone].filter(Boolean).join(" · ") || "–"}</TableCell>
 											<TableCell>
-												<CountLinkBadge href="/weg/eigentumsverhaeltnisse" count={ownershipCountMap.get(owner.id) ?? 0} label="Eigentumsverhältnisse" icon={Building2} />
+												<CountLinkBadge href="/weg/eigentumsverhaeltnisse" count={ownershipCountMap.get(owner.id) ?? 0} label={t("hoa.badge.ownerships")} icon={Building2} />
 											</TableCell>
 											<TableCell>
 												<div className="flex items-center justify-end gap-1">
 													<OwnerFormDialog owner={owner} />
-													<ConfirmDeleteButton action={deleteOwnerAction.bind(null, owner.id)} confirmMessage={`Eigentümer "${owner.firstName} ${owner.lastName}" wirklich löschen?`} />
+													<ConfirmDeleteButton action={deleteOwnerAction.bind(null, owner.id)} confirmMessage={t("hoa.owners.confirm.delete", { name: `${owner.firstName} ${owner.lastName}` })} />
 												</div>
 											</TableCell>
 										</TableRow>

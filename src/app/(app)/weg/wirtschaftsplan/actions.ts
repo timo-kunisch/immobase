@@ -25,6 +25,7 @@ import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import { calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
 import { findOwnershipForDate } from "@/lib/hoa-ownership";
+import { getT } from "@/lib/i18n/server";
 import type { HoaAllocationKey, HoaCostCategory } from "@/data/types";
 
 const HOA_ALLOCATION_KEYS: HoaAllocationKey[] = ["MEA", "LIVING_SPACE", "UNITS", "DIRECT", "CUSTOM"];
@@ -46,13 +47,14 @@ const HOA_COST_CATEGORIES: HoaCostCategory[] = [
 ];
 
 /** Lädt einen Wirtschaftsplan und prüft, dass er noch im Entwurf ist. */
-function requireDraftEconomicPlan(economicPlanId: string) {
+async function requireDraftEconomicPlan(economicPlanId: string) {
+	const t = await getT();
 	const plan = getEconomicPlan(economicPlanId);
 	if (!plan) {
-		return { error: "Der Wirtschaftsplan wurde nicht gefunden." } as const;
+		return { error: t("hoaPlan.errors.notFound") } as const;
 	}
 	if (plan.status !== "DRAFT") {
-		return { error: "Dieser Wirtschaftsplan ist bereits finalisiert und kann nicht mehr geändert werden." } as const;
+		return { error: t("hoaPlan.errors.alreadyFinalized") } as const;
 	}
 	return { plan } as const;
 }
@@ -68,6 +70,7 @@ function fiscalYearLabel(from: Date, to: Date): string {
 
 export async function saveEconomicPlanAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const fiscalYearFromRaw = getString(formData, "fiscalYearFrom");
@@ -75,17 +78,17 @@ export async function saveEconomicPlanAction(_prevState: ActionState, formData: 
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !fiscalYearFromRaw || !fiscalYearToRaw) {
-		return { error: "Bitte das Geschäftsjahr (von/bis) angeben." };
+		return { error: t("hoaPlan.errors.fiscalYearRequired") };
 	}
 
 	const fiscalYearFrom = new Date(fiscalYearFromRaw);
 	const fiscalYearTo = new Date(fiscalYearToRaw);
 	if (fiscalYearTo < fiscalYearFrom) {
-		return { error: "Das Ende des Geschäftsjahres darf nicht vor dessen Beginn liegen." };
+		return { error: t("hoaPlan.errors.fiscalYearOrder") };
 	}
 
 	if (id) {
-		const existing = requireDraftEconomicPlan(id);
+		const existing = await requireDraftEconomicPlan(id);
 		if ("error" in existing) return { error: existing.error };
 	}
 
@@ -106,7 +109,7 @@ export async function saveEconomicPlanAction(_prevState: ActionState, formData: 
 		}
 	} catch (error) {
 		console.error("saveEconomicPlanAction failed", error);
-		return { error: "Der Wirtschaftsplan konnte nicht gespeichert werden." };
+		return { error: t("hoaPlan.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/wirtschaftsplan`);
@@ -115,14 +118,15 @@ export async function saveEconomicPlanAction(_prevState: ActionState, formData: 
 
 export async function deleteEconomicPlanAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
-	const existing = requireDraftEconomicPlan(id);
+	const t = await getT();
+	const existing = await requireDraftEconomicPlan(id);
 	if ("error" in existing) return { error: existing.error };
 
 	try {
 		deleteEconomicPlan(id);
 	} catch (error) {
 		console.error("deleteEconomicPlanAction failed", error);
-		return { error: "Der Wirtschaftsplan konnte nicht gelöscht werden." };
+		return { error: t("hoaPlan.errors.deleteFailed") };
 	}
 
 	logActivity(
@@ -143,6 +147,7 @@ export async function deleteEconomicPlanAction(id: string, _hoaId: string): Prom
 
 export async function saveEconomicPlanCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const economicPlanId = getString(formData, "economicPlanId");
 	const categoryRaw = getString(formData, "category") as HoaCostCategory;
@@ -154,21 +159,21 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 	const notes = getString(formData, "notes");
 
 	if (!economicPlanId || !label || amount === null || !allocationKeyRaw) {
-		return { error: "Bitte Bezeichnung, Betrag und Umlageschlüssel angeben." };
+		return { error: t("hoaPlan.errors.costItemRequired") };
 	}
 
 	const category: HoaCostCategory = HOA_COST_CATEGORIES.includes(categoryRaw) ? categoryRaw : "OTHER";
 	if (!HOA_ALLOCATION_KEYS.includes(allocationKeyRaw)) {
-		return { error: "Ungültiger Umlageschlüssel." };
+		return { error: t("hoaPlan.errors.invalidAllocationKey") };
 	}
 	if (allocationKeyRaw === "DIRECT" && !directUnitId) {
-		return { error: "Bei direkter Zuordnung muss eine Einheit ausgewählt werden." };
+		return { error: t("hoaPlan.errors.directUnitRequired") };
 	}
 	if (allocationKeyRaw === "CUSTOM" && !customAllocationKeyId) {
-		return { error: "Bei einem frei definierten Schlüssel muss dieser ausgewählt werden." };
+		return { error: t("hoaPlan.errors.customKeyRequired") };
 	}
 
-	const existing = requireDraftEconomicPlan(economicPlanId);
+	const existing = await requireDraftEconomicPlan(economicPlanId);
 	if ("error" in existing) return { error: existing.error };
 
 	const data = {
@@ -191,7 +196,7 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 		}
 	} catch (error) {
 		console.error("saveEconomicPlanCostItemAction failed", error);
-		return { error: "Die Kostenposition konnte nicht gespeichert werden." };
+		return { error: t("hoaPlan.errors.costItemSaveFailed") };
 	}
 
 	revalidatePath(`/weg/wirtschaftsplan/${economicPlanId}`);
@@ -200,7 +205,8 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 
 export async function deleteEconomicPlanCostItemAction(id: string, _hoaId: string, economicPlanId: string): Promise<ActionState> {
 	const user = await requireUser();
-	const existing = requireDraftEconomicPlan(economicPlanId);
+	const t = await getT();
+	const existing = await requireDraftEconomicPlan(economicPlanId);
 	if ("error" in existing) return { error: existing.error };
 
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
@@ -209,7 +215,7 @@ export async function deleteEconomicPlanCostItemAction(id: string, _hoaId: strin
 		deleteEconomicPlanCostItem(id);
 	} catch (error) {
 		console.error("deleteEconomicPlanCostItemAction failed", error);
-		return { error: "Die Kostenposition konnte nicht gelöscht werden." };
+		return { error: t("hoaPlan.errors.costItemDeleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "wirtschaftsplan", `Kostenposition „${costItem ? costItem.label : id}“ gelöscht`, id);
@@ -224,19 +230,20 @@ export async function deleteEconomicPlanCostItemAction(id: string, _hoaId: strin
 
 export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const detail = getEconomicPlanDetail(economicPlanId);
 
 	if (!detail) {
-		return { error: "Der Wirtschaftsplan wurde nicht gefunden." };
+		return { error: t("hoaPlan.errors.notFound") };
 	}
 	if (detail.plan.status !== "DRAFT") {
-		return { error: "Dieser Wirtschaftsplan wurde bereits finalisiert." };
+		return { error: t("hoaPlan.errors.alreadyFinalizedShort") };
 	}
 	if (detail.costItems.length === 0) {
-		return { error: "Bitte erfassen Sie mindestens eine Kostenposition, bevor Sie finalisieren." };
+		return { error: t("hoaPlan.errors.noCostItems") };
 	}
 	if (detail.units.length === 0) {
-		return { error: "Diese Liegenschaft hat noch keine Einheiten." };
+		return { error: t("hoaPlan.errors.noUnits") };
 	}
 
 	// Gewichte für "CUSTOM"-Kostenpositionen separat je Einheit auflösen.
@@ -272,7 +279,7 @@ export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId:
 		);
 	} catch (error) {
 		console.error("finalizeEconomicPlanAction failed", error);
-		return { error: "Der Wirtschaftsplan konnte nicht finalisiert werden." };
+		return { error: t("hoaPlan.errors.finalizeFailed") };
 	}
 
 	logActivity(
@@ -306,20 +313,21 @@ export async function finalizeEconomicPlanAction(economicPlanId: string, _hoaId:
  */
 export async function generateHousingChargesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const economicPlanId = getString(formData, "economicPlanId");
 	const dueDayRaw = getString(formData, "dueDay");
 
 	const dueDay = Number(dueDayRaw);
 	if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
-		return { error: "Der Fälligkeitstag muss zwischen 1 und 28 liegen." };
+		return { error: t("hoaPlan.errors.dueDayRange") };
 	}
 
 	const plan = getEconomicPlan(economicPlanId);
 	if (!plan) {
-		return { error: "Der Wirtschaftsplan wurde nicht gefunden." };
+		return { error: t("hoaPlan.errors.notFound") };
 	}
 	if (plan.status !== "FINALIZED") {
-		return { error: "Hausgeld kann erst fällig gestellt werden, wenn der Wirtschaftsplan finalisiert wurde." };
+		return { error: t("hoaPlan.errors.chargesRequireFinalized") };
 	}
 
 	const unitShares = listEconomicPlanUnitShares(economicPlanId);
@@ -376,7 +384,7 @@ export async function generateHousingChargesAction(_prevState: ActionState, form
 		skipped = result.skipped;
 	} catch (error) {
 		console.error("generateHousingChargesAction failed", error);
-		return { error: "Die Hausgeld-Sollstellungen konnten nicht angelegt werden." };
+		return { error: t("hoaPlan.errors.chargesFailed") };
 	}
 
 	revalidatePath(`/weg/hausgeld`);
@@ -387,10 +395,10 @@ export async function generateHousingChargesAction(_prevState: ActionState, form
 			success: true,
 			message:
 				skipped > 0
-					? `Keine neuen Sollstellungen angelegt - für alle ${skipped} Einheit/Monat-Kombinationen existierten bereits Sollstellungen.`
+					? t("hoaPlan.success.chargesNoneExisting", { skipped })
 					: skippedNoOwner > 0
-						? "Für keine der Einheiten war zum jeweiligen Fälligkeitsmonat ein Eigentümer erfasst."
-						: "Keine Einheiten mit Einzelwirtschaftsplan gefunden.",
+						? t("hoaPlan.success.chargesNoneNoOwner")
+						: t("hoaPlan.success.chargesNoneNoShares"),
 		};
 	}
 
@@ -398,6 +406,6 @@ export async function generateHousingChargesAction(_prevState: ActionState, form
 
 	return {
 		success: true,
-		message: `${created} Hausgeld-Sollstellung${created === 1 ? "" : "en"} angelegt${skipped > 0 ? ` (${skipped} bereits vorhanden)` : ""}${skippedNoOwner > 0 ? ` (${skippedNoOwner} ohne erfassten Eigentümer übersprungen)` : ""}.`,
+		message: `${t(created === 1 ? "hoaPlan.success.chargesCreated.one" : "hoaPlan.success.chargesCreated.other", { created })}${skipped > 0 ? ` (${t("hoaPlan.success.chargesExistingHint", { skipped })})` : ""}${skippedNoOwner > 0 ? ` (${t("hoaPlan.success.chargesNoOwnerHint", { skippedNoOwner })})` : ""}.`,
 	};
 }

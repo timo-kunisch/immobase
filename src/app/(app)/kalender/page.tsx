@@ -17,6 +17,7 @@ import {
 	toLocalDayKey,
 	type CalendarItemKind,
 } from "@/lib/calendar";
+import { getT } from "@/lib/i18n/server";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,7 @@ const KIND_STYLES: Record<Exclude<CalendarItemKind, "MANUAL">, string> = {
 };
 
 export default async function KalenderPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+	const t = await getT();
 	const { month } = await searchParams;
 	const { year, monthIndex } = parseMonthParam(month);
 
@@ -46,6 +48,11 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
 		events: listCalendarEvents(range),
 		leases: listLeasesWithDetails(),
 		meetings: listOwnerMeetings(),
+		labels: {
+			leaseStart: t("calendar.labels.leaseStart"),
+			leaseEnd: t("calendar.labels.leaseEnd"),
+			meeting: t("calendar.labels.meeting"),
+		},
 	});
 	const itemsByDay = groupItemsByDay(items);
 
@@ -57,8 +64,8 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Kalender"
-				description="Manuelle Ereignisse und automatische Termine (Einzug/Auszug, Versammlungen)."
+				title={t("calendar.title")}
+				description={t("calendar.description")}
 				actions={<EventFormDialog defaultDate={todayKey} />}
 			/>
 
@@ -66,19 +73,27 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<div className="flex items-center gap-2">
 						<Button variant="outline" size="icon-sm" asChild>
-							<Link href={`/kalender?month=${formatMonthParam(prev.year, prev.monthIndex)}`} aria-label="Vorheriger Monat" title="Vorheriger Monat">
+							<Link
+								href={`/kalender?month=${formatMonthParam(prev.year, prev.monthIndex)}`}
+								aria-label={t("calendar.actions.prevMonth")}
+								title={t("calendar.actions.prevMonth")}
+							>
 								<ChevronLeft className="size-4" />
 							</Link>
 						</Button>
 						<h2 className="min-w-40 text-center text-base font-semibold capitalize">{monthTitle}</h2>
 						<Button variant="outline" size="icon-sm" asChild>
-							<Link href={`/kalender?month=${formatMonthParam(next.year, next.monthIndex)}`} aria-label="Nächster Monat" title="Nächster Monat">
+							<Link
+								href={`/kalender?month=${formatMonthParam(next.year, next.monthIndex)}`}
+								aria-label={t("calendar.actions.nextMonth")}
+								title={t("calendar.actions.nextMonth")}
+							>
 								<ChevronRight className="size-4" />
 							</Link>
 						</Button>
 					</div>
 					<Button variant="outline" size="sm" asChild>
-						<Link href="/kalender">Heute</Link>
+						<Link href="/kalender">{t("common.today")}</Link>
 					</Button>
 				</div>
 
@@ -127,16 +142,16 @@ export default async function KalenderPage({ searchParams }: { searchParams: Pro
 
 				<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
 					<span className="flex items-center gap-1.5">
-						<span className="inline-block size-2.5 rounded-sm bg-primary/60" /> Eigenes Ereignis (bearbeitbar per Klick)
+						<span className="inline-block size-2.5 rounded-sm bg-primary/60" /> {t("calendar.kind.MANUAL")}
 					</span>
 					<span className="flex items-center gap-1.5">
-						<span className="inline-block size-2.5 rounded-sm bg-emerald-500/60" /> Einzug (Mietbeginn)
+						<span className="inline-block size-2.5 rounded-sm bg-emerald-500/60" /> {t("calendar.kind.LEASE_START")}
 					</span>
 					<span className="flex items-center gap-1.5">
-						<span className="inline-block size-2.5 rounded-sm bg-orange-500/60" /> Auszug (Mietende)
+						<span className="inline-block size-2.5 rounded-sm bg-orange-500/60" /> {t("calendar.kind.LEASE_END")}
 					</span>
 					<span className="flex items-center gap-1.5">
-						<span className="inline-block size-2.5 rounded-sm bg-violet-500/60" /> Eigentümerversammlung
+						<span className="inline-block size-2.5 rounded-sm bg-violet-500/60" /> {t("calendar.kind.MEETING")}
 					</span>
 				</div>
 			</div>

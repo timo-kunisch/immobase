@@ -1,3 +1,6 @@
+import { deMessages } from "@/lib/i18n/messages/de";
+import { createTranslator, type TranslateFn } from "@/lib/i18n/translator";
+
 import type { AiConfig } from "./config";
 
 /**
@@ -8,9 +11,17 @@ import type { AiConfig } from "./config";
  * hier genutzte Subset (Messages + Function/Tool-Calling, nicht-streamend)
  * ist überall identisch.
  *
- * Fehler werden als AiClientError mit deutscher, UI-tauglicher Meldung
- * geworfen (keine Stack-Details nach außen - Details ins Server-Log).
+ * Fehler werden als AiClientError mit UI-tauglicher Meldung in der Sprache
+ * des übergebenen Übersetzers geworfen (Default: Deutsch - der Chat in
+ * src/lib/ai/chat.ts übergibt die gewählte App-Sprache; keine Stack-Details
+ * nach außen - Details ins Server-Log).
  */
+
+/**
+ * Standard-Übersetzer (Deutsch) für Aufrufe ohne eigenen t()-Parameter -
+ * u. a. die Unit-Tests, die ohne next/headers-Kontext laufen.
+ */
+const defaultT = createTranslator(deMessages);
 
 export class AiClientError extends Error {}
 
@@ -75,7 +86,8 @@ function sleep(ms: number): Promise<void> {
 export async function createChatCompletion(
 	config: AiConfig,
 	messages: OpenAiMessage[],
-	tools?: OpenAiTool[]
+	tools?: OpenAiTool[],
+	t: TranslateFn = defaultT
 ): Promise<OpenAiMessage> {
 	const url = `${config.baseUrl}/chat/completions`;
 	// Ohne übergebene Werkzeuge werden die Felder tools/tool_choice komplett
@@ -129,9 +141,7 @@ export async function createChatCompletion(
 
 	if (response === null) {
 		console.error("[ai] Endpunkt nicht erreichbar:", lastNetworkError);
-		throw new AiClientError(
-			`Der KI-Endpunkt (${config.baseUrl}) ist nicht erreichbar. Bitte prüfen Sie die Konfiguration unter Einstellungen → KI-Assistent und ob der Dienst läuft.`
-		);
+		throw new AiClientError(t("chat.client.unreachable", { baseUrl: config.baseUrl }));
 	}
 
 	if (!response.ok) {
@@ -147,26 +157,28 @@ export async function createChatCompletion(
 		console.error(`[ai] Endpunkt meldet HTTP ${response.status}:`, detail || "(kein Fehler-Body)");
 		const hint =
 			response.status === 401 || response.status === 403
-				? " (API-Schlüssel prüfen)"
+				? t("chat.client.hintAuth")
 				: response.status === 404
-					? " (Basis-URL/Modell prüfen)"
+					? t("chat.client.hintNotFound")
 					: response.status === 504 || response.status === 524
-						? " (Timeout: Der Endpunkt hat die Antwort auch nach mehreren Versuchen nicht rechtzeitig geliefert - bitte erneut versuchen)"
+						? t("chat.client.hintTimeout")
 						: "";
-		throw new AiClientError(`Der KI-Endpunkt meldet HTTP ${response.status}${hint}.${detail ? ` Antwort: ${detail}` : ""}`);
+		throw new AiClientError(
+			t("chat.client.httpError", { status: response.status, hint }) + (detail ? t("chat.client.httpErrorDetail", { detail }) : "")
+		);
 	}
 
 	let data: { choices?: { message?: OpenAiMessage }[] };
 	try {
 		data = (await response.json()) as typeof data;
 	} catch {
-		throw new AiClientError("Der KI-Endpunkt hat keine gültige JSON-Antwort geliefert.");
+		throw new AiClientError(t("chat.client.invalidJson"));
 	}
 
 	const message = data.choices?.[0]?.message;
 	if (!message || typeof message !== "object") {
 		console.error("[ai] Unerwartetes Antwortformat:", JSON.stringify(data).slice(0, 500));
-		throw new AiClientError("Der KI-Endpunkt hat ein unerwartetes Antwortformat geliefert (keine choices[0].message).");
+		throw new AiClientError(t("chat.client.unexpectedFormat"));
 	}
 	return message;
 }

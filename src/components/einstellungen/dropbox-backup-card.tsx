@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
 import { formatDateTime } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 
 /**
  * Strukturell identisch zu DropboxUiState in src/lib/dropbox-backup.ts -
@@ -45,10 +46,11 @@ const MIN_PASSWORD_LENGTH = 8;
 
 function SaveButton() {
 	const { pending } = useFormStatus();
+	const { t } = useI18n();
 	return (
 		<Button type="submit" disabled={pending}>
 			{pending ? <Loader2 className="animate-spin" /> : <Save />}
-			Speichern
+			{t("common.save")}
 		</Button>
 	);
 }
@@ -66,6 +68,7 @@ function SaveButton() {
  * electron/main/index.ts).
  */
 export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) {
+	const { t } = useI18n();
 	const [appKey, setAppKey] = useState(state.appKey);
 	const [connectStep, setConnectStep] = useState<"idle" | "awaiting-code">(state.connectPending ? "awaiting-code" : "idle");
 	const [code, setCode] = useState("");
@@ -80,18 +83,18 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 		try {
 			const result = await startDropboxConnectAction(appKey);
 			if (result.error || !result.url) {
-				setMessage({ kind: "error", text: result.error ?? "Der Verbindungsvorgang konnte nicht gestartet werden." });
+				setMessage({ kind: "error", text: result.error ?? t("settings.cards.dropbox.errors.connectStartFailed") });
 			} else {
 				window.open(result.url, "_blank", "noopener,noreferrer");
 				setConnectStep("awaiting-code");
 				setCode("");
 				setMessage({
 					kind: "success",
-					text: "Die Dropbox-Seite wurde im Browser geöffnet. Nach der Freigabe wird dort ein Code angezeigt - bitte hier einfügen.",
+					text: t("settings.cards.dropbox.connectStarted"),
 				});
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Der Verbindungsvorgang konnte nicht gestartet werden." });
+			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.connectStartFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -107,12 +110,14 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 			} else {
 				setMessage({
 					kind: "success",
-					text: `Dropbox ist jetzt verbunden${result.email ? ` als ${result.email}` : ""}. Die Seite wird neu geladen.`,
+					text: result.email
+						? t("settings.cards.dropbox.connectedSuccessAs", { email: result.email })
+						: t("settings.cards.dropbox.connectedSuccess"),
 				});
 				setTimeout(() => window.location.reload(), 1200);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Die Verbindung konnte nicht abgeschlossen werden." });
+			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.connectCompleteFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -133,7 +138,7 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 	}
 
 	async function handleDisconnect(): Promise<void> {
-		if (!window.confirm("Dropbox-Verbindung wirklich trennen?\n\nEs werden dann keine automatischen Sicherungen mehr hochgeladen. Die Backup-Konfiguration bleibt erhalten.")) {
+		if (!window.confirm(t("settings.cards.dropbox.disconnectConfirm"))) {
 			return;
 		}
 		setBusy("disconnect");
@@ -143,11 +148,11 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 			if (result.error) {
 				setMessage({ kind: "error", text: result.error });
 			} else {
-				setMessage({ kind: "success", text: "Die Dropbox-Verbindung wurde getrennt. Die Seite wird neu geladen." });
+				setMessage({ kind: "success", text: t("settings.cards.dropbox.disconnectSuccess") });
 				setTimeout(() => window.location.reload(), 1200);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Die Verbindung konnte nicht getrennt werden." });
+			setMessage({ kind: "error", text: t("settings.cards.dropbox.errors.disconnectFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -161,11 +166,14 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 			if (result.error) {
 				setMessage({ kind: "error", text: result.error });
 			} else {
-				setMessage({ kind: "success", text: `${result.message ?? "Die Sicherung wurde hochgeladen."} Die Seite wird neu geladen.` });
+				setMessage({
+					kind: "success",
+					text: t("settings.cards.dropbox.backupUploadedReload", { message: result.message ?? t("settings.cards.dropbox.backupUploaded") }),
+				});
 				setTimeout(() => window.location.reload(), 1500);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Das Dropbox-Backup konnte nicht ausgeführt werden." });
+			setMessage({ kind: "error", text: t("settings.cards.dropbox.backupRunFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -176,90 +184,88 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<Cloud className="size-5" />
-					Dropbox-Backup (Cloud-Sicherung)
+					{t("settings.cards.dropbox.title")}
 				</CardTitle>
 				<CardDescription>
-					Verbindet die App mit einem Dropbox-Konto und lädt die Datensicherung (Datenbank + alle Dateien)
-					regelmäßig automatisch hoch - optional mit Passwort verschlüsselt wie beim manuellen Export.
+					{t("settings.cards.dropbox.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<dl className="space-y-1 text-sm">
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Verbindung</dt>
+						<dt className="text-muted-foreground">{t("settings.cards.dropbox.status.connection")}</dt>
 						<dd>
 							{state.connected
-								? `Verbunden${state.accountEmail ? ` als ${state.accountEmail}` : ""}`
-								: "Nicht verbunden"}
+								? state.accountEmail
+									? t("settings.cards.dropbox.status.connectedAs", { email: state.accountEmail })
+									: t("settings.cards.dropbox.status.connected")
+								: t("settings.cards.dropbox.status.notConnected")}
 						</dd>
 					</div>
 					{state.connected ? (
 						<div className="flex justify-between gap-4">
-							<dt className="text-muted-foreground">Letzte erfolgreiche Sicherung</dt>
-							<dd>{state.lastBackupAt ? formatDateTime(state.lastBackupAt) : "noch keine"}</dd>
+							<dt className="text-muted-foreground">{t("settings.cards.dropbox.status.lastBackup")}</dt>
+							<dd>{state.lastBackupAt ? formatDateTime(state.lastBackupAt) : t("settings.cards.dropbox.status.lastBackupNever")}</dd>
 						</div>
 					) : null}
 				</dl>
 
 				{state.lastError ? (
 					<p className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive" role="alert">
-						Letzte Sicherung fehlgeschlagen{state.lastErrorAt ? ` (${formatDateTime(state.lastErrorAt)})` : ""}: {state.lastError}
+						{state.lastErrorAt
+							? t("settings.cards.dropbox.lastErrorAt", { at: formatDateTime(state.lastErrorAt), error: state.lastError })
+							: t("settings.cards.dropbox.lastError", { error: state.lastError })}
 					</p>
 				) : null}
 
 				{!state.connected ? (
 					<div className="space-y-3">
-						<Guide title="Anleitung: Dropbox-Backup einrichten">
-							<GuideStep step={1} title="Dropbox-App anlegen (einmalig)">
+						<Guide title={t("settings.cards.dropbox.guide.title")}>
+							<GuideStep step={1} title={t("settings.cards.dropbox.guide.step1.title")}>
 								<p>
-									Mit dem eigenen Dropbox-Konto auf{" "}
+									{t("settings.cards.dropbox.guide.step1.part1")}{" "}
 									<code className="rounded bg-muted px-1 py-0.5 text-xs">dropbox.com/developers/apps</code>{" "}
-									anmelden und auf „Create app“ klicken. Dabei „Scoped access“ wählen, als Zugriffsbereich „App
-									folder“ und einen beliebigen Namen vergeben, z. B. „ImmoBase-Sicherung“. Die Sicherungen landen
-									später in genau diesem Ordner in der Dropbox.
+									{t("settings.cards.dropbox.guide.step1.part2")}
 								</p>
 							</GuideStep>
-							<GuideStep step={2} title="Berechtigungen setzen">
+							<GuideStep step={2} title={t("settings.cards.dropbox.guide.step2.title")}>
 								<p>
-									In der neu angelegten App zum Reiter „Permissions“ wechseln und die Häkchen bei{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.write</code> und{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.read</code> setzen, dann
-									unten auf „Submit“ klicken.
+									{t("settings.cards.dropbox.guide.step2.part1")}{" "}
+									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.write</code>{" "}
+									{t("settings.cards.dropbox.guide.step2.part2")}{" "}
+									<code className="rounded bg-muted px-1 py-0.5 text-xs">files.content.read</code>{" "}
+									{t("settings.cards.dropbox.guide.step2.part3")}
 								</p>
 							</GuideStep>
-							<GuideStep step={3} title="App-Schlüssel kopieren">
+							<GuideStep step={3} title={t("settings.cards.dropbox.guide.step3.title")}>
 								<p>
-									Zurück im Reiter „Settings“ den „App key“ kopieren und unten im Feld „Dropbox-App-Schlüssel“
-									eintragen.
+									{t("settings.cards.dropbox.guide.step3.body")}
 								</p>
 							</GuideStep>
-							<GuideStep step={4} title="Konto verknüpfen">
+							<GuideStep step={4} title={t("settings.cards.dropbox.guide.step4.title")}>
 								<p>
-									Auf „Mit Dropbox verbinden“ klicken: Es öffnet sich eine Dropbox-Seite im Browser. Dort
-									anmelden, den Zugriff erlauben und den anschließend angezeigten Code hier einfügen.
+									{t("settings.cards.dropbox.guide.step4.body")}
 								</p>
 							</GuideStep>
-							<GuideStep step={5} title="Automatische Sicherung einrichten">
+							<GuideStep step={5} title={t("settings.cards.dropbox.guide.step5.title")}>
 								<p>
-									Nach dem Verbinden Intervall und Aufbewahrung festlegen und auf Wunsch ein Passwort für die
-									Verschlüsselung setzen. Die App lädt die Sicherung dann automatisch hoch, solange sie geöffnet
-									ist - ohne Internetverbindung holt sie es beim nächsten Start nach.
+									{t("settings.cards.dropbox.guide.step5.body")}
 								</p>
 							</GuideStep>
 						</Guide>
 
 						{state.appKeyFromEnv ? (
 							<p className="text-xs text-muted-foreground">
-								Der Dropbox-App-Schlüssel ist per Umgebungsvariable (DROPBOX_APP_KEY) vorgegeben.
+								{t("settings.cards.dropbox.appKeyFromEnv")}
 							</p>
 						) : (
 							<div className="grid gap-2">
-								<Label htmlFor="dropboxAppKey">Dropbox-App-Schlüssel</Label>
+								<Label htmlFor="dropboxAppKey">{t("settings.cards.dropbox.appKeyLabel")}</Label>
 								<Input
 									id="dropboxAppKey"
 									value={appKey}
 									onChange={(event) => setAppKey(event.target.value)}
-									placeholder="App-Schlüssel der eigenen Dropbox-App"
+									placeholder={t("settings.cards.dropbox.appKeyPlaceholder")}
 									autoComplete="off"
 									disabled={connectStep === "awaiting-code"}
 								/>
@@ -270,35 +276,34 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 							<div>
 								<Button onClick={handleStartConnect} disabled={busy !== null}>
 									{busy === "connect" ? <Loader2 className="animate-spin" /> : <Link2 />}
-									Mit Dropbox verbinden
+									{t("settings.cards.dropbox.connect")}
 								</Button>
 							</div>
 						) : (
 							<div className="space-y-3 rounded-md border p-3">
 								<p className="text-sm">
-									1. Auf der geöffneten Dropbox-Seite den Zugriff erlauben. 2. Den dort angezeigten Code hier
-									einfügen:
+									{t("settings.cards.dropbox.codePrompt")}
 								</p>
 								<div className="flex gap-2">
 									<Input
 										value={code}
 										onChange={(event) => setCode(event.target.value)}
-										placeholder="Autorisierungscode"
+										placeholder={t("settings.cards.dropbox.codePlaceholder")}
 										autoComplete="off"
 										disabled={busy !== null}
 									/>
 									<Button onClick={handleCompleteConnect} disabled={busy !== null || !code.trim()}>
 										{busy === "complete" ? <Loader2 className="animate-spin" /> : <Link2 />}
-										Verknüpfen
+										{t("settings.cards.dropbox.link")}
 									</Button>
 								</div>
 								<div className="flex flex-wrap gap-2">
 									<Button variant="ghost" size="sm" onClick={handleStartConnect} disabled={busy !== null}>
 										{busy === "connect" ? <Loader2 className="animate-spin" /> : <Cloud />}
-										Dropbox-Seite erneut öffnen
+										{t("settings.cards.dropbox.reopen")}
 									</Button>
 									<Button variant="ghost" size="sm" onClick={handleCancelConnect} disabled={busy !== null}>
-										Abbrechen
+										{t("common.cancel")}
 									</Button>
 								</div>
 							</div>
@@ -309,25 +314,25 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 						<form action={formAction} className="space-y-4">
 							<label className="flex items-center gap-2 text-sm">
 								<input type="checkbox" name="enabled" defaultChecked={state.enabled} />
-								Automatische Sicherung aktiviert (läuft, solange die App geöffnet ist)
+								{t("settings.cards.dropbox.enabledLabel")}
 							</label>
 							<div className="grid gap-4 sm:grid-cols-2">
 								<div className="grid gap-2">
-									<Label htmlFor="interval">Intervall</Label>
+									<Label htmlFor="interval">{t("settings.cards.dropbox.intervalLabel")}</Label>
 									<select id="interval" name="interval" defaultValue={state.interval} className="h-9 rounded-md border bg-background px-3 text-sm">
-										<option value="daily">Täglich</option>
-										<option value="weekly">Wöchentlich</option>
+										<option value="daily">{t("settings.cards.dropbox.interval.daily")}</option>
+										<option value="weekly">{t("settings.cards.dropbox.interval.weekly")}</option>
 									</select>
 								</div>
 								<div className="grid gap-2">
-									<Label htmlFor="retention">Aufbewahrung (Anzahl Sicherungen)</Label>
+									<Label htmlFor="retention">{t("settings.cards.dropbox.retentionLabel")}</Label>
 									<Input id="retention" name="retention" type="number" min={1} max={100} defaultValue={state.retention} />
 								</div>
 							</div>
 							<div className="space-y-2">
 								<label className="flex items-center gap-2 text-sm">
 									<input type="checkbox" name="encrypt" checked={encrypt} onChange={(event) => setEncrypt(event.target.checked)} />
-									Mit Passwort verschlüsseln (.imbak)
+									{t("settings.password.encryptToggle")}
 								</label>
 								{encrypt ? (
 									<div className="grid gap-2 sm:grid-cols-2">
@@ -335,21 +340,20 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 											type="password"
 											name="password"
 											placeholder={
-												state.passwordSet ? "•••••••• (gespeichert, unverändert wenn leer)" : `Passwort (min. ${MIN_PASSWORD_LENGTH} Zeichen)`
+												state.passwordSet ? t("settings.password.savedPlaceholder") : t("settings.password.placeholderMin", { min: MIN_PASSWORD_LENGTH })
 											}
 											autoComplete="new-password"
 										/>
-										<Input type="password" name="passwordConfirm" placeholder="Passwort wiederholen" autoComplete="new-password" />
+										<Input type="password" name="passwordConfirm" placeholder={t("settings.password.repeatPlaceholder")} autoComplete="new-password" />
 									</div>
 								) : null}
 								<p className="text-xs text-muted-foreground">
-									Ein vergessenes Passwort kann nicht wiederhergestellt werden - ohne Passwort lässt sich die
-									Sicherung nicht einspielen.
+									{t("settings.cards.dropbox.passwordHint")}
 								</p>
 							</div>
 
 							{formState.error ? <p className="text-sm text-destructive">{formState.error}</p> : null}
-							{formState.success ? <p className="text-sm text-emerald-600">Die Einstellungen wurden gespeichert.</p> : null}
+							{formState.success ? <p className="text-sm text-emerald-600">{t("settings.success.saved")}</p> : null}
 
 							<div className="flex justify-end">
 								<SaveButton />
@@ -359,11 +363,11 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 						<div className="flex flex-wrap gap-2 border-t pt-4">
 							<Button variant="outline" onClick={handleBackupNow} disabled={busy !== null}>
 								{busy === "backup" ? <Loader2 className="animate-spin" /> : <CloudUpload />}
-								Jetzt sichern
+								{t("settings.cards.dropbox.backupNow")}
 							</Button>
 							<Button variant="ghost" onClick={handleDisconnect} disabled={busy !== null}>
 								{busy === "disconnect" ? <Loader2 className="animate-spin" /> : <Link2Off />}
-								Verbindung trennen
+								{t("settings.cards.dropbox.disconnect")}
 							</Button>
 						</div>
 					</>
@@ -376,10 +380,9 @@ export function DropboxBackupCard({ state }: { state: DropboxBackupCardState }) 
 				) : null}
 
 				<p className="text-xs text-muted-foreground">
-					Die Sicherung enthält personenbezogene Daten (Mieter, Eigentümer, Nutzer) - sie liegt zusätzlich zur
-					lokalen Datei in der Dropbox des verbundenen Kontos. Verbindung{state.connectedAt ? ` seit ${formatDateTime(state.connectedAt)}` : ""}{" "}
-					und Upload laufen über die offizielle Dropbox-API; ohne Internetverbindung werden Sicherungen beim
-					nächsten Start nachgeholt.
+					{state.connectedAt
+						? t("settings.cards.dropbox.footerHintSince", { since: formatDateTime(state.connectedAt) })
+						: t("settings.cards.dropbox.footerHint")}
 				</p>
 			</CardContent>
 		</Card>

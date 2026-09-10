@@ -15,6 +15,7 @@ import {
 } from "@/data/transactions";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getTotalRentForDate } from "@/lib/rent-history";
@@ -55,6 +56,7 @@ function describeTransaction(transaction: { amount: string; dueDate: string; pur
 
 export async function saveDepositAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const leaseId = getString(formData, "leaseId");
 	const typeRaw = getString(formData, "type") as DepositType;
 	const statusRaw = getString(formData, "status") as DepositStatus;
@@ -65,7 +67,7 @@ export async function saveDepositAction(_prevState: ActionState, formData: FormD
 	const notes = getString(formData, "notes");
 
 	if (!leaseId || amount === null) {
-		return { error: "Bitte Mietvertrag und Betrag angeben." };
+		return { error: t("finances.errors.leaseAndAmountRequired") };
 	}
 
 	const type: DepositType = DEPOSIT_TYPES.includes(typeRaw) ? typeRaw : "CASH";
@@ -99,7 +101,7 @@ export async function saveDepositAction(_prevState: ActionState, formData: FormD
 		);
 	} catch (error) {
 		console.error("saveDepositAction failed", error);
-		return { error: "Das Kautionskonto konnte nicht gespeichert werden." };
+		return { error: t("finances.errors.depositSaveFailed") };
 	}
 
 	revalidatePath("/finanzen");
@@ -113,6 +115,7 @@ export async function saveDepositAction(_prevState: ActionState, formData: FormD
 
 export async function saveTransactionAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const leaseId = getString(formData, "leaseId");
 	const dueDateRaw = getString(formData, "dueDate");
@@ -122,7 +125,7 @@ export async function saveTransactionAction(_prevState: ActionState, formData: F
 
 	if (!leaseId || !dueDateRaw || amount === null) {
 		return {
-			error: "Bitte Mietvertrag, Fälligkeitsdatum und Betrag angeben.",
+			error: t("finances.errors.leaseDueDateAmountRequired"),
 		};
 	}
 
@@ -147,7 +150,7 @@ export async function saveTransactionAction(_prevState: ActionState, formData: F
 		}
 	} catch (error) {
 		console.error("saveTransactionAction failed", error);
-		return { error: "Die Zahlung konnte nicht gespeichert werden." };
+		return { error: t("finances.errors.transactionSaveFailed") };
 	}
 
 	revalidatePath("/finanzen");
@@ -158,13 +161,14 @@ export async function saveTransactionAction(_prevState: ActionState, formData: F
 /** Schnellaktion: Zahlung direkt aus der Tabelle als "bezahlt" markieren. */
 export async function markTransactionPaidAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung für den Log-Eintrag ermitteln.
 	const transaction = getTransaction(id);
 	try {
 		markTransactionPaid(id);
 	} catch (error) {
 		console.error("markTransactionPaidAction failed", error);
-		return { error: "Zahlung konnte nicht als bezahlt markiert werden." };
+		return { error: t("finances.errors.markPaidFailed") };
 	}
 
 	logActivity(user, "UPDATE", "finanzen", `Zahlung „${transaction ? describeTransaction(transaction) : id}“ als bezahlt markiert`, id);
@@ -184,6 +188,7 @@ export async function markTransactionPaidAction(id: string): Promise<ActionState
  */
 export async function generateDueTransactionsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const fromMonthRaw = getString(formData, "fromMonth"); // Format: YYYY-MM
 	const toMonthRaw = getString(formData, "toMonth"); // Format: YYYY-MM
 	const dueDayRaw = getString(formData, "dueDay");
@@ -192,12 +197,12 @@ export async function generateDueTransactionsAction(_prevState: ActionState, for
 	const toMatch = /^(\d{4})-(\d{2})$/.exec(toMonthRaw);
 
 	if (!fromMatch || !toMatch) {
-		return { error: "Bitte einen gültigen Zeitraum (Von/Bis) angeben." };
+		return { error: t("finances.errors.invalidPeriod") };
 	}
 
 	const dueDay = Number(dueDayRaw);
 	if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 28) {
-		return { error: "Der Fälligkeitstag muss zwischen 1 und 28 liegen." };
+		return { error: t("finances.errors.invalidDueDay") };
 	}
 
 	const fromYear = Number(fromMatch[1]);
@@ -209,11 +214,11 @@ export async function generateDueTransactionsAction(_prevState: ActionState, for
 	const endIndex = toYear * 12 + toMonth;
 
 	if (endIndex < startIndex) {
-		return { error: "Das Enddatum darf nicht vor dem Startdatum liegen." };
+		return { error: t("finances.errors.endBeforeStart") };
 	}
 	if (endIndex - startIndex > 60) {
 		return {
-			error: "Der Zeitraum darf maximal 61 Monate umfassen.",
+			error: t("finances.errors.periodTooLong"),
 		};
 	}
 
@@ -273,28 +278,29 @@ export async function generateDueTransactionsAction(_prevState: ActionState, for
 	if (created === 0) {
 		return {
 			success: true,
-			message:
-				skipped > 0
-					? `Keine neuen Zahlungen angelegt - für alle ${skipped} Vertrag/Monat-Kombinationen im Zeitraum existierten bereits Zahlungen.`
-					: "Keine aktiven Mietverträge im gewählten Zeitraum gefunden.",
+			message: skipped > 0 ? t("finances.success.noneCreatedAllSkipped", { skipped }) : t("finances.success.noActiveLeases"),
 		};
 	}
 
 	return {
 		success: true,
-		message: `${created} Zahlung${created === 1 ? "" : "en"} angelegt${skipped > 0 ? ` (${skipped} bereits vorhanden, übersprungen)` : ""}.`,
+		message: t(created === 1 ? "finances.success.created.one" : "finances.success.created.other", {
+			created,
+			skippedSuffix: skipped > 0 ? t("finances.success.createdSuffix", { skipped }) : "",
+		}),
 	};
 }
 
 export async function deleteTransactionAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const transaction = getTransaction(id);
 	try {
 		deleteTransaction(id);
 	} catch (error) {
 		console.error("deleteTransactionAction failed", error);
-		return { error: "Die Zahlung konnte nicht gelöscht werden." };
+		return { error: t("finances.errors.transactionDeleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "finanzen", `Zahlung „${transaction ? describeTransaction(transaction) : id}“ gelöscht`, id);

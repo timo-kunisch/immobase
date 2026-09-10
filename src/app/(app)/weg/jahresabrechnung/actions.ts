@@ -25,6 +25,7 @@ import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import { calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
+import { getT } from "@/lib/i18n/server";
 import { centsToDecimalString } from "@/lib/money";
 import { buildBetrKvCostItemsFromHoaStatement } from "@/lib/hoa-betrkv-bridge";
 
@@ -46,13 +47,14 @@ const HOA_COST_CATEGORIES: HoaCostCategory[] = [
 	"OTHER",
 ];
 
-function requireDraftAnnualStatement(annualStatementId: string) {
+async function requireDraftAnnualStatement(annualStatementId: string) {
+	const t = await getT();
 	const statement = getAnnualStatement(annualStatementId);
 	if (!statement) {
-		return { error: "Die Jahresabrechnung wurde nicht gefunden." } as const;
+		return { error: t("hoaStatement.errors.notFound") } as const;
 	}
 	if (statement.status !== "DRAFT") {
-		return { error: "Diese Jahresabrechnung ist bereits finalisiert und kann nicht mehr geändert werden." } as const;
+		return { error: t("hoaStatement.errors.alreadyFinalized") } as const;
 	}
 	return { statement } as const;
 }
@@ -68,6 +70,7 @@ function periodLabel(from: Date, to: Date): string {
 
 export async function saveAnnualStatementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const periodFromRaw = getString(formData, "periodFrom");
@@ -75,17 +78,17 @@ export async function saveAnnualStatementAction(_prevState: ActionState, formDat
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !periodFromRaw || !periodToRaw) {
-		return { error: "Bitte den Abrechnungszeitraum (von/bis) angeben." };
+		return { error: t("hoaStatement.errors.periodRequired") };
 	}
 
 	const periodFrom = new Date(periodFromRaw);
 	const periodTo = new Date(periodToRaw);
 	if (periodTo < periodFrom) {
-		return { error: "Das Ende des Zeitraums darf nicht vor dem Beginn liegen." };
+		return { error: t("hoaStatement.errors.periodOrder") };
 	}
 
 	if (id) {
-		const existing = requireDraftAnnualStatement(id);
+		const existing = await requireDraftAnnualStatement(id);
 		if ("error" in existing) return { error: existing.error };
 	}
 
@@ -106,7 +109,7 @@ export async function saveAnnualStatementAction(_prevState: ActionState, formDat
 		}
 	} catch (error) {
 		console.error("saveAnnualStatementAction failed", error);
-		return { error: "Die Jahresabrechnung konnte nicht gespeichert werden." };
+		return { error: t("hoaStatement.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/jahresabrechnung`);
@@ -115,14 +118,15 @@ export async function saveAnnualStatementAction(_prevState: ActionState, formDat
 
 export async function deleteAnnualStatementAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
-	const existing = requireDraftAnnualStatement(id);
+	const t = await getT();
+	const existing = await requireDraftAnnualStatement(id);
 	if ("error" in existing) return { error: existing.error };
 
 	try {
 		deleteAnnualStatement(id);
 	} catch (error) {
 		console.error("deleteAnnualStatementAction failed", error);
-		return { error: "Die Jahresabrechnung konnte nicht gelöscht werden." };
+		return { error: t("hoaStatement.errors.deleteFailed") };
 	}
 
 	logActivity(
@@ -143,6 +147,7 @@ export async function deleteAnnualStatementAction(id: string, _hoaId: string): P
 
 export async function saveAnnualStatementCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const annualStatementId = getString(formData, "annualStatementId");
 	const categoryRaw = getString(formData, "category") as HoaCostCategory;
@@ -155,21 +160,21 @@ export async function saveAnnualStatementCostItemAction(_prevState: ActionState,
 	const notes = getString(formData, "notes");
 
 	if (!annualStatementId || !label || amount === null || !allocationKeyRaw) {
-		return { error: "Bitte Bezeichnung, Betrag und Umlageschlüssel angeben." };
+		return { error: t("hoaStatement.errors.costItemRequired") };
 	}
 
 	const category: HoaCostCategory = HOA_COST_CATEGORIES.includes(categoryRaw) ? categoryRaw : "OTHER";
 	if (!HOA_ALLOCATION_KEYS.includes(allocationKeyRaw)) {
-		return { error: "Ungültiger Umlageschlüssel." };
+		return { error: t("hoaStatement.errors.invalidAllocationKey") };
 	}
 	if (allocationKeyRaw === "DIRECT" && !directUnitId) {
-		return { error: "Bei direkter Zuordnung muss eine Einheit ausgewählt werden." };
+		return { error: t("hoaStatement.errors.directUnitRequired") };
 	}
 	if (allocationKeyRaw === "CUSTOM" && !customAllocationKeyId) {
-		return { error: "Bei einem frei definierten Schlüssel muss dieser ausgewählt werden." };
+		return { error: t("hoaStatement.errors.customKeyRequired") };
 	}
 
-	const existing = requireDraftAnnualStatement(annualStatementId);
+	const existing = await requireDraftAnnualStatement(annualStatementId);
 	if ("error" in existing) return { error: existing.error };
 
 	const data = {
@@ -196,7 +201,7 @@ export async function saveAnnualStatementCostItemAction(_prevState: ActionState,
 		}
 	} catch (error) {
 		console.error("saveAnnualStatementCostItemAction failed", error);
-		return { error: "Die Kostenposition konnte nicht gespeichert werden." };
+		return { error: t("hoaStatement.errors.costItemSaveFailed") };
 	}
 
 	revalidatePath(`/weg/jahresabrechnung/${annualStatementId}`);
@@ -205,7 +210,8 @@ export async function saveAnnualStatementCostItemAction(_prevState: ActionState,
 
 export async function deleteAnnualStatementCostItemAction(id: string, _hoaId: string, annualStatementId: string): Promise<ActionState> {
 	const user = await requireUser();
-	const existing = requireDraftAnnualStatement(annualStatementId);
+	const t = await getT();
+	const existing = await requireDraftAnnualStatement(annualStatementId);
 	if ("error" in existing) return { error: existing.error };
 
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
@@ -214,7 +220,7 @@ export async function deleteAnnualStatementCostItemAction(id: string, _hoaId: st
 		deleteHoaCostItem(id);
 	} catch (error) {
 		console.error("deleteAnnualStatementCostItemAction failed", error);
-		return { error: "Die Kostenposition konnte nicht gelöscht werden." };
+		return { error: t("hoaStatement.errors.costItemDeleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "jahresabrechnung", `Kostenposition „${costItem ? costItem.label : id}“ gelöscht`, id);
@@ -229,18 +235,19 @@ export async function deleteAnnualStatementCostItemAction(id: string, _hoaId: st
 
 export async function saveHoaConsumptionValuesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const costItemId = getString(formData, "costItemId");
 	if (!costItemId) {
-		return { error: "Ungültige Kostenposition." };
+		return { error: t("hoaStatement.errors.invalidCostItem") };
 	}
 
 	const costItem = getHoaCostItem(costItemId);
 	const annualStatement = costItem?.annualStatementId ? getAnnualStatement(costItem.annualStatementId) : null;
 	if (!costItem || !annualStatement) {
-		return { error: "Die Kostenposition wurde nicht gefunden." };
+		return { error: t("hoaStatement.errors.costItemNotFound") };
 	}
 	if (annualStatement.status !== "DRAFT") {
-		return { error: "Diese Jahresabrechnung ist bereits finalisiert und kann nicht mehr geändert werden." };
+		return { error: t("hoaStatement.errors.alreadyFinalized") };
 	}
 
 	const unitIds: string[] = [];
@@ -262,7 +269,7 @@ export async function saveHoaConsumptionValuesAction(_prevState: ActionState, fo
 		logActivity(user, "UPDATE", "jahresabrechnung", `Verbrauchswerte der Kostenposition „${costItem.label}“ aktualisiert`, costItemId);
 	} catch (error) {
 		console.error("saveHoaConsumptionValuesAction failed", error);
-		return { error: "Die Verbrauchswerte konnten nicht gespeichert werden." };
+		return { error: t("hoaStatement.errors.consumptionSaveFailed") };
 	}
 
 	revalidatePath(`/weg/jahresabrechnung/${annualStatement.id}`);
@@ -275,16 +282,17 @@ export async function saveHoaConsumptionValuesAction(_prevState: ActionState, fo
 
 export async function finalizeAnnualStatementAction(annualStatementId: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const detail = getAnnualStatementDetail(annualStatementId);
 
 	if (!detail) {
-		return { error: "Die Jahresabrechnung wurde nicht gefunden." };
+		return { error: t("hoaStatement.errors.notFound") };
 	}
 	if (detail.statement.status !== "DRAFT") {
-		return { error: "Diese Jahresabrechnung wurde bereits finalisiert." };
+		return { error: t("hoaStatement.errors.alreadyFinalizedShort") };
 	}
 	if (detail.costItems.length === 0) {
-		return { error: "Bitte erfassen Sie mindestens eine Kostenposition, bevor Sie finalisieren." };
+		return { error: t("hoaStatement.errors.noCostItems") };
 	}
 
 	const units = detail.units;
@@ -322,7 +330,7 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
 	);
 
 	if (result.ownerResults.length === 0) {
-		return { error: "Für den gewählten Zeitraum wurden keine Eigentumsverhältnisse gefunden, die abgerechnet werden könnten." };
+		return { error: t("hoaStatement.errors.noOwnerships") };
 	}
 
 	// Atomar in einer Transaktion (src/data/annual-statements.ts) - ein
@@ -347,7 +355,7 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
 		);
 	} catch (error) {
 		console.error("finalizeAnnualStatementAction failed", error);
-		return { error: "Die Jahresabrechnung konnte nicht finalisiert werden." };
+		return { error: t("hoaStatement.errors.finalizeFailed") };
 	}
 
 	logActivity(
@@ -378,27 +386,28 @@ export async function finalizeAnnualStatementAction(annualStatementId: string, _
  */
 export async function bridgeToBetrKvAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const unitResultId = getString(formData, "unitResultId");
 	const billingPeriodId = getString(formData, "billingPeriodId");
 
 	if (!unitResultId || !billingPeriodId) {
-		return { error: "Bitte eine Nebenkostenabrechnungsperiode auswählen." };
+		return { error: t("hoaStatement.errors.bridgeNoPeriod") };
 	}
 
 	const bridgeData = getAnnualStatementUnitResultForBridge(unitResultId);
 	if (!bridgeData) {
-		return { error: "Die WEG-Einzelabrechnung wurde nicht gefunden." };
+		return { error: t("hoaStatement.errors.bridgeResultNotFound") };
 	}
 
 	const period = getBillingPeriod(billingPeriodId);
 	if (!period) {
-		return { error: "Die Nebenkostenabrechnungsperiode wurde nicht gefunden." };
+		return { error: t("hoaStatement.errors.bridgePeriodNotFound") };
 	}
 	if (period.status !== "DRAFT") {
-		return { error: "Diese Abrechnungsperiode ist bereits finalisiert und kann nicht mehr geändert werden." };
+		return { error: t("hoaStatement.errors.bridgePeriodFinalized") };
 	}
 	if (period.propertyId !== bridgeData.unit.propertyId) {
-		return { error: "Die gewählte Abrechnungsperiode gehört nicht zur Liegenschaft dieser Einheit." };
+		return { error: t("hoaStatement.errors.bridgePeriodMismatch") };
 	}
 
 	const bridgedItems = buildBetrKvCostItemsFromHoaStatement(
@@ -412,7 +421,7 @@ export async function bridgeToBetrKvAction(_prevState: ActionState, formData: Fo
 	);
 
 	if (bridgedItems.length === 0) {
-		return { error: "Diese WEG-Einzelabrechnung enthält keine umlagefähigen Positionen." };
+		return { error: t("hoaStatement.errors.bridgeNoApportionable") };
 	}
 
 	try {
@@ -429,7 +438,7 @@ export async function bridgeToBetrKvAction(_prevState: ActionState, formData: Fo
 		}
 	} catch (error) {
 		console.error("bridgeToBetrKvAction failed", error);
-		return { error: "Der Übertrag in die Nebenkostenabrechnung ist fehlgeschlagen." };
+		return { error: t("hoaStatement.errors.bridgeFailed") };
 	}
 
 	logActivity(
@@ -442,5 +451,5 @@ export async function bridgeToBetrKvAction(_prevState: ActionState, formData: Fo
 
 	revalidatePath(`/abrechnung/${billingPeriodId}`);
 	revalidatePath(`/weg/jahresabrechnung`);
-	return { success: true, message: `${bridgedItems.length} Kostenposition${bridgedItems.length === 1 ? "" : "en"} übertragen.` };
+	return { success: true, message: t(bridgedItems.length === 1 ? "hoaStatement.success.bridged.one" : "hoaStatement.success.bridged.other", { count: bridgedItems.length }) };
 }

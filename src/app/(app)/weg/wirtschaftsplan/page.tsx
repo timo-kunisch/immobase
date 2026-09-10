@@ -10,7 +10,8 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EconomicPlanFormDialog } from "@/components/weg/economic-plan-form-dialog";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatDate } from "@/lib/format";
-import { economicPlanStatusLabels, economicPlanStatusStyles } from "@/lib/hoa-economic-plan";
+import { economicPlanStatusStyles } from "@/lib/hoa-economic-plan";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteEconomicPlanAction } from "./actions";
 
@@ -18,15 +19,16 @@ export const dynamic = "force-dynamic";
 
 export default async function WirtschaftsplanListPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const { hoaId } = await searchParams;
+	const t = await getT();
 
 	const hoaList = listHoasSortedByName();
 
 	if (hoaList.length === 0) {
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Wirtschaftspläne" description="Wirtschaftspläne je WEG und Geschäftsjahr." />
+				<SiteHeader title={t("hoaPlan.title")} description={t("hoaPlan.description")} />
 				<div className="flex-1 p-4 sm:p-6">
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+					<p className="text-sm text-muted-foreground">{t("hoaPlan.empty.noHoa")}</p>
 				</div>
 			</div>
 		);
@@ -38,7 +40,7 @@ export default async function WirtschaftsplanListPage({ searchParams }: { search
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Wirtschaftspläne" description="Wirtschaftspläne je WEG und Geschäftsjahr." actions={selectedHoa ? <EconomicPlanFormDialog hoaId={selectedHoa.id} /> : undefined} />
+			<SiteHeader title={t("hoaPlan.title")} description={t("hoaPlan.description")} actions={selectedHoa ? <EconomicPlanFormDialog hoaId={selectedHoa.id} /> : undefined} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/wirtschaftsplan" />
@@ -48,16 +50,16 @@ export default async function WirtschaftsplanListPage({ searchParams }: { search
 						{planList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Noch keine Wirtschaftspläne angelegt.</p>
+								<p>{t("hoaPlan.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										{!selectedHoa ? <TableHead>WEG</TableHead> : null}
-										<TableHead>Geschäftsjahr</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="w-[140px] text-right">Aktionen</TableHead>
+										{!selectedHoa ? <TableHead>{t("hoaPlan.table.hoa")}</TableHead> : null}
+										<TableHead>{t("hoaPlan.table.fiscalYear")}</TableHead>
+										<TableHead>{t("common.status")}</TableHead>
+										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -69,18 +71,18 @@ export default async function WirtschaftsplanListPage({ searchParams }: { search
 											</TableCell>
 											<TableCell>
 												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${economicPlanStatusStyles[plan.status]}`}>
-													{economicPlanStatusLabels[plan.status]}
+													{t(`hoaPlan.status.${plan.status}`)}
 												</span>
 											</TableCell>
 											<TableCell>
 												<div className="flex items-center justify-end gap-1">
-													<Button variant="ghost" size="icon-sm" aria-label="Details" title="Details" asChild>
+													<Button variant="ghost" size="icon-sm" aria-label={t("common.details")} title={t("common.details")} asChild>
 														<Link href={`/weg/wirtschaftsplan/${plan.id}`}>
 															<ChevronRight className="size-4" />
 														</Link>
 													</Button>
 													{plan.status === "DRAFT" ? (
-														<ConfirmDeleteButton action={deleteEconomicPlanAction.bind(null, plan.id, plan.hoaId)} confirmMessage="Diesen Wirtschaftsplan wirklich löschen?" />
+														<ConfirmDeleteButton action={deleteEconomicPlanAction.bind(null, plan.id, plan.hoaId)} confirmMessage={t("hoaPlan.confirm.delete")} />
 													) : null}
 												</div>
 											</TableCell>

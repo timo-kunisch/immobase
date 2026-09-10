@@ -6,6 +6,7 @@ import { FileText, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { generateBillingStatementPdfAction, sendStatementByPostAction } from "@/app/(app)/abrechnung/actions";
 import { formatFileSize } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
 
 /**
@@ -25,6 +26,7 @@ export function GenerateStatementPdfButton({
 	/** Ob LetterXpress-Zugangsdaten hinterlegt sind (Einstellungen). */
 	postalConfigured: boolean;
 }) {
+	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 	const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +45,7 @@ export function GenerateStatementPdfButton({
 			<div className="flex flex-col items-end gap-1">
 				<Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={isPending}>
 					{isPending ? <Loader2 className="animate-spin" /> : <FileText />}
-					PDF erzeugen
+					{t("billing.actions.generatePdf")}
 				</Button>
 				{error ? <span className="text-xs text-destructive">{error}</span> : null}
 			</div>
@@ -56,18 +58,22 @@ export function GenerateStatementPdfButton({
 				<Button variant="ghost" size="sm" asChild>
 					<a href={`/api/uploads/${pdfPath}`} target="_blank" rel="noreferrer" className="flex items-center gap-1.5">
 						<FileText className="size-4" />
-						PDF ansehen
+						{t("billing.actions.viewPdf")}
 						<span className="text-xs text-muted-foreground">({formatFileSize(pdfFileSize)})</span>
 					</a>
 				</Button>
-				<Button type="button" variant="ghost" size="icon-sm" onClick={handleClick} disabled={isPending} aria-label="PDF neu erzeugen" title="PDF neu erzeugen">
+				<Button
+					type="button"
+					variant="ghost"
+					size="icon-sm"
+					onClick={handleClick}
+					disabled={isPending}
+					aria-label={t("billing.actions.regeneratePdf")}
+					title={t("billing.actions.regeneratePdf")}
+				>
 					{isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
 				</Button>
-				<SendByPostButton
-					sendAction={() => sendStatementByPostAction(tenantStatementId)}
-					disabled={!postalConfigured}
-					disabledReason="Postversand nicht konfiguriert (Einstellungen → Integrationen & KI)"
-				/>
+				<SendByPostButton sendAction={() => sendStatementByPostAction(tenantStatementId)} disabled={!postalConfigured} disabledReason={t("postal.notConfiguredShort")} />
 			</div>
 			{error ? <span className="text-xs text-destructive">{error}</span> : null}
 		</div>

@@ -1,14 +1,21 @@
 import { Building2 } from "lucide-react";
 
+import { LanguageSwitcher } from "@/components/layout/language-switcher";
+
 /**
  * Layout für alle öffentlichen Auth-Seiten (Login, Registrierung,
  * E-Mail-Verifizierung, Passwort vergessen/zurücksetzen). Bewusst ohne
  * Sidebar/Navigation – diese Seiten sind auch für nicht angemeldete
- * Besucher erreichbar (siehe PUBLIC_PATHS in src/proxy.ts).
+ * Besucher erreichbar (siehe PUBLIC_PATHS in src/proxy.ts). Oben rechts
+ * liegt der Sprachumschalter, damit die Sprache auch vor der Anmeldung
+ * gewechselt werden kann.
  */
 export default function AuthLayout({ children }: Readonly<{ children: React.ReactNode }>) {
 	return (
-		<div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+		<div className="relative flex min-h-svh flex-col items-center justify-center gap-6 bg-muted/40 p-4">
+			<div className="absolute top-4 right-4 w-36">
+				<LanguageSwitcher />
+			</div>
 			<div className="flex items-center gap-2">
 				<div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
 					<Building2 className="size-5" />

@@ -33,12 +33,6 @@ export function getOwnershipStatus(ownership: OwnershipStatusFields, date: Date 
 	return "ACTIVE";
 }
 
-export const ownershipStatusLabels: Record<OwnershipStatusValue, string> = {
-	ACTIVE: "Aktuell",
-	UPCOMING: "Zukünftig",
-	ENDED: "Beendet",
-};
-
 export const ownershipStatusStyles: Record<OwnershipStatusValue, string> = {
 	ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
 	UPCOMING: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",

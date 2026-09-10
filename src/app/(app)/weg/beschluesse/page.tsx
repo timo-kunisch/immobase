@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { PaginationBar } from "@/components/ui/pagination-bar";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { resolvePagination } from "@/lib/pagination";
-import { isContestationDeadlinePassed, resolutionVotingResultLabels, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
+import { isContestationDeadlinePassed, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +26,22 @@ export const dynamic = "force-dynamic";
  * übrigen WEG-Funktionen.
  */
 export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+	const t = await getT();
 	const { hoaId, page: pageParam } = await searchParams;
+
+	const votingResultLabels: Record<string, string> = {
+		ACCEPTED: t("hoaMeetings.votingResult.ACCEPTED"),
+		REJECTED: t("hoaMeetings.votingResult.REJECTED"),
+	};
 
 	const hoaList = listHoas();
 
 	if (hoaList.length === 0) {
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Beschluss-Sammlung" description="Fortlaufende Beschluss-Sammlung je WEG (§ 24 Abs. 6 WEG)." />
+				<SiteHeader title={t("hoaMeetings.collection.title")} description={t("hoaMeetings.collection.description")} />
 				<div className="flex-1 p-4 sm:p-6">
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+					<p className="text-sm text-muted-foreground">{t("hoaMeetings.noHoas")}</p>
 				</div>
 			</div>
 		);
@@ -51,34 +58,31 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Beschluss-Sammlung" description="Fortlaufende Beschluss-Sammlung je WEG (§ 24 Abs. 6 WEG)." />
+			<SiteHeader title={t("hoaMeetings.collection.title")} description={t("hoaMeetings.collection.description")} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/beschluesse" />
 
-				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-					Vollständige, unveränderliche Beschluss-Sammlung (§ 24 Abs. 6 WEG) - jeder Beschluss erhält beim Erfassen eine fortlaufende Nummer. Die einmonatige Anfechtungsfrist (§ 45
-					WEG) wird je Beschluss automatisch berechnet.
-				</div>
+				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">{t("hoaMeetings.collection.info")}</div>
 
 				<Card>
 					<CardContent className="p-0">
 						{resolutionList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Gavel className="size-8" />
-								<p>Noch keine Beschlüsse erfasst.</p>
+								<p>{t("hoaMeetings.collection.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead className="w-[60px]">Nr.</TableHead>
-										{!selectedHoa ? <TableHead>WEG</TableHead> : null}
-										<TableHead>Titel</TableHead>
-										<TableHead>Versammlung</TableHead>
-										<TableHead>Datum</TableHead>
-										<TableHead>Ergebnis</TableHead>
-										<TableHead>Anfechtbar bis</TableHead>
+										<TableHead className="w-[60px]">{t("hoaMeetings.collection.table.number")}</TableHead>
+										{!selectedHoa ? <TableHead>{t("hoaMeetings.collection.table.hoa")}</TableHead> : null}
+										<TableHead>{t("hoaMeetings.collection.table.title")}</TableHead>
+										<TableHead>{t("hoaMeetings.collection.table.meeting")}</TableHead>
+										<TableHead>{t("common.date")}</TableHead>
+										<TableHead>{t("hoaMeetings.collection.table.result")}</TableHead>
+										<TableHead>{t("hoaMeetings.collection.table.contestableUntil")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -95,25 +99,25 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 												</TableCell>
 												<TableCell className="text-muted-foreground">{resolution.meetingTitle}</TableCell>
 												<TableCell className="text-muted-foreground">{formatDate(resolution.resolvedAt)}</TableCell>
-												<TableCell>
-													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${resolutionVotingResultStyles[resolution.votingResult]}`}>
-														{resolutionVotingResultLabels[resolution.votingResult]}
+											<TableCell>
+												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${resolutionVotingResultStyles[resolution.votingResult]}`}>
+													{votingResultLabels[resolution.votingResult]}
+												</span>
+											</TableCell>
+											<TableCell>
+												{resolution.contestedUntil ? (
+													<span className="flex items-center gap-2 text-muted-foreground">
+														{formatDate(resolution.contestedUntil)}
+														{!deadlinePassed ? (
+															<Badge variant="outline" className="text-amber-700 dark:text-amber-400">
+																{t("hoaMeetings.collection.contestableBadge")}
+															</Badge>
+														) : null}
 													</span>
-												</TableCell>
-												<TableCell>
-													{resolution.contestedUntil ? (
-														<span className="flex items-center gap-2 text-muted-foreground">
-															{formatDate(resolution.contestedUntil)}
-															{!deadlinePassed ? (
-																<Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-																	Frist läuft
-																</Badge>
-															) : null}
-														</span>
-													) : (
-														"–"
-													)}
-												</TableCell>
+												) : (
+													"–"
+												)}
+											</TableCell>
 											</TableRow>
 										);
 									})}

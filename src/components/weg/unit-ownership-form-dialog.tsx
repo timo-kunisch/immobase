@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { saveUnitOwnershipAction } from "@/app/(app)/weg/eigentumsverhaeltnisse/actions";
 import type { Owner, Unit, UnitOwnership } from "@/data/types";
@@ -25,6 +26,7 @@ import type { Owner, Unit, UnitOwnership } from "@/data/types";
  * Beenden einer anderen Zeile.
  */
 export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitId }: { units: Unit[]; owners: Owner[]; ownership?: UnitOwnership; defaultUnitId?: string }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(ownership);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveUnitOwnershipAction, initialActionState);
@@ -39,24 +41,24 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Bearbeiten" title="Bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("common.edit")} title={t("common.edit")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button" size="sm" variant="outline" disabled={units.length === 0 || owners.length === 0}>
 						<Plus />
-						Eigentumsverhältnis
+						{t("hoa.ownerships.actions.create")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Eigentumsverhältnis bearbeiten" : "Eigentumsverhältnis erfassen"}</DialogTitle>
+						<DialogTitle>{isEdit ? t("hoa.ownerships.dialog.editTitle") : t("hoa.ownerships.dialog.createTitle")}</DialogTitle>
 						<DialogDescription>
 							{isEdit
-								? "Änderungen an einer bestehenden Zeile."
-								: "Bei einem Eigentümerwechsel wird das bisher laufende Eigentumsverhältnis dieser Einheit automatisch zum Vortag beendet."}
+								? t("hoa.ownerships.dialog.editDescription")
+								: t("hoa.ownerships.dialog.createDescription")}
 						</DialogDescription>
 					</DialogHeader>
 
@@ -64,10 +66,10 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="unitId">Einheit *</Label>
+							<Label htmlFor="unitId">{t("common.unit")} *</Label>
 							<Select name="unitId" defaultValue={ownership?.unitId ?? defaultUnitId ?? units[0]?.id} required>
 								<SelectTrigger id="unitId" className="w-full">
-									<SelectValue placeholder="Einheit auswählen" />
+									<SelectValue placeholder={t("hoa.ownerships.placeholder.unit")} />
 								</SelectTrigger>
 								<SelectContent>
 									{units.map((unit) => (
@@ -79,10 +81,10 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 							</Select>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="ownerId">Eigentümer *</Label>
+							<Label htmlFor="ownerId">{t("common.owner")} *</Label>
 							<Select name="ownerId" defaultValue={ownership?.ownerId} required>
 								<SelectTrigger id="ownerId" className="w-full">
-									<SelectValue placeholder="Eigentümer auswählen" />
+									<SelectValue placeholder={t("hoa.ownerships.placeholder.owner")} />
 								</SelectTrigger>
 								<SelectContent>
 									{owners.map((owner) => (
@@ -94,13 +96,13 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 							</Select>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="coOwnerId">Miteigentümer (z. B. Ehepartner)</Label>
+							<Label htmlFor="coOwnerId">{t("hoa.ownerships.fields.coOwner")}</Label>
 							<Select name="coOwnerId" defaultValue={ownership?.coOwnerId ?? "none"}>
 								<SelectTrigger id="coOwnerId" className="w-full">
-									<SelectValue placeholder="Kein Miteigentümer" />
+									<SelectValue placeholder={t("hoa.ownerships.fields.noCoOwner")} />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value="none">Kein Miteigentümer</SelectItem>
+									<SelectItem value="none">{t("hoa.ownerships.fields.noCoOwner")}</SelectItem>
 									{owners.map((owner) => (
 										<SelectItem key={owner.id} value={owner.id}>
 											{owner.firstName} {owner.lastName}
@@ -110,23 +112,23 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 							</Select>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="startDate">{isEdit ? "Beginn *" : "Beginn (Eigentumsübergang) *"}</Label>
+							<Label htmlFor="startDate">{isEdit ? t("hoa.ownerships.fields.startDate") : t("hoa.ownerships.fields.startDateCreate")} *</Label>
 							<Input id="startDate" name="startDate" type="date" defaultValue={toDateInputValue(ownership?.startDate)} required />
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="notes">Notizen</Label>
-							<Textarea id="notes" name="notes" placeholder="z. B. Notar, Kaufvertragsdatum" defaultValue={ownership?.notes ?? ""} />
+							<Label htmlFor="notes">{t("common.notes")}</Label>
+							<Textarea id="notes" name="notes" placeholder={t("hoa.ownerships.placeholder.notes")} defaultValue={ownership?.notes ?? ""} />
 						</div>
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 					</div>
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

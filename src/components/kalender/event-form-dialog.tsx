@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 import { cn } from "@/lib/utils";
 
 import { deleteCalendarEventAction, saveCalendarEventAction } from "@/app/(app)/kalender/actions";
@@ -21,6 +22,7 @@ import type { CalendarEvent } from "@/data/types";
  * steht zusätzlich ein Löschen-Button bereit.
  */
 export function EventFormDialog({ event, defaultDate, className }: { event?: CalendarEvent; defaultDate?: string; className?: string }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(event);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveCalendarEventAction, initialActionState);
@@ -35,7 +37,7 @@ export function EventFormDialog({ event, defaultDate, className }: { event?: Cal
 
 	function handleDelete() {
 		if (!event) return;
-		if (typeof window !== "undefined" && !window.confirm(`Ereignis "${event.title}" wirklich löschen?`)) {
+		if (typeof window !== "undefined" && !window.confirm(t("calendar.confirm.delete", { title: event.title }))) {
 			return;
 		}
 		setDeleteError(null);
@@ -66,39 +68,44 @@ export function EventFormDialog({ event, defaultDate, className }: { event?: Cal
 				) : (
 					<Button type="button">
 						<Plus />
-						Neues Ereignis
+						{t("calendar.actions.new")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Ereignis bearbeiten" : "Neues Ereignis"}</DialogTitle>
-						<DialogDescription>Manuellen Termin im Kalender eintragen (z. B. Wartung, Abnahme, Behördentermin).</DialogDescription>
+						<DialogTitle>{isEdit ? t("calendar.dialog.editTitle") : t("calendar.dialog.newTitle")}</DialogTitle>
+						<DialogDescription>{t("calendar.dialog.description")}</DialogDescription>
 					</DialogHeader>
 
 					{isEdit ? <input type="hidden" name="id" value={event!.id} /> : null}
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="title">Titel *</Label>
-							<Input id="title" name="title" placeholder="z. B. Heizungswartung" defaultValue={event?.title} required />
+							<Label htmlFor="title">{t("calendar.fields.title")}</Label>
+							<Input id="title" name="title" placeholder={t("calendar.fields.titlePlaceholder")} defaultValue={event?.title} required />
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="startDate">Datum *</Label>
+								<Label htmlFor="startDate">{t("calendar.fields.startDate")}</Label>
 								<Input id="startDate" name="startDate" type="date" defaultValue={event?.startDate ?? defaultDate} required />
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="endDate">Enddatum (optional)</Label>
+								<Label htmlFor="endDate">{t("calendar.fields.endDate")}</Label>
 								<Input id="endDate" name="endDate" type="date" defaultValue={event?.endDate ?? ""} />
 							</div>
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="description">Beschreibung</Label>
-							<Textarea id="description" name="description" placeholder="Details zum Termin…" defaultValue={event?.description ?? ""} />
+							<Label htmlFor="description">{t("common.description")}</Label>
+							<Textarea
+								id="description"
+								name="description"
+								placeholder={t("calendar.fields.descriptionPlaceholder")}
+								defaultValue={event?.description ?? ""}
+							/>
 						</div>
 
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -109,16 +116,16 @@ export function EventFormDialog({ event, defaultDate, className }: { event?: Cal
 						{isEdit ? (
 							<Button type="button" variant="destructive" onClick={handleDelete} disabled={isDeleting || isPending}>
 								{isDeleting ? <Loader2 className="animate-spin" /> : <Trash2 />}
-								Löschen
+								{t("common.delete")}
 							</Button>
 						) : null}
 						<div className="flex justify-end gap-2">
 							<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-								Abbrechen
+								{t("common.cancel")}
 							</Button>
 							<Button type="submit" disabled={isPending || isDeleting}>
 								{isPending ? <Loader2 className="animate-spin" /> : null}
-								Speichern
+								{t("common.save")}
 							</Button>
 						</div>
 					</DialogFooter>

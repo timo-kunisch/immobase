@@ -3,16 +3,14 @@
 import { useTransition } from "react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n/provider";
 import { updateTicketStatusAction } from "@/app/(app)/tickets/actions";
 import type { TicketStatus } from "@/data/types";
 
-const statusLabels: Record<string, string> = {
-	OPEN: "Offen",
-	IN_PROGRESS: "In Bearbeitung",
-	DONE: "Erledigt",
-};
+const statuses = ["OPEN", "IN_PROGRESS", "DONE"] as const;
 
 export function TicketStatusSelect({ ticketId, status }: { ticketId: string; status: TicketStatus }) {
+	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 
 	return (
@@ -29,9 +27,9 @@ export function TicketStatusSelect({ ticketId, status }: { ticketId: string; sta
 				<SelectValue />
 			</SelectTrigger>
 			<SelectContent>
-				{Object.entries(statusLabels).map(([value, label]) => (
+				{statuses.map((value) => (
 					<SelectItem key={value} value={value}>
-						{label}
+						{t(`tickets.status.${value}`)}
 					</SelectItem>
 				))}
 			</SelectContent>

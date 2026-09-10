@@ -12,18 +12,16 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { TicketFormDialog } from "@/components/tickets/ticket-form-dialog";
 import { TicketStatusSelect } from "@/components/tickets/ticket-status-select";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteTicketAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const columns: { status: TicketStatus; title: string }[] = [
-	{ status: "OPEN", title: "Offen" },
-	{ status: "IN_PROGRESS", title: "In Bearbeitung" },
-	{ status: "DONE", title: "Erledigt" },
-];
+const columns: TicketStatus[] = ["OPEN", "IN_PROGRESS", "DONE"];
 
 export default async function TicketsPage({ searchParams }: { searchParams: Promise<{ propertyId?: string; unitId?: string }> }) {
+	const t = await getT();
 	const { propertyId, unitId } = await searchParams;
 
 	const ticketList = listTickets({ propertyId, unitId });
@@ -39,16 +37,16 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Tickets" description="Schäden & Instandhaltung je Liegenschaft/Einheit." actions={<TicketFormDialog properties={propertyList} units={unitList} />} />
+			<SiteHeader title={t("tickets.title")} description={t("tickets.description")} actions={<TicketFormDialog properties={propertyList} units={unitList} />} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				{propertyList.length === 0 ? <p className="text-sm text-muted-foreground">Legen Sie zuerst eine Liegenschaft an, um Tickets erfassen zu können.</p> : null}
+				{propertyList.length === 0 ? <p className="text-sm text-muted-foreground">{t("tickets.emptyProperties")}</p> : null}
 
 				{filterLabel ? (
 					<p className="text-sm text-muted-foreground">
-						Gefiltert nach: <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
+						{t("tickets.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
 						<Link href="/tickets" className="text-primary hover:underline">
-							Filter zurücksetzen
+							{t("common.resetFilters")}
 						</Link>
 					</p>
 				) : null}
@@ -57,23 +55,23 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 					<Card>
 						<CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
 							<Wrench className="size-8" />
-							<p>Noch keine Tickets erfasst.</p>
+							<p>{t("tickets.empty")}</p>
 						</CardContent>
 					</Card>
 				) : (
 					<div className="grid gap-4 lg:grid-cols-3">
-						{columns.map((column) => {
-							const columnTickets = ticketList.filter((ticket) => ticket.status === column.status);
+						{columns.map((status) => {
+							const columnTickets = ticketList.filter((ticket) => ticket.status === status);
 							return (
-								<div key={column.status} className="flex flex-col gap-3">
+								<div key={status} className="flex flex-col gap-3">
 									<div className="flex items-center justify-between px-1">
-										<h2 className="text-sm font-semibold text-muted-foreground">{column.title}</h2>
+										<h2 className="text-sm font-semibold text-muted-foreground">{t(`tickets.status.${status}`)}</h2>
 										<Badge variant="secondary">{columnTickets.length}</Badge>
 									</div>
 
 									<div className="flex flex-col gap-3">
 										{columnTickets.length === 0 ? (
-											<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">Keine Tickets</div>
+											<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">{t("tickets.emptyColumn")}</div>
 										) : (
 											columnTickets.map((ticket) => (
 												<Card key={ticket.id}>
@@ -85,7 +83,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 														</CardTitle>
 														<div className="flex items-center gap-0.5">
 															<TicketFormDialog ticket={ticket} properties={propertyList} units={unitList} />
-															<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={`Ticket "${ticket.title}" wirklich löschen?`} />
+															<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={t("tickets.confirm.delete", { title: ticket.title })} />
 														</div>
 													</CardHeader>
 													<CardContent className="flex flex-col gap-3">
@@ -105,7 +103,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 														{ticket.description ? <p className="text-sm text-muted-foreground line-clamp-3">{ticket.description}</p> : null}
 														{ticket.contractorNotes ? (
 															<p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-																<span className="font-medium">Handwerker: </span>
+																<span className="font-medium">{t("tickets.contractorLabel")} </span>
 																{ticket.contractorNotes}
 															</p>
 														) : null}
@@ -116,7 +114,7 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 																	<Link
 																		href={`/tickets/${ticket.id}`}
 																		className="inline-flex items-center gap-1 rounded-md hover:text-foreground"
-																		title="Verlauf anzeigen"
+																		title={t("tickets.actions.showHistory")}
 																	>
 																		<MessagesSquare className="size-3.5" />
 																		{messageCounts[ticket.id]}

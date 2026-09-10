@@ -1,0 +1,39 @@
+import { documents as deDocuments } from "../de/documents";
+
+/** Englische Übersetzungen des Namespace "documents" (Parität per Typ erzwungen). */
+export const documents: typeof deDocuments = {
+	title: "Documents",
+	description: "Digital document archive (DMS).",
+	empty: "No documents yet.",
+	emptySearch: 'No documents found for "{query}".',
+	searchPlaceholder: "Search documents…",
+	"filter.filteredBy": "Filtered by:",
+	"table.file": "File",
+	"table.source": "Source",
+	"table.linkedTo": "Linked to",
+	// Document types (DocumentType)
+	"category.CONTRACT": "Contract",
+	"category.INVOICE": "Invoice",
+	"category.FLOORPLAN": "Floor plan",
+	"category.OTHER": "Other",
+	// File sources (DocumentSourceType)
+	"sourceType.DOCUMENT": "Uploaded document",
+	"sourceType.GENERATED_DOCUMENT": "Template letter",
+	"sourceType.TENANT_STATEMENT": "Service charge statement",
+	"actions.uploadFile": "Upload file",
+	"dialog.uploadTitle": "Upload document",
+	"dialog.uploadDescription": "Upload {types} files and optionally assign them to a property, unit or tenant.",
+	"fields.file": "File",
+	"fields.type": "Document type",
+	"fields.assignmentHint": "Optional assignment (one or more links possible):",
+	"fields.noTenant": "None",
+	"confirm.delete": 'Really delete "{name}"?',
+	"errors.noFile": "Please select a file.",
+	"errors.unsupportedType": "Currently only {types} files are supported.",
+	"errors.uploadFailed": "The file could not be uploaded.",
+	"errors.notFound": "Document not found.",
+	"errors.notFoundDetailed": "The document was not found.",
+	"errors.deleteFailed": "The document could not be deleted.",
+	"errors.onlyPdf": "Only PDF documents can be sent by post.",
+	"errors.statementDelete": "Statement PDFs can only be deleted via the respective billing period.",
+};

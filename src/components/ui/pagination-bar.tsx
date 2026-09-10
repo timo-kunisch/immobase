@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getT } from "@/lib/i18n/server";
 import { buildPageNumbers, type PaginationState } from "@/lib/pagination";
 
 /**
@@ -11,7 +12,7 @@ import { buildPageNumbers, type PaginationState } from "@/lib/pagination";
  * Filter-Parameter (z. B. `hoaId`, `leaseId`, `q`) werden über `params`
  * mitgeschleift. Bei nur einer Seite wird nichts gerendert.
  */
-export function PaginationBar({
+export async function PaginationBar({
 	basePath,
 	pagination,
 	params,
@@ -21,6 +22,7 @@ export function PaginationBar({
 	/** Bestehende Filter-Query-Params, die auf jeder Seite erhalten bleiben sollen. */
 	params?: Record<string, string | undefined>;
 }) {
+	const t = await getT();
 	const { page, totalPages, totalItems } = pagination;
 	if (totalPages <= 1) return null;
 
@@ -35,19 +37,22 @@ export function PaginationBar({
 	};
 
 	return (
-		<nav aria-label="Seitennavigation" className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
+		<nav aria-label={t("common.pagination.aria")} className="flex flex-col gap-2 px-1 sm:flex-row sm:items-center sm:justify-between">
 			<p className="text-sm text-muted-foreground">
-				Seite {page} von {totalPages} · {totalItems} {totalItems === 1 ? "Eintrag" : "Einträge"}
+				{t("common.pagination.pageOf", { page, totalPages })} ·{" "}
+				{totalItems === 1
+					? t("common.pagination.entries.one", { count: totalItems })
+					: t("common.pagination.entries.other", { count: totalItems })}
 			</p>
 			<div className="flex items-center gap-1">
 				{page > 1 ? (
-					<Button asChild variant="outline" size="icon-sm" aria-label="Vorherige Seite">
+					<Button asChild variant="outline" size="icon-sm" aria-label={t("common.pagination.previous")}>
 						<Link href={hrefFor(page - 1)}>
 							<ChevronLeft />
 						</Link>
 					</Button>
 				) : (
-					<Button variant="outline" size="icon-sm" disabled aria-label="Vorherige Seite">
+					<Button variant="outline" size="icon-sm" disabled aria-label={t("common.pagination.previous")}>
 						<ChevronLeft />
 					</Button>
 				)}
@@ -67,13 +72,13 @@ export function PaginationBar({
 					)
 				)}
 				{page < totalPages ? (
-					<Button asChild variant="outline" size="icon-sm" aria-label="Nächste Seite">
+					<Button asChild variant="outline" size="icon-sm" aria-label={t("common.pagination.next")}>
 						<Link href={hrefFor(page + 1)}>
 							<ChevronRight />
 						</Link>
 					</Button>
 				) : (
-					<Button variant="outline" size="icon-sm" disabled aria-label="Nächste Seite">
+					<Button variant="outline" size="icon-sm" disabled aria-label={t("common.pagination.next")}>
 						<ChevronRight />
 					</Button>
 				)}

@@ -22,12 +22,6 @@ export function getLeaseStatus(lease: LeaseStatusFields, date: Date = new Date()
 	return "ACTIVE";
 }
 
-export const leaseStatusLabels: Record<LeaseStatusValue, string> = {
-	ACTIVE: "Aktiv",
-	UPCOMING: "Zukünftig",
-	ENDED: "Beendet",
-};
-
 export const leaseStatusStyles: Record<LeaseStatusValue, string> = {
 	ACTIVE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
 	UPCOMING: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",

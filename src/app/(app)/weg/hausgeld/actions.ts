@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createHousingCharge, deleteHousingCharge, markHousingChargePaid, updateHousingCharge } from "@/data/housing-charges";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import type { HousingChargeStatus } from "@/data/types";
@@ -15,6 +16,7 @@ const HOUSING_CHARGE_STATUSES: HousingChargeStatus[] = ["OPEN", "PAID", "OVERDUE
 
 export async function saveHousingChargeAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const unitId = getString(formData, "unitId");
 	const ownerId = getString(formData, "ownerId");
@@ -24,7 +26,7 @@ export async function saveHousingChargeAction(_prevState: ActionState, formData:
 	const amount = getDecimalString(formData, "amount");
 
 	if (!unitId || !ownerId || !dueDateRaw || amount === null) {
-		return { error: "Bitte Einheit, Eigentümer, Fälligkeitsdatum und Betrag angeben." };
+		return { error: t("hoaFinance.charges.errors.requiredFields") };
 	}
 
 	const status: HousingChargeStatus = HOUSING_CHARGE_STATUSES.includes(statusRaw) ? statusRaw : "OPEN";
@@ -52,7 +54,7 @@ export async function saveHousingChargeAction(_prevState: ActionState, formData:
 		}
 	} catch (error) {
 		console.error("saveHousingChargeAction failed", error);
-		return { error: "Die Hausgeld-Sollstellung konnte nicht gespeichert werden." };
+		return { error: t("hoaFinance.charges.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/hausgeld`);
@@ -62,11 +64,12 @@ export async function saveHousingChargeAction(_prevState: ActionState, formData:
 /** Schnellaktion: Sollstellung direkt aus der Tabelle als "bezahlt" markieren. */
 export async function markHousingChargePaidAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		markHousingChargePaid(id);
 	} catch (error) {
 		console.error("markHousingChargePaidAction failed", error);
-		return { error: "Sollstellung konnte nicht als bezahlt markiert werden." };
+		return { error: t("hoaFinance.charges.errors.markPaidFailed") };
 	}
 
 	// Es gibt keine getX-Funktion für eine einzelne Sollstellung - Fallback auf die ID.
@@ -78,11 +81,12 @@ export async function markHousingChargePaidAction(id: string, _hoaId: string): P
 
 export async function deleteHousingChargeAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		deleteHousingCharge(id);
 	} catch (error) {
 		console.error("deleteHousingChargeAction failed", error);
-		return { error: "Die Hausgeld-Sollstellung konnte nicht gelöscht werden." };
+		return { error: t("hoaFinance.charges.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "hausgeld", `Hausgeld-Sollstellung „${id}“ gelöscht`, id);

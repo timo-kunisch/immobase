@@ -13,8 +13,10 @@ import { loginAction } from "@/app/(auth)/login/actions";
 import { initialLoginState } from "@/lib/auth/login-state";
 import { resendVerificationAction } from "@/lib/auth/actions";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 export function LoginForm({ defaultEmail, from, infoMessage }: { defaultEmail?: string; from?: string; infoMessage?: string }) {
+	const { t } = useI18n();
 	const [state, formAction, isPending] = useActionState(loginAction, initialLoginState);
 	const [resendState, resendAction, isResendPending] = useActionState(resendVerificationAction, initialActionState);
 
@@ -23,21 +25,21 @@ export function LoginForm({ defaultEmail, from, infoMessage }: { defaultEmail?: 
 			<Card>
 				<form action={formAction}>
 					<CardHeader>
-						<CardTitle>Anmelden</CardTitle>
-						<CardDescription>Melden Sie sich mit Ihrer E-Mail-Adresse und Ihrem Passwort an.</CardDescription>
+						<CardTitle>{t("auth.login.title")}</CardTitle>
+						<CardDescription>{t("auth.login.description")}</CardDescription>
 					</CardHeader>
 					<CardContent className="grid gap-4">
 						{infoMessage ? <p className="rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">{infoMessage}</p> : null}
 						{from ? <input type="hidden" name="from" value={from} /> : null}
 						<div className="grid gap-2">
-							<Label htmlFor="email">E-Mail-Adresse</Label>
+							<Label htmlFor="email">{t("auth.fields.email")}</Label>
 							<Input id="email" name="email" type="email" autoComplete="email" defaultValue={defaultEmail} required />
 						</div>
 						<div className="grid gap-2">
 							<div className="flex items-center justify-between">
-								<Label htmlFor="password">Passwort</Label>
+								<Label htmlFor="password">{t("auth.fields.password")}</Label>
 								<Link href="/forgot-password" className="text-xs text-muted-foreground hover:text-primary hover:underline">
-									Passwort vergessen?
+									{t("auth.login.forgotPassword")}
 								</Link>
 							</div>
 							<Input id="password" name="password" type="password" autoComplete="current-password" required />
@@ -50,7 +52,7 @@ export function LoginForm({ defaultEmail, from, infoMessage }: { defaultEmail?: 
 										<input type="hidden" name="email" value={state.unverifiedEmail} />
 										<Button type="submit" variant="outline" size="sm" disabled={isResendPending}>
 											{isResendPending ? <Loader2 className="animate-spin" /> : <MailCheck />}
-											Bestätigungs-E-Mail erneut senden
+											{t("auth.login.resendVerification")}
 										</Button>
 									</form>
 								) : null}
@@ -61,12 +63,12 @@ export function LoginForm({ defaultEmail, from, infoMessage }: { defaultEmail?: 
 					<CardFooter className="flex flex-col gap-4">
 						<Button type="submit" className="w-full" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Anmelden
+							{t("auth.login.submit")}
 						</Button>
 						<p className="text-center text-sm text-muted-foreground">
-							Noch kein Konto?{" "}
+							{t("auth.login.noAccount")}{" "}
 							<Link href="/register" className="text-primary hover:underline">
-								Jetzt registrieren
+								{t("auth.login.registerNow")}
 							</Link>
 						</p>
 					</CardFooter>

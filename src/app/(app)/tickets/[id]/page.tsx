@@ -17,18 +17,14 @@ import { TicketNoteForm } from "@/components/tickets/ticket-note-form";
 import { TicketReplyForm } from "@/components/tickets/ticket-reply-form";
 import { TicketStatusSelect } from "@/components/tickets/ticket-status-select";
 import { isSmtpConfigured } from "@/lib/email/mailer";
+import { getT } from "@/lib/i18n/server";
+import type { TranslateFn } from "@/lib/i18n/translator";
 import { buildTicketSubjectTag } from "@/lib/ticket-ref";
 import { formatDate, formatDateTime } from "@/lib/format";
 
 import { deleteTicketAction } from "../actions";
 
 export const dynamic = "force-dynamic";
-
-const statusLabels: Record<TicketStatus, string> = {
-	OPEN: "Offen",
-	IN_PROGRESS: "In Bearbeitung",
-	DONE: "Erledigt",
-};
 
 const statusVariants: Record<TicketStatus, "default" | "secondary" | "outline"> = {
 	OPEN: "default",
@@ -37,7 +33,7 @@ const statusVariants: Record<TicketStatus, "default" | "secondary" | "outline"> 
 };
 
 /** Ein Verlauf-Eintrag (eingehende/ausgehende E-Mail oder interne Notiz). */
-function TimelineEntry({ message, reassignTickets }: { message: TicketMessage; reassignTickets: ReassignableTicket[] }) {
+function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage; reassignTickets: ReassignableTicket[]; t: TranslateFn }) {
 	const isNote = message.direction === "NOTE";
 	const isOutbound = message.direction === "OUTBOUND";
 	const Icon = isNote ? StickyNote : isOutbound ? MailPlus : Mail;
@@ -48,8 +44,8 @@ function TimelineEntry({ message, reassignTickets }: { message: TicketMessage; r
 				<div className="flex flex-wrap items-center justify-between gap-2">
 					<div className="flex items-center gap-2 text-sm font-medium">
 						<Icon className="size-4 text-muted-foreground" />
-						{isNote ? "Interne Notiz" : isOutbound ? "E-Mail gesendet" : "E-Mail empfangen"}
-						{isNote ? <Badge variant="secondary">Intern</Badge> : null}
+						{isNote ? t("tickets.note.label") : isOutbound ? t("tickets.history.outbound") : t("tickets.history.inbound")}
+						{isNote ? <Badge variant="secondary">{t("tickets.history.internalBadge")}</Badge> : null}
 					</div>
 					<div className="flex items-center gap-1">
 						{/* Eingehende E-Mails können wieder ins Postfach gelöst oder
@@ -65,8 +61,8 @@ function TimelineEntry({ message, reassignTickets }: { message: TicketMessage; r
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{isNote
-						? (message.authorEmail ?? "Unbekannt")
-						: `Von: ${message.fromAddress ?? "–"}${message.toAddresses ? ` · An: ${message.toAddresses}` : ""}`}
+						? (message.authorEmail ?? t("tickets.history.unknownAuthor"))
+						: `${t("common.from")}: ${message.fromAddress ?? "–"}${message.toAddresses ? ` · ${t("tickets.email.to")}: ${message.toAddresses}` : ""}`}
 					{!isNote && message.subject ? ` · ${message.subject}` : ""}
 				</p>
 			</CardHeader>
@@ -80,6 +76,7 @@ function TimelineEntry({ message, reassignTickets }: { message: TicketMessage; r
 }
 
 export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+	const t = await getT();
 	const { id } = await params;
 	const ticket = getTicket(id);
 	if (!ticket) {
@@ -105,11 +102,11 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
 				title={ticket.title}
-				description="Ticket-Details mit komplettem Kommunikationsverlauf."
+				description={t("tickets.detail.description")}
 				actions={
 					<>
 						<TicketFormDialog ticket={ticket} properties={propertyList} units={unitList} />
-						<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={`Ticket "${ticket.title}" wirklich löschen?`} />
+						<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={t("tickets.confirm.delete", { title: ticket.title })} />
 					</>
 				}
 			/>
@@ -117,15 +114,15 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<Link href="/tickets" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline">
 					<ArrowLeft className="size-4" />
-					Zurück zur Übersicht
+					{t("tickets.detail.backToList")}
 				</Link>
 
 				<Card>
 					<CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
 						<div className="flex items-center gap-2">
-							<Badge variant={statusVariants[ticket.status]}>{statusLabels[ticket.status]}</Badge>
-							<span className="text-xs text-muted-foreground">Erstellt am {formatDate(ticket.createdAt)}</span>
-							{ticket.resolvedAt ? <span className="text-xs text-muted-foreground">· Erledigt am {formatDate(ticket.resolvedAt)}</span> : null}
+							<Badge variant={statusVariants[ticket.status]}>{t(`tickets.status.${ticket.status}`)}</Badge>
+							<span className="text-xs text-muted-foreground">{t("tickets.detail.createdAt", { date: formatDate(ticket.createdAt) })}</span>
+							{ticket.resolvedAt ? <span className="text-xs text-muted-foreground">{t("tickets.detail.resolvedAt", { date: formatDate(ticket.resolvedAt) })}</span> : null}
 						</div>
 						<div className="w-40">
 							<TicketStatusSelect ticketId={ticket.id} status={ticket.status} />
@@ -148,7 +145,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 						{ticket.description ? <p className="text-sm whitespace-pre-wrap">{ticket.description}</p> : null}
 						{ticket.contractorNotes ? (
 							<p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-								<span className="font-medium">Handwerker: </span>
+								<span className="font-medium">{t("tickets.contractorLabel")} </span>
 								{ticket.contractorNotes}
 							</p>
 						) : null}
@@ -156,19 +153,19 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 				</Card>
 
 				<div className="flex flex-col gap-3">
-					<h2 className="text-sm font-semibold text-muted-foreground">Verlauf ({messages.length})</h2>
+					<h2 className="text-sm font-semibold text-muted-foreground">{t("tickets.history.title", { count: messages.length })}</h2>
 					{messages.length === 0 ? (
 						<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-							Noch keine Kommunikation vorhanden.
+							{t("tickets.history.empty")}
 						</div>
 					) : (
-						messages.map((message) => <TimelineEntry key={message.id} message={message} reassignTickets={reassignTickets} />)
+						messages.map((message) => <TimelineEntry key={message.id} message={message} reassignTickets={reassignTickets} t={t} />)
 					)}
 				</div>
 
 				<Card>
 					<CardHeader>
-						<CardTitle className="text-sm">Kommunikation hinzufügen</CardTitle>
+						<CardTitle className="text-sm">{t("tickets.history.addTitle")}</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-6">
 						<TicketNoteForm ticketId={ticket.id} />
@@ -176,13 +173,12 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 							<div className="border-t pt-4">
 								<TicketReplyForm ticketId={ticket.id} defaultTo={defaultTo} defaultSubject={defaultSubject} />
 								<p className="mt-2 text-xs text-muted-foreground">
-									Dem Betreff wird beim Versand automatisch die Ticket-Kennung {buildTicketSubjectTag(ticket.id)} angehängt - Antworten des
-									Empfängers werden so beim nächsten Postfach-Abruf automatisch diesem Ticket zugeordnet.
+									{t("tickets.history.subjectTagHint", { tag: buildTicketSubjectTag(ticket.id) })}
 								</p>
 							</div>
 						) : (
 							<p className="border-t pt-4 text-xs text-muted-foreground">
-								E-Mail-Antworten sind deaktiviert, solange kein SMTP-Server konfiguriert ist (Einstellungen → Integrationen &amp; KI).
+								{t("tickets.history.smtpDisabled")}
 							</p>
 						)}
 					</CardContent>

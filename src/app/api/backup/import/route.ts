@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { importBackup } from "@/data/backup";
 import { requireAdmin } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Backup-Import (Ersetzen oder Zusammenführen, siehe src/data/backup.ts).
@@ -16,12 +17,13 @@ import { logActivity } from "@/lib/audit";
  */
 export async function POST(request: Request) {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+		return NextResponse.json({ error: t("settings.backup.errors.invalidRequest") }, { status: 400 });
 	}
 
 	const path = typeof (body as { path?: unknown })?.path === "string" ? (body as { path: string }).path : null;
@@ -31,7 +33,7 @@ export async function POST(request: Request) {
 			? (body as { password: string }).password
 			: undefined;
 	if (!path) {
-		return NextResponse.json({ error: "Pfad zur Sicherungsdatei fehlt." }, { status: 400 });
+		return NextResponse.json({ error: t("settings.backup.errors.pathMissing") }, { status: 400 });
 	}
 
 	try {
@@ -49,7 +51,7 @@ export async function POST(request: Request) {
 	} catch (error) {
 		console.error("Backup-Import fehlgeschlagen", error);
 		return NextResponse.json(
-			{ error: `Import fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}` },
+			{ error: t("settings.backup.errors.importFailed", { error: error instanceof Error ? error.message : String(error) }) },
 			{ status: 400 }
 		);
 	}

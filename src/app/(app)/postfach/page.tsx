@@ -14,12 +14,14 @@ import { MailboxSyncButton } from "@/components/postfach/mailbox-sync-button";
 import { ViewMessageDialog } from "@/components/postfach/view-message-dialog";
 import { getImapConfig, isImapConfigured } from "@/lib/email/imap";
 import { formatDateTime } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteMailboxMessageAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function PostfachPage() {
+	const t = await getT();
 	const configured = isImapConfigured();
 	const mailbox = configured ? (getImapConfig()?.mailbox ?? "INBOX") : null;
 	const syncState = configured && mailbox ? getImapSyncState(mailbox) : null;
@@ -37,8 +39,8 @@ export default async function PostfachPage() {
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Postfach"
-				description="Eingehende E-Mails - in Tickets umwandeln oder an bestehende Tickets anheften."
+				title={t("tickets.mailbox.title")}
+				description={t("tickets.mailbox.description")}
 				actions={configured ? <MailboxSyncButton /> : null}
 			/>
 
@@ -47,30 +49,31 @@ export default async function PostfachPage() {
 					<Card>
 						<CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
 							<Inbox className="size-8" />
-							<p>Das E-Mail-Postfach ist nicht konfiguriert.</p>
+							<p>{t("tickets.mailbox.notConfigured")}</p>
 							<p className="text-xs">
-								Ein Administrator kann unter{" "}
+								{t("tickets.mailbox.notConfiguredHint1")}{" "}
 								<Link href="/einstellungen" className="text-primary hover:underline">
-									Einstellungen → Integrationen &amp; KI
+									{t("tickets.mailbox.notConfiguredSettingsLink")}
 								</Link>{" "}
-								einen IMAP-Server hinterlegen. Das Ticket-System funktioniert auch ohne Postfach (manuell angelegte Tickets und interne
-								Notizen).
+								{t("tickets.mailbox.notConfiguredHint2")}
 							</p>
 						</CardContent>
 					</Card>
 				) : (
 					<>
 						<p className="text-xs text-muted-foreground">
-							Ordner „{mailbox}“
-							{syncState?.lastSyncAt ? <> · Letzter Abruf: {formatDateTime(syncState.lastSyncAt)}</> : " · Noch kein Abruf erfolgt"}
-							{syncState?.lastError ? <span className="text-destructive"> · Letzter Fehler: {syncState.lastError}</span> : null}
+							{t("tickets.mailbox.folder", { name: mailbox ?? "INBOX" })}
+							{syncState?.lastSyncAt
+								? ` · ${t("tickets.mailbox.lastFetch")}: ${formatDateTime(syncState.lastSyncAt)}`
+								: ` · ${t("tickets.mailbox.neverFetched")}`}
+							{syncState?.lastError ? <span className="text-destructive">{` · ${t("tickets.mailbox.lastError")}: ${syncState.lastError}`}</span> : null}
 						</p>
 
 						{messages.length === 0 ? (
 							<Card>
 								<CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
 									<Inbox className="size-8" />
-									<p>Keine neuen E-Mails im Postfach.</p>
+									<p>{t("tickets.mailbox.empty")}</p>
 								</CardContent>
 							</Card>
 						) : (
@@ -79,14 +82,14 @@ export default async function PostfachPage() {
 									<Card key={message.id}>
 										<CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
 											<div className="min-w-0">
-												<CardTitle className="text-sm font-medium leading-snug">{message.subject ?? "(ohne Betreff)"}</CardTitle>
+												<CardTitle className="text-sm font-medium leading-snug">{message.subject ?? t("tickets.email.noSubject")}</CardTitle>
 												<p className="mt-1 truncate text-xs text-muted-foreground">
-													Von: {message.fromAddress ?? "–"} · {formatDateTime(message.createdAt)}
+													{t("common.from")}: {message.fromAddress ?? "–"} · {formatDateTime(message.createdAt)}
 												</p>
 											</div>
 											<ConfirmDeleteButton
 												action={deleteMailboxMessageAction.bind(null, message.id)}
-												confirmMessage={`E-Mail "${message.subject ?? "(ohne Betreff)"}" aus dem Postfach löschen? (Die Nachricht auf dem Server bleibt erhalten.)`}
+												confirmMessage={t("tickets.mailbox.confirm.delete", { subject: message.subject ?? t("tickets.email.noSubject") })}
 											/>
 										</CardHeader>
 										<CardContent className="flex flex-col gap-3">

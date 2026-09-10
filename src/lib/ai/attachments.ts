@@ -3,15 +3,24 @@ import type { CellValue } from "exceljs";
 import JSZip from "jszip";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 
+import { deMessages } from "@/lib/i18n/messages/de";
+import { createTranslator, type TranslateFn } from "@/lib/i18n/translator";
+
 import {
 	EXCEL_ATTACHMENT_EXTENSIONS,
 	IMAGE_ATTACHMENT_MIME_TYPES,
 	MAX_ATTACHMENT_BYTES,
 	OFFICE_ATTACHMENT_EXTENSIONS,
 	PDF_ATTACHMENT_EXTENSIONS,
-	SUPPORTED_TYPES_HINT,
 	TEXT_ATTACHMENT_EXTENSIONS,
 } from "./attachment-types";
+
+/**
+ * Standard-Übersetzer (Deutsch) für Aufrufe ohne eigenen t()-Parameter -
+ * u. a. die Unit-Tests, die ohne next/headers-Kontext laufen. Der Chat
+ * (src/lib/ai/chat.ts) übergibt den Übersetzer der gewählten App-Sprache.
+ */
+const defaultT = createTranslator(deMessages);
 
 /**
  * Verarbeitung von Datei-Anhängen des KI-Chats (src/lib/ai/chat.ts): Damit
@@ -65,9 +74,9 @@ function fileExtension(name: string): string {
 	return dot >= 0 ? name.slice(dot + 1).toLowerCase() : "";
 }
 
-function truncateText(text: string): string {
+function truncateText(text: string, t: TranslateFn): string {
 	if (text.length <= MAX_CHARS_PER_ATTACHMENT) return text;
-	return `${text.slice(0, MAX_CHARS_PER_ATTACHMENT)}\n[... gekürzt: Der Anhang überschreitet die maximale Textlänge von ${MAX_CHARS_PER_ATTACHMENT} Zeichen ...]`;
+	return `${text.slice(0, MAX_CHARS_PER_ATTACHMENT)}\n${t("chat.attach.truncatedChars", { max: MAX_CHARS_PER_ATTACHMENT })}`;
 }
 
 // ------------------------------------------------------------
@@ -94,15 +103,13 @@ function csvField(text: string): string {
 	return text;
 }
 
-async function excelToText(buffer: Buffer, name: string): Promise<string> {
+async function excelToText(buffer: Buffer, name: string, t: TranslateFn): Promise<string> {
 	const workbook = new Workbook();
 	try {
 		await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
 	} catch (error) {
 		console.warn("[ai] Excel-Datei konnte nicht gelesen werden:", error);
-		throw new AttachmentError(
-			`Die Datei "${name}" konnte nicht als Excel-Arbeitsmappe gelesen werden. Hinweis: Das alte .xls-Format wird nicht unterstützt - bitte in Excel als .xlsx speichern.`
-		);
+		throw new AttachmentError(t("chat.attach.excelUnreadable", { name }));
 	}
 
 	const parts: string[] = [];
@@ -122,12 +129,16 @@ async function excelToText(buffer: Buffer, name: string): Promise<string> {
 		});
 		if (rows.length === 0) return;
 		parts.push(
-			`Tabellenblatt "${worksheet.name}" (${rows.length} Zeilen${truncated ? `, auf die ersten ${MAX_ROWS_PER_SHEET} Zeilen gekürzt` : ""}):\n${rows.join("\n")}`
+			`${t("chat.attach.sheetHeader", {
+				sheet: worksheet.name,
+				rows: rows.length,
+				truncation: truncated ? t("chat.attach.sheetTruncated", { max: MAX_ROWS_PER_SHEET }) : "",
+			})}\n${rows.join("\n")}`
 		);
 	});
 
 	if (parts.length === 0) {
-		throw new AttachmentError(`Die Datei "${name}" enthält keine auswertbaren Tabellendaten.`);
+		throw new AttachmentError(t("chat.attach.excelNoData", { name }));
 	}
 	return parts.join("\n\n");
 }
@@ -147,19 +158,17 @@ async function excelToText(buffer: Buffer, name: string): Promise<string> {
  * Modul-Import zwingend erwartet bzw. @napi-rs/canvas als natives Polyfill
  * gefordert - beides kommt für die App nicht infrage).
  */
-async function loadPdfJs(): Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> {
+async function loadPdfJs(t: TranslateFn): Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")> {
 	try {
 		return await import("pdfjs-dist/legacy/build/pdf.mjs");
 	} catch (error) {
 		console.error("[ai] pdfjs-dist konnte nicht geladen werden:", error);
-		throw new AttachmentError(
-			"Die PDF-Unterstützung konnte nicht initialisiert werden (Details im Server-Log). Andere Dateitypen und der Chat ohne Anhang funktionieren weiterhin."
-		);
+		throw new AttachmentError(t("chat.attach.pdfEngineUnavailable"));
 	}
 }
 
-async function pdfToText(buffer: Buffer, name: string): Promise<string> {
-	const { getDocument } = await loadPdfJs();
+async function pdfToText(buffer: Buffer, name: string, t: TranslateFn): Promise<string> {
+	const { getDocument } = await loadPdfJs(t);
 
 	let task: ReturnType<typeof getDocument>;
 	try {
@@ -173,7 +182,7 @@ async function pdfToText(buffer: Buffer, name: string): Promise<string> {
 		});
 	} catch (error) {
 		console.warn("[ai] PDF-Initialisierung fehlgeschlagen:", error);
-		throw new AttachmentError(`Die PDF-Datei "${name}" konnte nicht geöffnet werden.`);
+		throw new AttachmentError(t("chat.attach.pdfOpenFailed", { name }));
 	}
 
 	try {
@@ -191,25 +200,21 @@ async function pdfToText(buffer: Buffer, name: string): Promise<string> {
 				.join(" ")
 				.replace(/\s{2,}/g, " ")
 				.trim();
-			if (text) parts.push(`--- Seite ${pageNumber} ---\n${text}`);
+			if (text) parts.push(`${t("chat.attach.pageMarker", { page: pageNumber })}\n${text}`);
 		}
 		const truncated = pdf.numPages > MAX_PDF_PAGES;
 		if (parts.length === 0) {
-			throw new AttachmentError(
-				`Die PDF-Datei "${name}" enthält keinen extrahierbaren Text (vermutlich ein Scan ohne Textebene). Hinweis: Als Workaround die PDF in Bilder umwandeln und diese anhängen.`
-			);
+			throw new AttachmentError(t("chat.attach.pdfNoText", { name }));
 		}
-		return (
-			parts.join("\n\n") + (truncated ? `\n\n[... gekürzt: Nur die ersten ${MAX_PDF_PAGES} von ${pdf.numPages} Seiten wurden übernommen ...]` : "")
-		);
+		return parts.join("\n\n") + (truncated ? `\n\n${t("chat.attach.pdfPagesTruncated", { max: MAX_PDF_PAGES, total: pdf.numPages })}` : "");
 	} catch (error) {
 		if (error instanceof AttachmentError) throw error;
 		const message = error instanceof Error ? error.message : String(error);
 		if (/password/i.test(message)) {
-			throw new AttachmentError(`Die PDF-Datei "${name}" ist passwortgeschützt - bitte den Schutz entfernen und erneut anhängen.`);
+			throw new AttachmentError(t("chat.attach.pdfPassword", { name }));
 		}
 		console.warn("[ai] PDF-Extraktion fehlgeschlagen:", error);
-		throw new AttachmentError(`Die PDF-Datei "${name}" konnte nicht gelesen werden (beschädigt oder kein gültiges PDF).`);
+		throw new AttachmentError(t("chat.attach.pdfReadFailed", { name }));
 	} finally {
 		// Ressourcen (Worker) freigeben - wichtig bei wiederholten Anhängen.
 		await task.destroy().catch(() => {});
@@ -271,20 +276,20 @@ async function readZipTextFile(zip: JSZip, filePath: string): Promise<string | n
 	return entry.async("string");
 }
 
-async function officeToText(buffer: Buffer, name: string, extension: string): Promise<string> {
+async function officeToText(buffer: Buffer, name: string, extension: string, t: TranslateFn): Promise<string> {
 	let zip: JSZip;
 	try {
 		zip = await JSZip.loadAsync(buffer);
 	} catch (error) {
 		console.warn("[ai] Office-Datei konnte nicht als ZIP geöffnet werden:", error);
-		throw new AttachmentError(`Die Datei "${name}" ist beschädigt oder keine gültige ${extension.toUpperCase()}-Datei.`);
+		throw new AttachmentError(t("chat.attach.officeInvalid", { name, extension: extension.toUpperCase() }));
 	}
 
 	try {
 		switch (extension) {
 			case "docx": {
 				const xml = await readZipTextFile(zip, "word/document.xml");
-				if (xml === null) throw new AttachmentError(`Die Datei "${name}" enthält kein word/document.xml - keine gültige DOCX-Datei.`);
+				if (xml === null) throw new AttachmentError(t("chat.attach.docxInvalid", { name }));
 				return officeXmlToText(xml);
 			}
 			case "pptx": {
@@ -294,16 +299,16 @@ async function officeToText(buffer: Buffer, name: string, extension: string): Pr
 				const parts: string[] = [];
 				for (const [index, filePath] of slideNames.entries()) {
 					const text = officeXmlToText((await readZipTextFile(zip, filePath)) ?? "");
-					if (text) parts.push(`--- Folie ${index + 1} ---\n${text}`);
+					if (text) parts.push(`${t("chat.attach.slideMarker", { index: index + 1 })}\n${text}`);
 				}
-				if (parts.length === 0) throw new AttachmentError(`Die Datei "${name}" enthält keinen extrahierbaren Folientext.`);
+				if (parts.length === 0) throw new AttachmentError(t("chat.attach.pptxNoText", { name }));
 				return parts.join("\n\n");
 			}
 			default: {
 				// OpenDocument (odt/ods/odp): gesamter Inhalt in content.xml
 				const xml = await readZipTextFile(zip, "content.xml");
 				if (xml === null) {
-					throw new AttachmentError(`Die Datei "${name}" enthält kein content.xml - keine gültige OpenDocument-Datei.`);
+					throw new AttachmentError(t("chat.attach.odfInvalid", { name }));
 				}
 				return officeXmlToText(xml);
 			}
@@ -311,7 +316,7 @@ async function officeToText(buffer: Buffer, name: string, extension: string): Pr
 	} catch (error) {
 		if (error instanceof AttachmentError) throw error;
 		console.warn("[ai] Office-Extraktion fehlgeschlagen:", error);
-		throw new AttachmentError(`Die Datei "${name}" konnte nicht gelesen werden (beschädigtes Office-Dokument).`);
+		throw new AttachmentError(t("chat.attach.officeReadFailed", { name }));
 	}
 }
 
@@ -322,21 +327,27 @@ async function officeToText(buffer: Buffer, name: string, extension: string): Pr
 /**
  * Verarbeitet einen Anhang: liefert extrahierten Text oder ein Bild
  * (Vision-Input). Wirft AttachmentError bei nicht unterstützten Dateitypen,
- * unlesbaren Dateien oder Überschreitung der Größenobergrenze.
+ * unlesbaren Dateien oder Überschreitung der Größenobergrenze. Die
+ * Fehlertexte folgen der Sprache des übergebenen Übersetzers (Default:
+ * Deutsch - runChat übergibt die gewählte App-Sprache).
  */
-export async function processAttachment(name: string, dataBase64: string): Promise<ProcessedAttachment> {
+export async function processAttachment(name: string, dataBase64: string, t: TranslateFn = defaultT): Promise<ProcessedAttachment> {
 	let buffer: Buffer;
 	try {
 		buffer = Buffer.from(dataBase64, "base64");
 	} catch {
-		throw new AttachmentError(`Der Anhang "${name}" ist beschädigt (ungültige Base64-Kodierung).`);
+		throw new AttachmentError(t("chat.attach.invalidBase64", { name }));
 	}
 	if (buffer.length === 0) {
-		throw new AttachmentError(`Der Anhang "${name}" ist leer.`);
+		throw new AttachmentError(t("chat.attach.empty", { name }));
 	}
 	if (buffer.length > MAX_ATTACHMENT_BYTES) {
 		throw new AttachmentError(
-			`Der Anhang "${name}" ist zu groß (${(buffer.length / 1024 / 1024).toFixed(1)} MB - erlaubt sind höchstens ${MAX_ATTACHMENT_BYTES / 1024 / 1024} MB).`
+			t("chat.attach.tooLarge", {
+				name,
+				size: (buffer.length / 1024 / 1024).toFixed(1),
+				max: MAX_ATTACHMENT_BYTES / 1024 / 1024,
+			})
 		);
 	}
 
@@ -350,27 +361,23 @@ export async function processAttachment(name: string, dataBase64: string): Promi
 
 	let text: string;
 	if (PDF_ATTACHMENT_EXTENSIONS.includes(extension)) {
-		text = await pdfToText(buffer, name);
+		text = await pdfToText(buffer, name, t);
 	} else if (EXCEL_EXTENSIONS.has(extension)) {
-		text = await excelToText(buffer, name);
+		text = await excelToText(buffer, name, t);
 	} else if (OFFICE_EXTENSIONS.has(extension)) {
-		text = await officeToText(buffer, name, extension);
+		text = await officeToText(buffer, name, extension, t);
 	} else if (TEXT_EXTENSIONS.has(extension)) {
 		text = buffer.toString("utf8");
 	} else if (extension === "xls") {
-		throw new AttachmentError(
-			`Das alte .xls-Format ("${name}") wird nicht unterstützt - bitte in Excel als .xlsx speichern und erneut anhängen.`
-		);
+		throw new AttachmentError(t("chat.attach.legacyXls", { name }));
 	} else if (extension === "doc" || extension === "ppt") {
-		throw new AttachmentError(
-			`Das alte .${extension}-Format ("${name}") wird nicht unterstützt - bitte als .${extension}x speichern und erneut anhängen.`
-		);
+		throw new AttachmentError(t("chat.attach.legacyOffice", { name, extension }));
 	} else {
-		throw new AttachmentError(`Der Dateityp von "${name}" wird nicht unterstützt. Erlaubt sind: ${SUPPORTED_TYPES_HINT}.`);
+		throw new AttachmentError(t("chat.attach.unsupportedType", { name, types: t("chat.attach.supportedTypesHint") }));
 	}
 
 	if (!text.trim()) {
-		throw new AttachmentError(`Aus der Datei "${name}" konnte kein Text extrahiert werden (leer oder nur nicht-textuelle Inhalte).`);
+		throw new AttachmentError(t("chat.attach.noTextExtracted", { name }));
 	}
-	return { kind: "text", text: truncateText(text) };
+	return { kind: "text", text: truncateText(text, t) };
 }

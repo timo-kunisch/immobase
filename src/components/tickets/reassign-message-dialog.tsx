@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { reassignTicketMessageAction } from "@/app/(app)/tickets/actions";
 import type { TicketMessage } from "@/data/types";
@@ -21,6 +22,7 @@ export interface ReassignableTicket {
 
 /** Ordnet eine bereits verknüpfte eingehende E-Mail einem anderen Ticket zu. */
 export function ReassignMessageDialog({ message, tickets }: { message: TicketMessage; tickets: ReassignableTicket[] }) {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(reassignTicketMessageAction, initialActionState);
 
@@ -38,8 +40,8 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 					variant="ghost"
 					size="icon-sm"
 					disabled={tickets.length === 0}
-					aria-label="Anderem Ticket zuordnen"
-					title="Anderem Ticket zuordnen"
+					aria-label={t("tickets.actions.reassign")}
+					title={t("tickets.actions.reassign")}
 				>
 					<Forward className="size-4 text-muted-foreground" />
 				</Button>
@@ -47,10 +49,9 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>E-Mail anderem Ticket zuordnen</DialogTitle>
+						<DialogTitle>{t("tickets.dialog.reassignTitle")}</DialogTitle>
 						<DialogDescription>
-							Die E-Mail „{message.subject ?? "(ohne Betreff)"}“ wird aus dem aktuellen Verlauf entfernt und dem ausgewählten Ticket
-							zugeordnet.
+							{t("tickets.dialog.reassignDescription", { subject: message.subject ?? t("tickets.email.noSubject") })}
 						</DialogDescription>
 					</DialogHeader>
 
@@ -58,10 +59,10 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="reassign-ticketId">Ticket *</Label>
+							<Label htmlFor="reassign-ticketId">{t("tickets.fields.ticket")} *</Label>
 							<Select name="ticketId" required>
 								<SelectTrigger id="reassign-ticketId" className="w-full">
-									<SelectValue placeholder="Ticket auswählen" />
+									<SelectValue placeholder={t("tickets.fields.ticketPlaceholder")} />
 								</SelectTrigger>
 								<SelectContent>
 									{tickets.map((ticket) => (
@@ -78,11 +79,11 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Zuordnen
+							{t("tickets.actions.assign")}
 						</Button>
 					</DialogFooter>
 				</form>

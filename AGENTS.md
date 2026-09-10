@@ -290,6 +290,10 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Action prüft selbst `requireUser()`/`requireAdmin()` (Defense-in-Depth).
 - **Authentifizierung** (eigenes System): E-Mail+Passwort, DB-Sessions über httpOnly-Cookie
   (`session_token`), Rollen `ADMIN`/`USER`. Details: Abschnitt 3.
+- **Mehrsprachigkeit** (eigenes schlankes i18n, `src/lib/i18n/`, keine externe Bibliothek):
+  Deutsch (Standard) und Englisch; Sprachwahl im Cookie `immobase_locale` (Umschalter in den
+  Einstellungen und auf den Auth-Seiten). Namespaces je Modul unter `messages/de|en/`, t() via
+  `getT()` (Server) bzw. `useI18n()` (Client); Konventionen: Abschnitt 7.
 - **`pdfkit`** (PDF-Erzeugung, `src/lib/pdf/`) über den Importpfad `"pdfkit/js/pdfkit.standalone"`
   (inline Font-Metriken – kein `fs.readFileSync` zur Laufzeit).
 - **`archiver`** (ZIP-Export) und **`yauzl`** (ZIP-Import) statt `fflate` (Streaming statt
@@ -410,6 +414,11 @@ src/
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
                             # chat.ts (Tool-Loop über die MCP-Registry)
     billing.ts              # Nebenkostenabrechnungs-Berechnung (reine Funktionen)
+    i18n/                   # Mehrsprachigkeit (de/en): config.ts (Locales/Cookie), translator.ts
+                            # (t()-Fabrik, typsichere Schlüssel), server.ts (getLocale/getT via
+                            # Cookie, NUR Server), provider.tsx (I18nProvider/useI18n, Client),
+                            # actions.ts (setLocaleAction), messages/de|en/<namespace>.ts
+                            # (flache Dictionaries je Modul; Parität per typeof + messages.test.ts)
     calendar.ts             # Kalender-Aggregation (manuelle Ereignisse + automatische Termine, reine Funktionen)
     audit.ts                # logActivity() - Helfer für das Aktivitätsprotokoll (aus Server Actions)
     hoa-*.ts                # WEG-Berechnungslogik (reine Funktionen, vitest-getestet)
@@ -532,7 +541,24 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 
 ## 7. Code-Konventionen
 
-- **Deutsche Sprache** für UI-Texte, Kommentare und Commit-Kommunikation.
+- **Deutsche Sprache** für Kommentare und Commit-Kommunikation. **UI-Texte** laufen über das
+  eigene i18n-System (`src/lib/i18n/`, Deutsch = Standard, Englisch = Alternative; Sprachwahl im
+  Cookie `immobase_locale`, Umschalter in den Einstellungen und auf den Auth-Seiten): Keine
+  hartcodierten UI-Texte mehr - jeder sichtbare Text ist ein Schlüssel im passenden
+  Modul-Namespace unter `src/lib/i18n/messages/de|en/<namespace>.ts` (flache Objekte, Subkeys
+  mit Punkten, `{platzhalter}` für Interpolation). Server Components/Actions/Route Handler:
+  `const t = await getT();` aus `@/lib/i18n/server`; Client Components: `const { t } = useI18n();`
+  aus `@/lib/i18n/provider`. Neue Schlüssel IMMER in beiden Sprachen anlegen (de = Originalwortlaut,
+  en = Übersetzung) - die Parität (Schlüsselmenge + Platzhalter) ist per `typeof de<Ns>` im
+  en-Modul compile-zeit-erzwungen und wird zusätzlich von `src/lib/i18n/messages.test.ts`
+  zur Laufzeit geprüft. Allgemeine Begriffe in `common` wiederverwenden statt duplizieren.
+  Ausnahmen (bleiben bewusst deutsch bzw. unlokalisiert): Code-Kommentare, `logActivity()`-
+  Audit-Texte und gespeicherte Protokoll-Einträge, E-Mail-Inhalte, generierte PDF-Inhalte
+  (fachlich deutsche Dokumente), MCP-Tool-Beschreibungen, Nutzerdaten, Datums-/Zahlen-/
+  Währungsformate (`src/lib/format.ts`, de-DE) sowie die Electron-Shell-Seite `connect.html`.
+  Reine Server-Libs ohne Request-Kontext (z. B. `postal-shipments.ts`, `ai/*`) erhalten die
+  Sprache über einen optionalen `t`-/`locale`-Parameter mit deutschem Default, damit Unit-Tests
+  ohne Cookie-Kontext unverändert laufen.
 - **Tabs** statt Spaces (an bestehenden Dateien orientieren).
 - **Server Actions:** Rückgabetyp `ActionState` (`src/lib/action-state.ts`) für die meisten
   Formular-Actions; eigene State-Typen in separaten Dateien ohne `"use server"` (Muster:

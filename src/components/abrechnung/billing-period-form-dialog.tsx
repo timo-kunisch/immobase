@@ -11,11 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { saveBillingPeriodAction } from "@/app/(app)/abrechnung/actions";
 import type { BillingPeriod, Property } from "@/data/types";
 
 export function BillingPeriodFormDialog({ billingPeriod, properties }: { billingPeriod?: BillingPeriod; properties: Property[] }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(billingPeriod);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveBillingPeriodAction, initialActionState);
@@ -32,31 +34,31 @@ export function BillingPeriodFormDialog({ billingPeriod, properties }: { billing
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Bearbeiten" title="Bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("common.edit")} title={t("common.edit")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button" disabled={disabled}>
 						<Plus />
-						Neue Abrechnungsperiode
+						{t("billing.periodDialog.trigger")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Abrechnungsperiode bearbeiten" : "Neue Abrechnungsperiode"}</DialogTitle>
-						<DialogDescription>Zeitraum (i. d. R. ein Kalenderjahr) für die Nebenkostenabrechnung einer Liegenschaft.</DialogDescription>
+						<DialogTitle>{isEdit ? t("billing.periodDialog.editTitle") : t("billing.periodDialog.createTitle")}</DialogTitle>
+						<DialogDescription>{t("billing.periodDialog.description")}</DialogDescription>
 					</DialogHeader>
 
 					{isEdit ? <input type="hidden" name="id" value={billingPeriod!.id} /> : null}
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="propertyId">Liegenschaft *</Label>
+							<Label htmlFor="propertyId">{t("common.property")} *</Label>
 							<Select name="propertyId" defaultValue={billingPeriod?.propertyId ?? properties[0]?.id} required>
 								<SelectTrigger id="propertyId" className="w-full">
-									<SelectValue placeholder="Liegenschaft auswählen" />
+									<SelectValue placeholder={t("billing.fields.propertyPlaceholder")} />
 								</SelectTrigger>
 								<SelectContent>
 									{properties.map((property) => (
@@ -70,18 +72,18 @@ export function BillingPeriodFormDialog({ billingPeriod, properties }: { billing
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="periodFrom">Zeitraum von *</Label>
+								<Label htmlFor="periodFrom">{t("billing.fields.periodFrom")} *</Label>
 								<Input id="periodFrom" name="periodFrom" type="date" defaultValue={toDateInputValue(billingPeriod?.periodFrom)} required />
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="periodTo">Zeitraum bis *</Label>
+								<Label htmlFor="periodTo">{t("billing.fields.periodTo")} *</Label>
 								<Input id="periodTo" name="periodTo" type="date" defaultValue={toDateInputValue(billingPeriod?.periodTo)} required />
 							</div>
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="notes">Notizen</Label>
-							<Textarea id="notes" name="notes" placeholder="Optionale interne Anmerkungen" defaultValue={billingPeriod?.notes ?? ""} />
+							<Label htmlFor="notes">{t("common.notes")}</Label>
+							<Textarea id="notes" name="notes" placeholder={t("billing.fields.notesPlaceholder")} defaultValue={billingPeriod?.notes ?? ""} />
 						</div>
 
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -89,11 +91,11 @@ export function BillingPeriodFormDialog({ billingPeriod, properties }: { billing
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

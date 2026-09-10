@@ -9,6 +9,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CustomAllocationKeyFormDialog } from "@/components/weg/custom-allocation-key-form-dialog";
 import { CustomAllocationWeightsDialog } from "@/components/weg/custom-allocation-weights-dialog";
 import { HoaFilter } from "@/components/weg/hoa-filter";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteCustomAllocationKeyAction } from "./actions";
 
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 
 export default async function VerteilerschluesselPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const { hoaId } = await searchParams;
+	const t = await getT();
 
 	// WEGs für den Filter alphabetisch (bisher per SQL ORDER BY name, jetzt im
 	// Anschluss an listHoasWithProperty() sortiert - Code-Unit-Vergleich
@@ -25,9 +27,9 @@ export default async function VerteilerschluesselPage({ searchParams }: { search
 	if (hoaList.length === 0) {
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Verteilerschlüssel" description="Frei definierte Verteilerschlüssel je WEG." />
+				<SiteHeader title={t("hoa.allocationKeys.title")} description={t("hoa.allocationKeys.description")} />
 				<div className="flex-1 p-4 sm:p-6">
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+					<p className="text-sm text-muted-foreground">{t("hoa.noHoa")}</p>
 				</div>
 			</div>
 		);
@@ -43,36 +45,33 @@ export default async function VerteilerschluesselPage({ searchParams }: { search
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Verteilerschlüssel"
-				description="Frei definierte Verteilerschlüssel je WEG."
+				title={t("hoa.allocationKeys.title")}
+				description={t("hoa.allocationKeys.description")}
 				actions={selectedHoa ? <CustomAllocationKeyFormDialog hoaId={selectedHoa.id} /> : undefined}
 			/>
 
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/verteilerschluessel" />
 
-				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
-					Neben den festen Verteilerschlüsseln (Miteigentumsanteile, Wohnfläche, Einheiten, Verbrauch, direkte Zuordnung) können hier zusätzliche, frei definierte Verteilerschlüssel
-					angelegt werden (z. B. „Anzahl Stellplätze“). Diese stehen anschließend bei Kostenpositionen im Wirtschaftsplan und der Jahresabrechnung zur Auswahl.
-				</div>
+				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">{t("hoa.allocationKeys.info")}</div>
 
 				{!selectedHoa ? (
-					<p className="text-sm text-muted-foreground">Wählen Sie oben eine WEG aus, um Verteilerschlüssel anzulegen oder zu bearbeiten.</p>
+					<p className="text-sm text-muted-foreground">{t("hoa.allocationKeys.selectHoa")}</p>
 				) : (
 					<Card>
 						<CardContent className="p-0">
 							{customAllocationKeys.length === 0 ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 									<Scale className="size-8" />
-									<p>Noch keine frei definierten Verteilerschlüssel angelegt.</p>
+									<p>{t("hoa.allocationKeys.empty")}</p>
 								</div>
 							) : (
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Bezeichnung</TableHead>
-											<TableHead>Notizen</TableHead>
-											<TableHead className="w-[120px] text-right">Aktionen</TableHead>
+											<TableHead>{t("hoa.table.name")}</TableHead>
+											<TableHead>{t("common.notes")}</TableHead>
+											<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -84,7 +83,7 @@ export default async function VerteilerschluesselPage({ searchParams }: { search
 													<div className="flex items-center justify-end gap-1">
 														<CustomAllocationWeightsDialog hoaId={selectedHoa.id} customAllocationKeyId={key.id} customAllocationKeyLabel={key.label} units={units} weights={key.weights} />
 														<CustomAllocationKeyFormDialog hoaId={selectedHoa.id} customAllocationKey={key} />
-														<ConfirmDeleteButton action={deleteCustomAllocationKeyAction.bind(null, key.id, selectedHoa.id)} confirmMessage={`Verteilerschlüssel "${key.label}" wirklich löschen?`} />
+														<ConfirmDeleteButton action={deleteCustomAllocationKeyAction.bind(null, key.id, selectedHoa.id)} confirmMessage={t("hoa.allocationKeys.confirm.delete", { name: key.label })} />
 													</div>
 												</TableCell>
 											</TableRow>

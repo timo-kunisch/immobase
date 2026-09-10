@@ -233,11 +233,3 @@ export function calculateHoaAllocationResult(period: HoaAllocationPeriodInput): 
 // Beschriftungen (für UI, analog zu src/lib/billing.ts)
 // ============================================================
 
-export const hoaAllocationKeyLabels: Record<HoaAllocationKey, string> = {
-	MEA: "Miteigentumsanteile (MEA)",
-	LIVING_SPACE: "Wohnfläche",
-	UNITS: "Einheiten",
-	CONSUMPTION: "Verbrauch",
-	DIRECT: "Direkte Zuordnung",
-	CUSTOM: "Frei definierter Schlüssel",
-};

@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { destroyAllSessionsForUser } from "@/lib/auth/session";
 import { isSmtpConfigured, sendAccountApprovedEmail } from "@/lib/email/mailer";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 
 /**
@@ -21,14 +22,15 @@ import { ActionState } from "@/lib/action-state";
  */
 export async function toggleUserApprovalAction(userId: string, isApproved: boolean): Promise<ActionState> {
 	const admin = await requireAdmin();
+	const t = await getT();
 
 	if (userId === admin.id) {
-		return { error: "Sie können Ihren eigenen Freigabestatus nicht ändern." };
+		return { error: t("admin.users.errors.selfToggle") };
 	}
 
 	const targetUser = getUserById(userId);
 	if (!targetUser) {
-		return { error: "Nutzer nicht gefunden." };
+		return { error: t("admin.users.errors.notFound") };
 	}
 
 	updateUserApproval(userId, isApproved);
@@ -55,8 +57,7 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 			revalidatePath("/admin/users");
 			return {
 				success: true,
-				message:
-					"Freigabe erteilt. Hinweis: Es ist kein E-Mail-Server konfiguriert (Einstellungen → Integrationen & KI) - der Nutzer wurde nicht per E-Mail benachrichtigt.",
+				message: t("admin.users.success.approvedWithoutEmail"),
 			};
 		}
 		// Best-effort-Benachrichtigung, Fehler beim Mailversand sollen die

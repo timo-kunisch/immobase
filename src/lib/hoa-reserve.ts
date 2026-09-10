@@ -81,11 +81,6 @@ export function buildReserveFundLedger(bookings: ReserveFundBookingWithDescripti
 	});
 }
 
-export const reserveFundBookingTypeLabels: Record<ReserveFundBookingType, string> = {
-	CONTRIBUTION: "Zuführung",
-	WITHDRAWAL: "Entnahme",
-};
-
 // ============================================================
 // Vermögensbericht (§ 28 Abs. 4 WEG)
 // ============================================================

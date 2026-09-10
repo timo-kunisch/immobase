@@ -85,11 +85,6 @@ export function calculateAnnualStatementResult(period: HoaAllocationPeriodInput,
 	return { ownerResults, warnings: allocation.warnings };
 }
 
-export const annualStatementStatusLabels: Record<AnnualStatementStatus, string> = {
-	DRAFT: "Entwurf",
-	FINALIZED: "Finalisiert",
-};
-
 export const annualStatementStatusStyles: Record<AnnualStatementStatus, string> = {
 	DRAFT: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
 	FINALIZED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",

@@ -8,10 +8,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { generateHousingChargesAction } from "@/app/(app)/weg/wirtschaftsplan/actions";
 
 export function GenerateHousingChargesDialog({ economicPlanId, hoaId }: { economicPlanId: string; hoaId: string }) {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(generateHousingChargesAction, initialActionState);
 
@@ -20,30 +22,27 @@ export function GenerateHousingChargesDialog({ economicPlanId, hoaId }: { econom
 			<DialogTrigger asChild>
 				<Button type="button" variant="outline">
 					<CalendarClock />
-					Hausgeld fällig stellen
+					{t("hoaFinance.charges.actions.generate")}
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				{state.success ? (
 					<>
 						<DialogHeader>
-							<DialogTitle>Fällig gestellt</DialogTitle>
+							<DialogTitle>{t("hoaFinance.charges.dialog.generatedTitle")}</DialogTitle>
 							<DialogDescription>{state.message}</DialogDescription>
 						</DialogHeader>
 						<DialogFooter>
 							<Button type="button" onClick={() => setOpen(false)}>
-								Schließen
+								{t("common.close")}
 							</Button>
 						</DialogFooter>
 					</>
 				) : (
 					<form action={formAction}>
 						<DialogHeader>
-							<DialogTitle>Hausgeld für dieses Geschäftsjahr fällig stellen</DialogTitle>
-							<DialogDescription>
-								Legt für jede Einheit und jeden Monat des Geschäftsjahres eine Hausgeld-Sollstellung anhand des Einzelwirtschaftsplans an. Der Eigentümer wird je Monat aus den
-								erfassten Eigentumsverhältnissen ermittelt (unterjähriger Wechsel wird berücksichtigt). Bereits vorhandene Sollstellungen werden nicht doppelt angelegt.
-							</DialogDescription>
+							<DialogTitle>{t("hoaFinance.charges.dialog.generateTitle")}</DialogTitle>
+							<DialogDescription>{t("hoaFinance.charges.dialog.generateDescription")}</DialogDescription>
 						</DialogHeader>
 
 						<input type="hidden" name="economicPlanId" value={economicPlanId} />
@@ -51,20 +50,20 @@ export function GenerateHousingChargesDialog({ economicPlanId, hoaId }: { econom
 
 						<div className="grid gap-4 py-4">
 							<div className="grid gap-2">
-								<Label htmlFor="dueDay">Fällig jeweils am (Tag des Monats) *</Label>
+								<Label htmlFor="dueDay">{t("hoaFinance.charges.fields.dueDay")} *</Label>
 								<Input id="dueDay" name="dueDay" type="number" min="1" max="28" defaultValue="3" required />
-								<p className="text-xs text-muted-foreground">Tag zwischen 1 und 28, um für jeden Monat ein gültiges Datum zu garantieren.</p>
+								<p className="text-xs text-muted-foreground">{t("hoaFinance.charges.fields.dueDayHint")}</p>
 							</div>
 							{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 						</div>
 
 						<DialogFooter>
 							<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-								Abbrechen
+								{t("common.cancel")}
 							</Button>
 							<Button type="submit" disabled={isPending}>
 								{isPending ? <Loader2 className="animate-spin" /> : null}
-								Fällig stellen
+								{t("hoaFinance.charges.actions.makeDue")}
 							</Button>
 						</DialogFooter>
 					</form>

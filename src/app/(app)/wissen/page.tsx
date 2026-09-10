@@ -8,10 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { ArticleFormDialog } from "@/components/wissen/article-form-dialog";
 import { ArticleSearchForm } from "@/components/wissen/article-search-form";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
 
 export default async function WissenPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+	const t = await getT();
 	const { q } = await searchParams;
 	const search = q?.trim() ?? "";
 
@@ -21,8 +23,8 @@ export default async function WissenPage({ searchParams }: { searchParams: Promi
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Wissensdatenbank"
-				description="Richtlinien, Anweisungen und Erklärungen hinterlegen und nachschlagen."
+				title={t("knowledge.title")}
+				description={t("knowledge.description")}
 				actions={<ArticleFormDialog categories={categories} />}
 			/>
 
@@ -31,9 +33,9 @@ export default async function WissenPage({ searchParams }: { searchParams: Promi
 					<ArticleSearchForm defaultValue={search || undefined} />
 					{search ? (
 						<p className="text-sm text-muted-foreground">
-							Suche nach: <span className="font-medium text-foreground">{search}</span> ·{" "}
+							{t("knowledge.search.label")} <span className="font-medium text-foreground">{search}</span> ·{" "}
 							<Link href="/wissen" className="text-primary hover:underline">
-								Suche zurücksetzen
+								{t("knowledge.search.reset")}
 							</Link>
 						</p>
 					) : null}
@@ -43,7 +45,7 @@ export default async function WissenPage({ searchParams }: { searchParams: Promi
 					<Card>
 						<CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
 							<BookOpen className="size-8" />
-							<p>{search ? "Keine Artikel gefunden." : "Noch keine Artikel hinterlegt."}</p>
+							<p>{search ? t("knowledge.empty.noResults") : t("knowledge.empty.noArticles")}</p>
 						</CardContent>
 					</Card>
 				) : (
@@ -61,9 +63,11 @@ export default async function WissenPage({ searchParams }: { searchParams: Promi
 								<CardContent className="flex flex-col gap-3">
 									<p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">{article.content}</p>
 									<div className="flex items-center justify-between gap-2">
-										<span className="text-xs text-muted-foreground">Aktualisiert: {formatDate(article.updatedAt)}</span>
+										<span className="text-xs text-muted-foreground">
+											{t("knowledge.updatedAt", { date: formatDate(article.updatedAt) })}
+										</span>
 										<Link href={`/wissen/${article.id}`} className="text-xs text-primary hover:underline">
-											Lesen →
+											{t("knowledge.actions.read")}
 										</Link>
 									</div>
 								</CardContent>

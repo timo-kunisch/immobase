@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { FileStack, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n/provider";
 import { generateAllBillingStatementPdfsAction } from "@/app/(app)/abrechnung/actions";
 
 /**
@@ -12,6 +13,7 @@ import { generateAllBillingStatementPdfsAction } from "@/app/(app)/abrechnung/ac
  * Massenversands) - siehe generateAllBillingStatementPdfsAction.
  */
 export function GenerateAllStatementPdfsButton({ billingPeriodId }: { billingPeriodId: string }) {
+	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 	const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +31,7 @@ export function GenerateAllStatementPdfsButton({ billingPeriodId }: { billingPer
 		<div className="flex flex-col items-end gap-1">
 			<Button type="button" variant="outline" size="sm" onClick={handleClick} disabled={isPending}>
 				{isPending ? <Loader2 className="animate-spin" /> : <FileStack />}
-				Alle PDFs erzeugen
+				{t("billing.actions.generateAllPdfs")}
 			</Button>
 			{error ? <span className="text-xs text-destructive">{error}</span> : null}
 		</div>

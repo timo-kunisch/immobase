@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n/provider";
 import type { Property } from "@/data/types";
 
 const ALL_VALUE = "all";
 
 export function BillingPropertyFilter({ properties, value }: { properties: Property[]; value?: string }) {
+	const { t } = useI18n();
 	const router = useRouter();
 
 	return (
@@ -18,10 +20,10 @@ export function BillingPropertyFilter({ properties, value }: { properties: Prope
 			}}
 		>
 			<SelectTrigger className="w-full sm:w-64">
-				<SelectValue placeholder="Alle Liegenschaften" />
+				<SelectValue placeholder={t("billing.filter.allProperties")} />
 			</SelectTrigger>
 			<SelectContent>
-				<SelectItem value={ALL_VALUE}>Alle Liegenschaften</SelectItem>
+				<SelectItem value={ALL_VALUE}>{t("billing.filter.allProperties")}</SelectItem>
 				{properties.map((property) => (
 					<SelectItem key={property.id} value={property.id}>
 						{property.name}

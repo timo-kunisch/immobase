@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 export interface AiCardState {
 	baseUrl: string;
@@ -22,10 +23,11 @@ export interface AiCardState {
 
 function SubmitButton() {
 	const { pending } = useFormStatus();
+	const { t } = useI18n();
 	return (
 		<Button type="submit" disabled={pending}>
 			{pending ? <Loader2 className="animate-spin" /> : <Save />}
-			Speichern
+			{t("common.save")}
 		</Button>
 	);
 }
@@ -41,6 +43,7 @@ function SubmitButton() {
  * den übrigen Geheimnissen) - leeres Feld = unverändert lassen.
  */
 export function AiCard({ state }: { state: AiCardState }) {
+	const { t } = useI18n();
 	const [formState, formAction] = useActionState(saveAiSettingsAction, initialActionState);
 	// Nach dem Speichern muss die Seite neu geladen werden, damit die Sidebar
 	// den (geänderten) Freigabestatus der Sprechblase übernimmt (Muster wie
@@ -61,75 +64,70 @@ export function AiCard({ state }: { state: AiCardState }) {
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<Sparkles className="size-5" />
-					KI-Assistent (OpenAI-kompatibel)
+					{t("settings.cards.ai.title")}
 				</CardTitle>
 				<CardDescription>
-					Verbindet den KI-Assistenten (Sprechblase in der Sidebar) mit einem OpenAI-kompatiblen
-					Chat-Endpunkt - z. B. OpenAI, ein kompatibles Gateway oder ein lokaler Server (LM Studio, Ollama). Der
-					Assistent kann über die Werkzeuge des MCP-Servers Daten der Anwendung lesen und ändern. Ohne
-					Konfiguration ist die Sprechblase deaktiviert.
+					{t("settings.cards.ai.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<dl className="space-y-1 text-sm">
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Status</dt>
-						<dd>{state.configured ? "Konfiguriert - Assistent freigegeben" : "Nicht konfiguriert - Assistent deaktiviert"}</dd>
+						<dt className="text-muted-foreground">{t("settings.cards.ai.statusLabel")}</dt>
+						<dd>{state.configured ? t("settings.cards.ai.status.configured") : t("settings.cards.ai.status.notConfigured")}</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">API-Schlüssel</dt>
-						<dd>{state.apiKeySet ? "hinterlegt" : "nicht hinterlegt (optional)"}</dd>
+						<dt className="text-muted-foreground">{t("settings.cards.ai.apiKeyStatus")}</dt>
+						<dd>{state.apiKeySet ? t("settings.cards.ai.apiKeyStatus.set") : t("settings.cards.ai.apiKeyStatus.notSet")}</dd>
 					</div>
 				</dl>
 
-				<Guide title="Anleitung: KI-Assistenten einrichten">
-					<GuideStep step={1} title="Anbieter wählen">
+				<Guide title={t("settings.cards.ai.guide.title")}>
+					<GuideStep step={1} title={t("settings.cards.ai.guide.step1.title")}>
 						<p>
-							Entweder ein KI-Anbieter in der Cloud (z. B. OpenAI - kostenpflichtig nach Verbrauch) oder ein
-							lokales Modell auf diesem Rechner (z. B. mit LM Studio oder Ollama - kostenlos, die Daten bleiben
-							auf dem eigenen Gerät).
+							{t("settings.cards.ai.guide.step1.body")}
 						</p>
 					</GuideStep>
-					<GuideStep step={2} title="Zugang vorbereiten">
+					<GuideStep step={2} title={t("settings.cards.ai.guide.step2.title")}>
 						<p>
-							<strong>OpenAI:</strong> Auf <code className="rounded bg-muted px-1 py-0.5 text-xs">platform.openai.com</code>{" "}
-							unter „API keys“ einen neuen Schlüssel erzeugen (beginnt mit „sk-…“).
+							<strong>OpenAI:</strong> {t("settings.cards.ai.guide.step2.openai.part1")}{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">platform.openai.com</code>{" "}
+							{t("settings.cards.ai.guide.step2.openai.part2")}
 						</p>
 						<p>
-							<strong>LM Studio:</strong> Programm installieren, ein Modell herunterladen und darin den lokalen
-							Server starten (Standard-Adresse:{" "}
-							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>).
-						</p>
-					</GuideStep>
-					<GuideStep step={3} title="Basis-URL und Modell eintragen">
-						<p>
-							OpenAI: <code className="rounded bg-muted px-1 py-0.5 text-xs">https://api.openai.com/v1</code> und
-							z. B. <code className="rounded bg-muted px-1 py-0.5 text-xs">gpt-4o-mini</code>. LM Studio:{" "}
-							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code> und den Namen
-							des geladenen Modells.
-						</p>
-						<p>
-							Wichtig: Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen - sonst kann der
-							Assistent nicht auf die App-Daten zugreifen.
+							<strong>LM Studio:</strong> {t("settings.cards.ai.guide.step2.lmStudio.part1")}{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>
+							{t("settings.cards.ai.guide.step2.lmStudio.part2")}
 						</p>
 					</GuideStep>
-					<GuideStep step={4} title="API-Schlüssel eintragen">
+					<GuideStep step={3} title={t("settings.cards.ai.guide.step3.title")}>
 						<p>
-							Bei OpenAI den erzeugten Schlüssel einfügen (wird verschlüsselt gespeichert). Bei einem lokalen
-							Server das Feld einfach leer lassen.
+							OpenAI: <code className="rounded bg-muted px-1 py-0.5 text-xs">https://api.openai.com/v1</code>{" "}
+							{t("settings.cards.ai.guide.step3.andExample")}{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">gpt-4o-mini</code>
+							{t("settings.cards.ai.guide.step3.lmStudio")}{" "}
+							<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>{" "}
+							{t("settings.cards.ai.guide.step3.modelName")}
+						</p>
+						<p>
+							{t("settings.cards.ai.guide.step3.toolCalling")}
 						</p>
 					</GuideStep>
-					<GuideStep step={5} title="Speichern und ausprobieren">
+					<GuideStep step={4} title={t("settings.cards.ai.guide.step4.title")}>
 						<p>
-							Nach dem Speichern wird die Sprechblase unten in der Seitenleiste aktiv. Ein erster Test: „Welche
-							Liegenschaften sind angelegt?“
+							{t("settings.cards.ai.guide.step4.body")}
+						</p>
+					</GuideStep>
+					<GuideStep step={5} title={t("settings.cards.ai.guide.step5.title")}>
+						<p>
+							{t("settings.cards.ai.guide.step5.body")}
 						</p>
 					</GuideStep>
 				</Guide>
 
 				<form action={formAction} className="space-y-4">
 					<div className="grid gap-2">
-						<Label htmlFor="aiBaseUrl">Basis-URL des Endpunkts</Label>
+						<Label htmlFor="aiBaseUrl">{t("settings.cards.ai.baseUrl")}</Label>
 						<Input
 							id="aiBaseUrl"
 							name="aiBaseUrl"
@@ -138,31 +136,27 @@ export function AiCard({ state }: { state: AiCardState }) {
 							autoComplete="off"
 						/>
 						<p className="text-xs text-muted-foreground">
-							Ohne Pfad „/chat/completions“ - dieser wird automatisch angehängt. Basis-URL und Modell gemeinsam
-							leeren, um den Assistenten zu deaktivieren.
+							{t("settings.cards.ai.baseUrlHint")}
 						</p>
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="aiModel">Modell</Label>
+						<Label htmlFor="aiModel">{t("settings.cards.ai.model")}</Label>
 						<Input id="aiModel" name="aiModel" defaultValue={state.model} placeholder="gpt-4o-mini" autoComplete="off" />
 						<p className="text-xs text-muted-foreground">
-							Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen, damit der Assistent auf die
-							App-Daten zugreifen kann. Für angehängte Bilder ist zusätzlich ein multimodales („vision“-fähiges)
-							Modell nötig.
+							{t("settings.cards.ai.modelHint")}
 						</p>
 					</div>
 					<div className="grid gap-2">
-						<Label htmlFor="aiApiKey">API-Schlüssel (optional)</Label>
+						<Label htmlFor="aiApiKey">{t("settings.cards.ai.apiKey")}</Label>
 						<Input
 							id="aiApiKey"
 							name="aiApiKey"
 							type="password"
-							placeholder={state.apiKeySet ? "hinterlegt - leer lassen, um ihn beizubehalten" : "sk-..."}
+							placeholder={state.apiKeySet ? t("settings.cards.ai.apiKeyPlaceholderSet") : "sk-..."}
 							autoComplete="new-password"
 						/>
 						<p className="text-xs text-muted-foreground">
-							Wird verschlüsselt gespeichert. Lokale Endpunkte (z. B. LM Studio, Ollama) kommen meist ohne
-							Schlüssel aus.
+							{t("settings.cards.ai.apiKeyHint")}
 						</p>
 					</div>
 
@@ -170,7 +164,7 @@ export function AiCard({ state }: { state: AiCardState }) {
 						<SubmitButton />
 						{formState.error ? <p className="text-sm text-destructive">{formState.error}</p> : null}
 						{formState.success ? (
-							<p className="text-sm text-emerald-600">Gespeichert. Die Seite wird neu geladen.</p>
+							<p className="text-sm text-emerald-600">{t("settings.cards.ai.savedReload")}</p>
 						) : null}
 					</div>
 				</form>
@@ -178,11 +172,7 @@ export function AiCard({ state }: { state: AiCardState }) {
 				<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
 					<ShieldAlert className="mt-0.5 size-4 shrink-0" />
 					<span>
-						Der Assistent erhält über die MCP-Werkzeuge Lese- UND Schreibzugriff auf die Daten (inkl. Löschen
-						und Finalisieren) und steht allen angemeldeten Nutzern offen - normale Nutzer dabei ohne
-						Administrations-Funktionen (Nutzerverwaltung, Absenderdaten). Anfragen samt anfragbarem
-						Datenbestand werden an den konfigurierten Endpunkt übertragen: Nutzen Sie einen Anbieter, dem Sie
-						Ihre Daten anvertrauen wollen (alternativ ein lokales Modell).
+						{t("settings.cards.ai.warning")}
 					</span>
 				</p>
 			</CardContent>

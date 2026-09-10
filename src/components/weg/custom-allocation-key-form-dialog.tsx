@@ -9,11 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { saveCustomAllocationKeyAction } from "@/app/(app)/weg/verteilerschluessel/actions";
 import type { HoaCustomAllocationKey as CustomAllocationKey } from "@/data/types";
 
 export function CustomAllocationKeyFormDialog({ hoaId, customAllocationKey }: { hoaId: string; customAllocationKey?: CustomAllocationKey }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(customAllocationKey);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveCustomAllocationKeyAction, initialActionState);
@@ -28,21 +30,21 @@ export function CustomAllocationKeyFormDialog({ hoaId, customAllocationKey }: { 
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Bearbeiten" title="Bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("common.edit")} title={t("common.edit")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button" size="sm" variant="outline">
 						<Plus />
-						Neuer Verteilerschlüssel
+						{t("hoa.allocationKeys.actions.create")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Verteilerschlüssel bearbeiten" : "Neuer frei definierter Verteilerschlüssel"}</DialogTitle>
-						<DialogDescription>Die Gewichte je Einheit werden nach dem Speichern erfasst.</DialogDescription>
+						<DialogTitle>{isEdit ? t("hoa.allocationKeys.dialog.editTitle") : t("hoa.allocationKeys.dialog.createTitle")}</DialogTitle>
+						<DialogDescription>{t("hoa.allocationKeys.dialog.description")}</DialogDescription>
 					</DialogHeader>
 
 					<input type="hidden" name="hoaId" value={hoaId} />
@@ -50,11 +52,11 @@ export function CustomAllocationKeyFormDialog({ hoaId, customAllocationKey }: { 
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="label">Bezeichnung *</Label>
-							<Input id="label" name="label" placeholder="z. B. Anzahl Stellplätze" defaultValue={customAllocationKey?.label} required />
+							<Label htmlFor="label">{t("hoa.fields.name")} *</Label>
+							<Input id="label" name="label" placeholder={t("hoa.allocationKeys.placeholder.label")} defaultValue={customAllocationKey?.label} required />
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="notes">Notizen</Label>
+							<Label htmlFor="notes">{t("common.notes")}</Label>
 							<Textarea id="notes" name="notes" defaultValue={customAllocationKey?.notes ?? ""} />
 						</div>
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -62,11 +64,11 @@ export function CustomAllocationKeyFormDialog({ hoaId, customAllocationKey }: { 
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

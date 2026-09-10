@@ -10,7 +10,8 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { AnnualStatementFormDialog } from "@/components/weg/annual-statement-form-dialog";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatDate } from "@/lib/format";
-import { annualStatementStatusLabels, annualStatementStatusStyles } from "@/lib/hoa-annual-statement";
+import { annualStatementStatusStyles } from "@/lib/hoa-annual-statement";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteAnnualStatementAction } from "./actions";
 
@@ -18,15 +19,16 @@ export const dynamic = "force-dynamic";
 
 export default async function JahresabrechnungListPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const { hoaId } = await searchParams;
+	const t = await getT();
 
 	const hoaList = listHoasSortedByName();
 
 	if (hoaList.length === 0) {
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Jahresabrechnungen" description="Jahresabrechnungen je WEG und Abrechnungszeitraum." />
+				<SiteHeader title={t("hoaStatement.title")} description={t("hoaStatement.description")} />
 				<div className="flex-1 p-4 sm:p-6">
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+					<p className="text-sm text-muted-foreground">{t("hoaStatement.empty.noHoa")}</p>
 				</div>
 			</div>
 		);
@@ -39,8 +41,8 @@ export default async function JahresabrechnungListPage({ searchParams }: { searc
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title="Jahresabrechnungen"
-				description="Jahresabrechnungen je WEG und Abrechnungszeitraum."
+				title={t("hoaStatement.title")}
+				description={t("hoaStatement.description")}
 				actions={selectedHoa ? <AnnualStatementFormDialog hoaId={selectedHoa.id} /> : undefined}
 			/>
 
@@ -52,16 +54,16 @@ export default async function JahresabrechnungListPage({ searchParams }: { searc
 						{statementList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Noch keine Jahresabrechnungen angelegt.</p>
+								<p>{t("hoaStatement.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										{!selectedHoa ? <TableHead>WEG</TableHead> : null}
-										<TableHead>Zeitraum</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="w-[140px] text-right">Aktionen</TableHead>
+										{!selectedHoa ? <TableHead>{t("hoaStatement.table.hoa")}</TableHead> : null}
+										<TableHead>{t("hoaStatement.table.period")}</TableHead>
+										<TableHead>{t("common.status")}</TableHead>
+										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -73,18 +75,18 @@ export default async function JahresabrechnungListPage({ searchParams }: { searc
 											</TableCell>
 											<TableCell>
 												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${annualStatementStatusStyles[statement.status]}`}>
-													{annualStatementStatusLabels[statement.status]}
+													{t(`hoaStatement.status.${statement.status}`)}
 												</span>
 											</TableCell>
 											<TableCell>
 												<div className="flex items-center justify-end gap-1">
-													<Button variant="ghost" size="icon-sm" aria-label="Details" title="Details" asChild>
+													<Button variant="ghost" size="icon-sm" aria-label={t("common.details")} title={t("common.details")} asChild>
 														<Link href={`/weg/jahresabrechnung/${statement.id}`}>
 															<ChevronRight className="size-4" />
 														</Link>
 													</Button>
 													{statement.status === "DRAFT" ? (
-														<ConfirmDeleteButton action={deleteAnnualStatementAction.bind(null, statement.id, statement.hoaId)} confirmMessage="Diese Jahresabrechnung wirklich löschen?" />
+														<ConfirmDeleteButton action={deleteAnnualStatementAction.bind(null, statement.id, statement.hoaId)} confirmMessage={t("hoaStatement.confirm.delete")} />
 													) : null}
 												</div>
 											</TableCell>

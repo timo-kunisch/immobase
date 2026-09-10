@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createBackupZipStream, exportBackup } from "@/data/backup";
 import { requireAdmin } from "@/lib/auth/dal";
 import { MIN_BACKUP_PASSWORD_LENGTH } from "@/lib/backup-crypto";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Backup-Export (vollständige Anwendungsdaten: data.db + files/ + manifest
@@ -46,17 +47,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
 	await requireAdmin();
+	const t = await getT();
 
 	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
-		return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
+		return NextResponse.json({ error: t("settings.backup.errors.invalidRequest") }, { status: 400 });
 	}
 
 	const targetPath = typeof (body as { targetPath?: unknown })?.targetPath === "string" ? (body as { targetPath: string }).targetPath : null;
 	if (!targetPath) {
-		return NextResponse.json({ error: "Zielpfad fehlt." }, { status: 400 });
+		return NextResponse.json({ error: t("settings.backup.errors.targetPathMissing") }, { status: 400 });
 	}
 	const password =
 		typeof (body as { password?: unknown })?.password === "string" && (body as { password: string }).password.length > 0
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
 			: null;
 	if (password !== null && password.length < MIN_BACKUP_PASSWORD_LENGTH) {
 		return NextResponse.json(
-			{ error: `Das Passwort muss mindestens ${MIN_BACKUP_PASSWORD_LENGTH} Zeichen lang sein.` },
+			{ error: t("settings.errors.passwordTooShort", { min: MIN_BACKUP_PASSWORD_LENGTH }) },
 			{ status: 400 }
 		);
 	}
@@ -75,7 +77,7 @@ export async function POST(request: Request) {
 	} catch (error) {
 		console.error("Backup-Export fehlgeschlagen", error);
 		return NextResponse.json(
-			{ error: `Export fehlgeschlagen: ${error instanceof Error ? error.message : String(error)}` },
+			{ error: t("settings.backup.errors.exportFailed", { error: error instanceof Error ? error.message : String(error) }) },
 			{ status: 500 }
 		);
 	}

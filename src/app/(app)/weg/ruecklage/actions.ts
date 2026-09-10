@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createReserveFundBooking, deleteReserveFundBooking, updateReserveFundBooking } from "@/data/reserve-fund";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { getString, getDecimalString } from "@/lib/form-data";
 import type { ReserveFundBookingType } from "@/data/types";
@@ -13,6 +14,7 @@ const RESERVE_FUND_BOOKING_TYPES: ReserveFundBookingType[] = ["CONTRIBUTION", "W
 
 export async function saveReserveFundBookingAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const hoaId = getString(formData, "hoaId");
 	const bookingDateRaw = getString(formData, "bookingDate");
@@ -22,13 +24,13 @@ export async function saveReserveFundBookingAction(_prevState: ActionState, form
 	const notes = getString(formData, "notes");
 
 	if (!hoaId || !bookingDateRaw || amount === null || !description) {
-		return { error: "Bitte Datum, Betrag und Bezeichnung der Buchung angeben." };
+		return { error: t("hoaFinance.reserve.errors.requiredFields") };
 	}
 	if (!RESERVE_FUND_BOOKING_TYPES.includes(typeRaw)) {
-		return { error: "Ungültige Buchungsart." };
+		return { error: t("hoaFinance.reserve.errors.invalidType") };
 	}
 	if (Number(amount) <= 0) {
-		return { error: "Der Betrag muss größer als 0 sein (die Buchungsart bestimmt das Vorzeichen)." };
+		return { error: t("hoaFinance.reserve.errors.amountPositive") };
 	}
 
 	const data = {
@@ -50,7 +52,7 @@ export async function saveReserveFundBookingAction(_prevState: ActionState, form
 		}
 	} catch (error) {
 		console.error("saveReserveFundBookingAction failed", error);
-		return { error: "Die Buchung konnte nicht gespeichert werden." };
+		return { error: t("hoaFinance.reserve.errors.saveFailed") };
 	}
 
 	revalidatePath(`/weg/ruecklage`);
@@ -59,11 +61,12 @@ export async function saveReserveFundBookingAction(_prevState: ActionState, form
 
 export async function deleteReserveFundBookingAction(id: string, _hoaId: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		deleteReserveFundBooking(id);
 	} catch (error) {
 		console.error("deleteReserveFundBookingAction failed", error);
-		return { error: "Die Buchung konnte nicht gelöscht werden." };
+		return { error: t("hoaFinance.reserve.errors.deleteFailed") };
 	}
 
 	// Es gibt keine getX-Funktion für eine einzelne Buchung - Fallback auf die ID.

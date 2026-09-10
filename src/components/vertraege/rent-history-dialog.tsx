@@ -10,6 +10,7 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { RentAdjustmentFormDialog } from "@/components/vertraege/rent-adjustment-form-dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { buildRentHistory } from "@/lib/rent-history";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { deleteRentAdjustmentAction } from "@/app/(app)/vertraege/actions";
 import type { Lease, RentAdjustment } from "@/data/types";
@@ -17,6 +18,7 @@ import type { Lease, RentAdjustment } from "@/data/types";
 type LeaseRentFields = Pick<Lease, "id" | "startDate" | "coldRent" | "serviceCharges">;
 
 export function RentHistoryDialog({ lease, adjustments, hasAdjustments }: { lease: LeaseRentFields; adjustments: RentAdjustment[]; hasAdjustments: boolean }) {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	const history = buildRentHistory(lease, adjustments);
 
@@ -26,8 +28,8 @@ export function RentHistoryDialog({ lease, adjustments, hasAdjustments }: { leas
 				<Button
 					variant="ghost"
 					size="icon-sm"
-					aria-label="Verlauf der Miete/Nebenkosten"
-					title={hasAdjustments ? "Verlauf der Miete/Nebenkosten" : "Miet-/Nebenkostenänderung hinterlegen"}
+					aria-label={t("leases.history.triggerHistory")}
+					title={hasAdjustments ? t("leases.history.triggerHistory") : t("leases.history.triggerAdd")}
 					className={hasAdjustments ? "text-primary" : undefined}
 				>
 					<History className="size-4" />
@@ -35,20 +37,20 @@ export function RentHistoryDialog({ lease, adjustments, hasAdjustments }: { leas
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-2xl">
 				<DialogHeader>
-					<DialogTitle>Verlauf der vereinbarten Zahlungen</DialogTitle>
-					<DialogDescription>Übersicht aller Kaltmiete-/Nebenkostenbeträge über die Mietdauer inkl. späterer Änderungen (z. B. Mieterhöhungen).</DialogDescription>
+					<DialogTitle>{t("leases.history.title")}</DialogTitle>
+					<DialogDescription>{t("leases.history.description")}</DialogDescription>
 				</DialogHeader>
 
 				<div className="max-h-[50vh] overflow-y-auto rounded-lg border">
 					<Table>
 						<TableHeader>
 							<TableRow>
-								<TableHead>Gültig ab</TableHead>
-								<TableHead>Gültig bis</TableHead>
-								<TableHead className="text-right">Kaltmiete</TableHead>
-								<TableHead className="text-right">Nebenkosten</TableHead>
-								<TableHead>Notiz</TableHead>
-								<TableHead className="w-[80px] text-right">Aktionen</TableHead>
+								<TableHead>{t("leases.adjustment.fields.validFrom")}</TableHead>
+								<TableHead>{t("leases.history.table.validUntil")}</TableHead>
+								<TableHead className="text-right">{t("leases.history.table.coldRent")}</TableHead>
+								<TableHead className="text-right">{t("leases.history.table.serviceCharges")}</TableHead>
+								<TableHead>{t("leases.history.table.note")}</TableHead>
+								<TableHead className="w-[80px] text-right">{t("common.actions")}</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -57,15 +59,18 @@ export function RentHistoryDialog({ lease, adjustments, hasAdjustments }: { leas
 								return (
 									<TableRow key={period.adjustmentId ?? "initial"}>
 										<TableCell className="whitespace-nowrap">{formatDate(period.validFrom)}</TableCell>
-										<TableCell className="whitespace-nowrap text-muted-foreground">{period.validUntil ? formatDate(period.validUntil) : "laufend"}</TableCell>
+										<TableCell className="whitespace-nowrap text-muted-foreground">{period.validUntil ? formatDate(period.validUntil) : t("leases.history.ongoing")}</TableCell>
 										<TableCell className="text-right">{formatCurrency(period.coldRent)}</TableCell>
 										<TableCell className="text-right">{formatCurrency(period.serviceCharges)}</TableCell>
-										<TableCell className="text-muted-foreground">{period.notes ?? (period.adjustmentId ? "–" : "Ursprünglicher Vertragsbetrag")}</TableCell>
+										<TableCell className="text-muted-foreground">{period.notes ?? (period.adjustmentId ? "–" : t("leases.history.initialAmount"))}</TableCell>
 										<TableCell>
 											{adjustment ? (
 												<div className="flex items-center justify-end gap-1">
 													<RentAdjustmentFormDialog leaseId={lease.id} adjustment={adjustment} />
-													<ConfirmDeleteButton action={deleteRentAdjustmentAction.bind(null, adjustment.id)} confirmMessage="Diese Änderung wirklich löschen?" />
+													<ConfirmDeleteButton
+														action={deleteRentAdjustmentAction.bind(null, adjustment.id)}
+														confirmMessage={t("leases.confirm.deleteAdjustment")}
+													/>
 												</div>
 											) : null}
 										</TableCell>
@@ -79,7 +84,7 @@ export function RentHistoryDialog({ lease, adjustments, hasAdjustments }: { leas
 				<DialogFooter className="items-center sm:justify-between">
 					<RentAdjustmentFormDialog leaseId={lease.id} />
 					<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-						Schließen
+						{t("common.close")}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

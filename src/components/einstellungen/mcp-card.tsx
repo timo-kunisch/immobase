@@ -6,6 +6,7 @@ import { Bot, Copy, Eye, EyeOff, Loader2, RefreshCw, ShieldAlert } from "lucide-
 import { getMcpTokenAction, regenerateMcpTokenAction, setMcpEnabledAction } from "@/app/(app)/einstellungen/actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/lib/i18n/provider";
 import type { McpTokenKind } from "@/lib/mcp/auth";
 
 export interface McpCardState {
@@ -30,6 +31,7 @@ export interface McpCardState {
  * gewähren Lese-/Schreibzugriff auf die Fachdaten.
  */
 export function McpCard({ state }: { state: McpCardState }) {
+	const { t } = useI18n();
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
@@ -47,13 +49,13 @@ export function McpCard({ state }: { state: McpCardState }) {
 				setMessage({
 					kind: "success",
 					text: state.enabled
-						? "Der MCP-Server wurde deaktiviert. Bestehende Tokens verlieren sofort ihre Wirkung."
-						: "Der MCP-Server wurde aktiviert. Die Seite wird neu geladen.",
+						? t("settings.cards.mcp.disabledSuccess")
+						: t("settings.cards.mcp.enabledSuccess"),
 				});
 				setTimeout(() => window.location.reload(), 1200);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Die MCP-Einstellung konnte nicht gespeichert werden." });
+			setMessage({ kind: "error", text: t("settings.cards.mcp.errors.saveFailed") });
 		} finally {
 			setBusy(false);
 		}
@@ -64,55 +66,54 @@ export function McpCard({ state }: { state: McpCardState }) {
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<Bot className="size-5" />
-					MCP-Server (KI-Zugriff)
+					{t("settings.cards.mcp.title")}
 				</CardTitle>
 				<CardDescription>
-					Aktiviert einen MCP-Endpunkt (Model Context Protocol), über den KI-Assistenten (z. B. Claude) die
-					Daten der Anwendung lesen, anlegen, bearbeiten und löschen können. Standardmäßig deaktiviert.
+					{t("settings.cards.mcp.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<dl className="space-y-1 text-sm">
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Status</dt>
-						<dd>{state.enabled ? "Aktiviert - Endpunkt erreichbar" : "Deaktiviert"}</dd>
+						<dt className="text-muted-foreground">{t("settings.cards.mcp.statusLabel")}</dt>
+						<dd>{state.enabled ? t("settings.cards.mcp.status.enabled") : t("settings.cards.mcp.status.disabled")}</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Endpunkt (URL)</dt>
+						<dt className="text-muted-foreground">{t("settings.cards.mcp.endpoint")}</dt>
 						<dd>
 							<code className="break-all rounded bg-muted px-1 py-0.5 text-xs">{endpointUrl}</code>
 						</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Admin-Token (Vollzugriff)</dt>
-						<dd>{state.adminTokenSet ? "eingerichtet" : "noch nicht erzeugt"}</dd>
+						<dt className="text-muted-foreground">{t("settings.cards.mcp.adminToken")}</dt>
+						<dd>{state.adminTokenSet ? t("settings.cards.mcp.tokenSet") : t("settings.cards.mcp.tokenNotSet")}</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Nutzer-Token (eingeschränkt)</dt>
-						<dd>{state.userTokenSet ? "eingerichtet" : "noch nicht erzeugt"}</dd>
+						<dt className="text-muted-foreground">{t("settings.cards.mcp.userToken")}</dt>
+						<dd>{state.userTokenSet ? t("settings.cards.mcp.tokenSet") : t("settings.cards.mcp.tokenNotSet")}</dd>
 					</div>
 				</dl>
 
 				<div className="flex flex-wrap gap-2">
 					<Button variant={state.enabled ? "outline" : "default"} onClick={handleToggle} disabled={busy}>
 						{busy ? <Loader2 className="animate-spin" /> : <Bot />}
-						{state.enabled ? "MCP-Server deaktivieren" : "MCP-Server aktivieren"}
+						{state.enabled ? t("settings.cards.mcp.disable") : t("settings.cards.mcp.enable")}
 					</Button>
 				</div>
 
 				{state.adminTokenSet ? (
 					<TokenSection
 						kind="ADMIN"
-						title="Admin-Token (Vollzugriff)"
-						description="Alle Werkzeuge inkl. Administration (Nutzerverwaltung, Absenderdaten)."
+						title={t("settings.cards.mcp.adminToken")}
+						description={t("settings.cards.mcp.adminTokenDescription")}
 						endpointUrl={endpointUrl}
 					/>
 				) : null}
 				{state.userTokenSet ? (
 					<TokenSection
 						kind="USER"
-						title="Nutzer-Token (eingeschränkt)"
-						description="Nur fachliche Werkzeuge - entspricht den Rechten eines normalen Nutzers der App."
+						title={t("settings.cards.mcp.userToken")}
+						description={t("settings.cards.mcp.userTokenDescription")}
 						endpointUrl={endpointUrl}
 					/>
 				) : null}
@@ -126,12 +127,7 @@ export function McpCard({ state }: { state: McpCardState }) {
 				<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
 					<ShieldAlert className="mt-0.5 size-4 shrink-0" />
 					<span>
-						Das Admin-Token gewährt vollständigen Lese- UND Schreibzugriff auf alle Daten inkl.
-						Administrations-Funktionen - behandeln Sie es wie ein Administrator-Passwort. Das Nutzer-Token ist
-						für KI-Clients normaler Nutzer gedacht (keine Administrations-Funktionen, aber ebenfalls
-						Lese-/Schreibzugriff auf die Fachdaten inkl. Löschen und Finalisieren). Geben Sie Token nur an
-						vertrauenswürdige KI-Clients weiter. Der Zugriff erfolgt lokal über diese App (im
-						Mehrbenutzer-Betrieb zusätzlich durch das LAN-Zugangs-Token geschützt).
+						{t("settings.cards.mcp.warning")}
 					</span>
 				</p>
 			</CardContent>
@@ -151,6 +147,7 @@ function TokenSection({
 	description: string;
 	endpointUrl: string;
 }) {
+	const { t } = useI18n();
 	const [busy, setBusy] = useState<"reveal" | "rotate" | null>(null);
 	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 	const [token, setToken] = useState<string | null>(null);
@@ -162,7 +159,7 @@ function TokenSection({
 			setCopied(what);
 			setTimeout(() => setCopied(null), 2000);
 		} catch {
-			setMessage({ kind: "error", text: "Kopieren in die Zwischenablage ist fehlgeschlagen." });
+			setMessage({ kind: "error", text: t("settings.cards.mcp.token.copyFailed") });
 		}
 	}
 
@@ -176,12 +173,12 @@ function TokenSection({
 		try {
 			const result = await getMcpTokenAction(kind);
 			if (result.error || !result.token) {
-				setMessage({ kind: "error", text: result.error ?? "Das MCP-Token konnte nicht gelesen werden." });
+				setMessage({ kind: "error", text: result.error ?? t("settings.cards.mcp.token.readFailed") });
 			} else {
 				setToken(result.token);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Das MCP-Token konnte nicht gelesen werden." });
+			setMessage({ kind: "error", text: t("settings.cards.mcp.token.readFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -190,7 +187,7 @@ function TokenSection({
 	async function handleRegenerate(): Promise<void> {
 		if (
 			!window.confirm(
-				"Neues Zugriffs-Token erzeugen?\n\nDas bisherige Token verliert sofort seine Wirkung - verbundene KI-Clients müssen anschließend mit dem neuen Token konfiguriert werden."
+				t("settings.cards.mcp.token.regenerateConfirm")
 			)
 		) {
 			return;
@@ -200,13 +197,13 @@ function TokenSection({
 		try {
 			const result = await regenerateMcpTokenAction(kind);
 			if (result.error || !result.token) {
-				setMessage({ kind: "error", text: result.error ?? "Das MCP-Token konnte nicht neu erzeugt werden." });
+				setMessage({ kind: "error", text: result.error ?? t("settings.cards.mcp.token.regenerateFailed") });
 			} else {
 				setToken(result.token);
-				setMessage({ kind: "success", text: "Ein neues Token wurde erzeugt und wird unten angezeigt." });
+				setMessage({ kind: "success", text: t("settings.cards.mcp.token.regenerated") });
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Das MCP-Token konnte nicht neu erzeugt werden." });
+			setMessage({ kind: "error", text: t("settings.cards.mcp.token.regenerateFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -235,11 +232,11 @@ function TokenSection({
 			<div className="flex flex-wrap gap-2">
 				<Button variant="ghost" size="sm" onClick={handleToggleToken} disabled={busy !== null}>
 					{busy === "reveal" ? <Loader2 className="animate-spin" /> : token !== null ? <EyeOff /> : <Eye />}
-					{token !== null ? "Token ausblenden" : "Token anzeigen"}
+					{token !== null ? t("settings.cards.mcp.token.hide") : t("settings.cards.mcp.token.show")}
 				</Button>
 				<Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy !== null}>
 					{busy === "rotate" ? <Loader2 className="animate-spin" /> : <RefreshCw />}
-					Neues Token erzeugen
+					{t("settings.cards.mcp.token.regenerate")}
 				</Button>
 			</div>
 
@@ -249,11 +246,11 @@ function TokenSection({
 						<code className="block flex-1 break-all rounded-md border bg-muted p-2 text-xs select-all">{token}</code>
 						<Button variant="outline" size="sm" onClick={() => copyToClipboard(token, "token")}>
 							<Copy />
-							{copied === "token" ? "Kopiert" : "Kopieren"}
+							{copied === "token" ? t("settings.cards.mcp.token.copied") : t("settings.cards.mcp.token.copy")}
 						</Button>
 					</div>
 					<div className="space-y-1">
-						<p className="text-xs text-muted-foreground">Beispiel-Konfiguration für MCP-Clients (Token einsetzen):</p>
+						<p className="text-xs text-muted-foreground">{t("settings.cards.mcp.token.configExample")}</p>
 						<div className="flex items-start gap-2">
 							<pre className="flex-1 overflow-x-auto rounded-md border bg-muted p-2 text-xs">{clientConfigExample}</pre>
 							<Button
@@ -262,7 +259,7 @@ function TokenSection({
 								onClick={() => copyToClipboard(clientConfigExample.replace("Bearer <TOKEN>", `Bearer ${token}`), "config")}
 							>
 								<Copy />
-								{copied === "config" ? "Kopiert" : "Kopieren"}
+								{copied === "config" ? t("settings.cards.mcp.token.copied") : t("settings.cards.mcp.token.copy")}
 							</Button>
 						</div>
 					</div>

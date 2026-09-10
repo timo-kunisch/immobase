@@ -7,34 +7,36 @@ import { ActionState } from "@/lib/action-state";
 import { hashPassword } from "@/lib/auth/password";
 import { consumePasswordResetToken } from "@/lib/auth/tokens";
 import { destroyAllSessionsForUser } from "@/lib/auth/session";
-import { validatePassword } from "@/lib/auth/validation";
+import { getT } from "@/lib/i18n/server";
+import { MIN_PASSWORD_LENGTH, validatePassword } from "@/lib/auth/validation";
 
 export async function resetPasswordAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const t = await getT();
 	const token = String(formData.get("token") ?? "");
 	const password = String(formData.get("password") ?? "");
 	const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
 	if (!token) {
-		return { error: "Ungültiger oder fehlender Token." };
+		return { error: t("auth.errors.tokenMissing") };
 	}
 
 	const passwordError = validatePassword(password);
 	if (passwordError) {
-		return { error: passwordError };
+		return { error: t(passwordError, { min: MIN_PASSWORD_LENGTH }) };
 	}
 
 	if (password !== passwordConfirm) {
-		return { error: "Die Passwörter stimmen nicht überein." };
+		return { error: t("auth.errors.passwordMismatch") };
 	}
 
 	const result = await consumePasswordResetToken(token);
 	if (!result.success) {
-		return { error: result.error };
+		return { error: t(result.errorKey) };
 	}
 
 	const user = getUserByEmail(result.identifier);
 	if (!user) {
-		return { error: "Zu diesem Link wurde kein Konto gefunden." };
+		return { error: t("auth.errors.noAccountForToken") };
 	}
 
 	const passwordHash = await hashPassword(password);

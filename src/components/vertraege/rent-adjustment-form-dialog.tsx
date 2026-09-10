@@ -10,11 +10,13 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { saveRentAdjustmentAction } from "@/app/(app)/vertraege/actions";
 import type { RentAdjustment } from "@/data/types";
 
 export function RentAdjustmentFormDialog({ leaseId, adjustment, onSaved }: { leaseId: string; adjustment?: RentAdjustment; onSaved?: () => void }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(adjustment);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveRentAdjustmentAction, initialActionState);
@@ -33,21 +35,21 @@ export function RentAdjustmentFormDialog({ leaseId, adjustment, onSaved }: { lea
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Änderung bearbeiten" title="Änderung bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("leases.adjustment.editTitle")} title={t("leases.adjustment.editTitle")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button" variant="outline" size="sm">
 						<Plus />
-						Änderung hinterlegen
+						{t("leases.adjustment.add")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Änderung bearbeiten" : "Miet-/Nebenkostenänderung"}</DialogTitle>
-						<DialogDescription>Ab dem gewählten Datum gilt die neue Kaltmiete/Nebenkosten. Der bisherige Betrag bleibt für den Zeitraum davor erhalten.</DialogDescription>
+						<DialogTitle>{isEdit ? t("leases.adjustment.editTitle") : t("leases.adjustment.createTitle")}</DialogTitle>
+						<DialogDescription>{t("leases.adjustment.description")}</DialogDescription>
 					</DialogHeader>
 
 					<input type="hidden" name="leaseId" value={leaseId} />
@@ -55,24 +57,24 @@ export function RentAdjustmentFormDialog({ leaseId, adjustment, onSaved }: { lea
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="validFrom">Gültig ab *</Label>
+							<Label htmlFor="validFrom">{t("leases.adjustment.fields.validFrom")} *</Label>
 							<Input id="validFrom" name="validFrom" type="date" defaultValue={toDateInputValue(adjustment?.validFrom)} required />
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="coldRent">Kaltmiete (€) *</Label>
+								<Label htmlFor="coldRent">{t("leases.fields.coldRent")} *</Label>
 								<Input id="coldRent" name="coldRent" type="number" step="0.01" min="0" defaultValue={adjustment?.coldRent} required />
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="serviceCharges">Nebenkosten (€) *</Label>
+								<Label htmlFor="serviceCharges">{t("leases.fields.serviceCharges")} *</Label>
 								<Input id="serviceCharges" name="serviceCharges" type="number" step="0.01" min="0" defaultValue={adjustment?.serviceCharges} required />
 							</div>
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="notes">Notizen</Label>
-							<Textarea id="notes" name="notes" placeholder="z. B. Mieterhöhung nach § 558 BGB" defaultValue={adjustment?.notes ?? ""} />
+							<Label htmlFor="notes">{t("common.notes")}</Label>
+							<Textarea id="notes" name="notes" placeholder={t("leases.adjustment.fields.notesPlaceholder")} defaultValue={adjustment?.notes ?? ""} />
 						</div>
 
 						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -80,11 +82,11 @@ export function RentAdjustmentFormDialog({ leaseId, adjustment, onSaved }: { lea
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

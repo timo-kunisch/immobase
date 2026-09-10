@@ -1,0 +1,30 @@
+import { calendar as deCalendar } from "../de/calendar";
+
+/** Englische Übersetzungen des Namespace "calendar" (Parität per Typ erzwungen). */
+export const calendar: typeof deCalendar = {
+	title: "Calendar",
+	description: "Manual events and automatic appointments (move-in/move-out, meetings).",
+	"actions.prevMonth": "Previous month",
+	"actions.nextMonth": "Next month",
+	"actions.new": "New event",
+	"kind.MANUAL": "Custom event (click to edit)",
+	"kind.LEASE_START": "Move-in (lease start)",
+	"kind.LEASE_END": "Move-out (lease end)",
+	"kind.MEETING": "Owners' meeting",
+	"labels.leaseStart": "Move-in",
+	"labels.leaseEnd": "Move-out",
+	"labels.meeting": "Meeting",
+	"dialog.newTitle": "New event",
+	"dialog.editTitle": "Edit event",
+	"dialog.description": "Add a manual appointment to the calendar (e.g. maintenance, inspection, official appointment).",
+	"fields.title": "Title *",
+	"fields.titlePlaceholder": "e.g. heating maintenance",
+	"fields.startDate": "Date *",
+	"fields.endDate": "End date (optional)",
+	"fields.descriptionPlaceholder": "Appointment details…",
+	"confirm.delete": "Really delete event \"{title}\"?",
+	"errors.titleAndStartRequired": "Please enter a title and a start date.",
+	"errors.endBeforeStart": "The end date must not be before the start date.",
+	"errors.saveFailed": "The event could not be saved.",
+	"errors.deleteFailed": "The event could not be deleted.",
+};

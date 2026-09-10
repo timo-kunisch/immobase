@@ -11,12 +11,14 @@ import { CountLinkBadge } from "@/components/ui/count-link-badge";
 import { UnitFormDialog } from "@/components/einheiten/unit-form-dialog";
 import { UnitPropertyFilter } from "@/components/einheiten/unit-property-filter";
 import { formatNumber } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteUnitAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function EinheitenPage({ searchParams }: { searchParams: Promise<{ propertyId?: string }> }) {
+	const t = await getT();
 	const { propertyId } = await searchParams;
 
 	// Liegenschaften für den Filter/das Formular alphabetisch (bisher per
@@ -30,31 +32,31 @@ export default async function EinheitenPage({ searchParams }: { searchParams: Pr
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Mieteinheiten" description="Wohnungen und Gewerbeeinheiten je Liegenschaft." actions={<UnitFormDialog properties={propertyList} />} />
+		<SiteHeader title={t("units.title")} description={t("units.description")} actions={<UnitFormDialog properties={propertyList} />} />
 
-			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				{propertyList.length === 0 ? (
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst eine Liegenschaft an, um Einheiten erfassen zu können.</p>
-				) : (
-					<UnitPropertyFilter properties={propertyList} value={propertyId} />
-				)}
+		<div className="flex-1 space-y-4 p-4 sm:p-6">
+			{propertyList.length === 0 ? (
+				<p className="text-sm text-muted-foreground">{t("units.noProperties")}</p>
+			) : (
+				<UnitPropertyFilter properties={propertyList} value={propertyId} />
+			)}
 				<Card>
 					<CardContent className="p-0">
 						{unitList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-								<DoorOpen className="size-8" />
-								<p>{propertyId ? "Keine Einheiten für diese Liegenschaft gefunden." : "Noch keine Einheiten angelegt."}</p>
+							<DoorOpen className="size-8" />
+							<p>{propertyId ? t("units.emptyFiltered") : t("units.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Einheit</TableHead>
-										<TableHead>Liegenschaft</TableHead>
-										<TableHead>Wohnfläche</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead>Verknüpft</TableHead>
-										<TableHead className="w-[100px] text-right">Aktionen</TableHead>
+									<TableHead>{t("common.unit")}</TableHead>
+									<TableHead>{t("common.property")}</TableHead>
+									<TableHead>{t("units.table.livingSpace")}</TableHead>
+									<TableHead>{t("common.status")}</TableHead>
+									<TableHead>{t("units.table.linked")}</TableHead>
+									<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -72,45 +74,45 @@ export default async function EinheitenPage({ searchParams }: { searchParams: Pr
 														{unit.propertyName}
 													</Link>
 												</TableCell>
-												<TableCell>
-													{unit.livingSpace ? `${formatNumber(unit.livingSpace)} m²` : "–"}
-													{unit.rooms ? ` · ${formatNumber(unit.rooms)} Zi.` : ""}
-												</TableCell>
+											<TableCell>
+												{unit.livingSpace ? t("units.areaValue", { value: formatNumber(unit.livingSpace) }) : "–"}
+												{unit.rooms ? t("units.roomsValue", { value: formatNumber(unit.rooms) }) : ""}
+											</TableCell>
 												<TableCell>
 													{activeLease ? (
 														<Link
 															href={`/vertraege#lease-${activeLease.id}`}
 															className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20"
 														>
-															Vermietet an {activeLease.tenantFirstName} {activeLease.tenantLastName}
-														</Link>
-													) : (
-														<span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
-															Leerstand
-														</span>
+														{t("units.status.rentedTo", { firstName: activeLease.tenantFirstName, lastName: activeLease.tenantLastName })}
+													</Link>
+												) : (
+													<span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+														{t("units.status.vacant")}
+													</span>
 													)}
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center gap-1.5">
-														<CountLinkBadge href={`/vertraege?unitId=${unit.id}`} count={stats?.leases ?? 0} label="Verträge" icon={FileSignature} />
-														{(stats?.openTickets ?? 0) > 0 ? (
-															<CountLinkBadge
-																href={`/tickets?unitId=${unit.id}`}
-																count={stats!.openTickets}
-																label="Tickets"
-																icon={Wrench}
+													<CountLinkBadge href={`/vertraege?unitId=${unit.id}`} count={stats?.leases ?? 0} label={t("units.badge.leases")} icon={FileSignature} />
+													{(stats?.openTickets ?? 0) > 0 ? (
+														<CountLinkBadge
+															href={`/tickets?unitId=${unit.id}`}
+															count={stats!.openTickets}
+															label={t("units.badge.tickets")}
+															icon={Wrench}
 																className="bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
 															/>
 														) : null}
-														{(stats?.documents ?? 0) > 0 ? (
-															<CountLinkBadge href={`/dokumente?unitId=${unit.id}`} count={stats!.documents} label="Dokumente" icon={FileText} />
-														) : null}
+													{(stats?.documents ?? 0) > 0 ? (
+														<CountLinkBadge href={`/dokumente?unitId=${unit.id}`} count={stats!.documents} label={t("units.badge.documents")} icon={FileText} />
+													) : null}
 													</div>
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
-														<UnitFormDialog unit={unit} properties={propertyList} />
-														<ConfirmDeleteButton action={deleteUnitAction.bind(null, unit.id)} confirmMessage={`Einheit "${unit.label}" wirklich löschen?`} />
+													<UnitFormDialog unit={unit} properties={propertyList} />
+													<ConfirmDeleteButton action={deleteUnitAction.bind(null, unit.id)} confirmMessage={t("units.confirm.delete", { name: unit.label })} />
 													</div>
 												</TableCell>
 											</TableRow>

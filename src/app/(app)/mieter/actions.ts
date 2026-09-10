@@ -6,6 +6,7 @@ import { createTenant, deleteTenant, getTenant, updateTenant } from "@/data/tena
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -14,6 +15,7 @@ function getString(formData: FormData, key: string): string {
 
 export async function saveTenantAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const firstName = getString(formData, "firstName");
 	const lastName = getString(formData, "lastName");
@@ -22,7 +24,7 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 	const notes = getString(formData, "notes");
 
 	if (!firstName || !lastName) {
-		return { error: "Bitte geben Sie Vor- und Nachnamen an." };
+		return { error: t("tenants.errors.nameRequired") };
 	}
 
 	const data = {
@@ -43,7 +45,7 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 		}
 	} catch (error) {
 		console.error("saveTenantAction failed", error);
-		return { error: "Der Mieter konnte nicht gespeichert werden." };
+		return { error: t("tenants.errors.saveFailed") };
 	}
 
 	revalidatePath("/mieter");
@@ -53,6 +55,7 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 
 export async function deleteTenantAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const tenant = getTenant(id);
 	try {
@@ -60,7 +63,7 @@ export async function deleteTenantAction(id: string): Promise<ActionState> {
 	} catch (error) {
 		console.error("deleteTenantAction failed", error);
 		return {
-			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Mietverträge.",
+			error: t("tenants.errors.deleteFailed"),
 		};
 	}
 

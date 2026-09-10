@@ -5,15 +5,17 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
+import type { MessageKey } from "@/lib/i18n/translator";
 import { getDashboardData } from "@/app/(app)/actions/dashboard";
 
 // Immer dynamisch rendern: Die Kennzahlen werden live aus der Datenbank
 // geladen und sollen weder beim Build noch zwischen Requests zwischengespeichert werden.
 export const dynamic = "force-dynamic";
 
-const ticketStatusLabels: Record<string, string> = {
-	OPEN: "Offen",
-	IN_PROGRESS: "In Bearbeitung",
+const ticketStatusLabelKeys: Record<string, MessageKey> = {
+	OPEN: "tickets.status.OPEN",
+	IN_PROGRESS: "tickets.status.IN_PROGRESS",
 };
 
 const ticketStatusStyles: Record<string, string> = {
@@ -22,44 +24,48 @@ const ticketStatusStyles: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
+	const t = await getT();
 	const data = await getDashboardData();
 
 	const cards = [
 		{
-			title: "Liegenschaften",
+			title: t("dashboard.cards.properties.title"),
 			value: data.propertiesCount.toString(),
-			description: `${data.tenantsCount} Mieter insgesamt`,
+			description: t("dashboard.cards.properties.description", { count: data.tenantsCount }),
 			icon: Building2,
 		},
 		{
-			title: "Mieteinheiten",
+			title: t("dashboard.cards.units.title"),
 			value: data.unitsCount.toString(),
-			description: `${data.occupiedUnitsCount} vermietet · ${data.vacantUnitsCount} leer`,
+			description: t("dashboard.cards.units.description", { occupied: data.occupiedUnitsCount, vacant: data.vacantUnitsCount }),
 			icon: DoorOpen,
 		},
 		{
-			title: "Leerstandsquote",
+			title: t("dashboard.cards.vacancyRate.title"),
 			value: formatPercent(data.vacancyRate),
-			description: `${data.vacantUnitsCount} von ${data.unitsCount} Einheiten leer`,
+			description: t("dashboard.cards.vacancyRate.description", { vacant: data.vacantUnitsCount, total: data.unitsCount }),
 			icon: PercentCircle,
 		},
 		{
-			title: "Gesamtmiete / Monat",
+			title: t("dashboard.cards.totalRent.title"),
 			value: formatCurrency(data.totalRent),
-			description: `${formatCurrency(data.coldRentSum)} Kaltmiete + ${formatCurrency(data.serviceChargesSum)} NK`,
+			description: t("dashboard.cards.totalRent.description", {
+				baseRent: formatCurrency(data.coldRentSum),
+				serviceCharges: formatCurrency(data.serviceChargesSum),
+			}),
 			icon: Euro,
 		},
 		{
-			title: "Offene Tickets",
+			title: t("dashboard.cards.openTickets.title"),
 			value: data.openTicketsCount.toString(),
-			description: "Schäden & Instandhaltung",
+			description: t("dashboard.cards.openTickets.description"),
 			icon: Wrench,
 			href: "/tickets",
 		},
 		{
-			title: "Mietrückstände",
+			title: t("dashboard.cards.rentArrears.title"),
 			value: formatCurrency(data.rentArrears),
-			description: "Fällige/überfällige Zahlungen",
+			description: t("dashboard.cards.rentArrears.description"),
 			icon: AlertTriangle,
 			href: "/finanzen",
 			accent: data.rentArrears > 0,
@@ -68,7 +74,7 @@ export default async function DashboardPage() {
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Dashboard" description="Kennzahlen von ImmoBase auf einen Blick." />
+			<SiteHeader title={t("dashboard.title")} description={t("dashboard.description")} />
 
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -98,16 +104,16 @@ export default async function DashboardPage() {
 
 				<Card>
 					<CardHeader className="flex flex-row items-center justify-between">
-						<CardTitle className="text-base">Neueste offene Tickets</CardTitle>
+						<CardTitle className="text-base">{t("dashboard.latestTickets.title")}</CardTitle>
 						<Link href="/tickets" className="text-sm text-primary hover:underline">
-							Alle Tickets →
+							{t("dashboard.latestTickets.allTickets")}
 						</Link>
 					</CardHeader>
 					<CardContent className="p-0">
 						{data.latestOpenTickets.length === 0 ? (
 							<div className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
 								<Wrench className="size-8" />
-								<p>Keine offenen Tickets – alles erledigt.</p>
+								<p>{t("dashboard.latestTickets.empty")}</p>
 							</div>
 						) : (
 							<ul className="divide-y">
@@ -130,7 +136,7 @@ export default async function DashboardPage() {
 												· {formatDate(ticket.createdAt)}
 											</p>
 										</div>
-										<span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${ticketStatusStyles[ticket.status]}`}>{ticketStatusLabels[ticket.status]}</span>
+										<span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-medium ${ticketStatusStyles[ticket.status]}`}>{t(ticketStatusLabelKeys[ticket.status])}</span>
 									</li>
 								))}
 							</ul>
@@ -143,7 +149,8 @@ export default async function DashboardPage() {
 						<CardContent className="flex flex-col items-center gap-2 py-12 text-center text-muted-foreground">
 							<Building2 className="size-8" />
 							<p>
-								Willkommen! Legen Sie zunächst eine Liegenschaft unter <span className="font-medium text-foreground">Objekte</span> an, um mit der Verwaltung zu beginnen.
+								{t("dashboard.welcome.textPrefix")} <span className="font-medium text-foreground">{t("dashboard.welcome.propertiesLabel")}</span>{" "}
+								{t("dashboard.welcome.textSuffix")}
 							</p>
 						</CardContent>
 					</Card>
@@ -158,16 +165,15 @@ export default async function DashboardPage() {
 						<div className="flex items-start gap-3">
 							<LifeBuoy className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
 							<div>
-								<p className="text-sm font-medium">Priority-Support direkt vom Entwickler</p>
+								<p className="text-sm font-medium">{t("dashboard.support.title")}</p>
 								<p className="mt-0.5 text-xs text-muted-foreground">
-									ImmoBase bleibt kostenlos und Open Source. Für Hausverwaltungen und Unternehmen, die garantierte
-									Reaktionszeiten und persönliche Betreuung brauchen, gibt es kostenpflichtige Support-Pakete.
+									{t("dashboard.support.description")}
 								</p>
 							</div>
 						</div>
 						<Button variant="outline" size="sm" className="shrink-0" asChild>
 							<a href="https://help.immobase.app" target="_blank" rel="noopener noreferrer">
-								Mehr erfahren
+								{t("dashboard.support.learnMore")}
 							</a>
 						</Button>
 					</CardContent>

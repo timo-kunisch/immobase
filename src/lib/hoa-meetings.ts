@@ -1,4 +1,4 @@
-import type { OwnerMeetingStatus, OwnerMeetingType, ResolutionVotingResult } from "@/data/types";
+import type { OwnerMeetingStatus, ResolutionVotingResult } from "@/data/types";
 
 /**
  * Berechnungs-/Ableitungslogik für Eigentümerversammlungen und die
@@ -55,31 +55,12 @@ export function nextResolutionSequenceNumber(existingSequenceNumbers: number[]):
 	return Math.max(...existingSequenceNumbers) + 1;
 }
 
-export const ownerMeetingTypeLabels: Record<OwnerMeetingType, string> = {
-	ORDINARY: "Ordentliche Versammlung",
-	EXTRAORDINARY: "Außerordentliche Versammlung",
-	CIRCULATION: "Umlaufbeschluss-Verfahren",
-};
-
-export const ownerMeetingStatusLabels: Record<OwnerMeetingStatus, string> = {
-	PLANNED: "Geplant",
-	INVITED: "Eingeladen",
-	HELD: "Durchgeführt",
-	MINUTES_FINALIZED: "Protokoll finalisiert",
-	CANCELLED: "Abgesagt",
-};
-
 export const ownerMeetingStatusStyles: Record<OwnerMeetingStatus, string> = {
 	PLANNED: "bg-muted text-muted-foreground",
 	INVITED: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
 	HELD: "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400",
 	MINUTES_FINALIZED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
 	CANCELLED: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
-};
-
-export const resolutionVotingResultLabels: Record<ResolutionVotingResult, string> = {
-	ACCEPTED: "Angenommen",
-	REJECTED: "Abgelehnt",
 };
 
 export const resolutionVotingResultStyles: Record<ResolutionVotingResult, string> = {

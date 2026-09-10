@@ -1,0 +1,31 @@
+import { knowledge as deKnowledge } from "../de/knowledge";
+
+/** Englische Übersetzungen des Namespace "knowledge" (Parität per Typ erzwungen). */
+export const knowledge: typeof deKnowledge = {
+	title: "Knowledge base",
+	description: "Store and look up guidelines, instructions and explanations.",
+	"search.placeholder": "Search articles…",
+	"search.label": "Search for:",
+	"search.reset": "Reset search",
+	"empty.noArticles": "No articles stored yet.",
+	"empty.noResults": "No articles found.",
+	createdAt: "Created: {date}",
+	updatedAt: "Updated: {date}",
+	"actions.read": "Read →",
+	"actions.new": "New article",
+	categoryLine: "Category: {category}",
+	articleFallback: "Knowledge base article",
+	"confirm.delete": "Really delete article \"{title}\"?",
+	"dialog.newTitle": "New article",
+	"dialog.editTitle": "Edit article",
+	"dialog.description": "Store a guideline, instruction or explanation in the knowledge base.",
+	"fields.title": "Title *",
+	"fields.titlePlaceholder": "e.g. rent increase policy",
+	"fields.category": "Category (optional)",
+	"fields.categoryPlaceholder": "e.g. billing",
+	"fields.content": "Content *",
+	"fields.contentPlaceholder": "Article text…",
+	"errors.titleAndContentRequired": "Please enter a title and fill in the content.",
+	"errors.saveFailed": "The article could not be saved.",
+	"errors.deleteFailed": "The article could not be deleted.",
+};

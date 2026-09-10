@@ -6,11 +6,13 @@ import { Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDesktopBridge, type DesktopConnectionInfo } from "@/lib/desktop-bridge";
+import { useI18n } from "@/lib/i18n/provider";
+import type { MessageKey } from "@/lib/i18n/translator";
 
-const MODE_LABELS: Record<string, string> = {
-	local: "Lokal (nur dieser Rechner)",
-	host: "Host (stellt Daten im Netzwerk bereit)",
-	client: "Client (verbunden mit einem Host)",
+const MODE_LABEL_KEYS: Record<string, MessageKey> = {
+	local: "settings.cards.connection.mode.local",
+	host: "settings.cards.connection.mode.host",
+	client: "settings.cards.connection.mode.client",
 };
 
 /**
@@ -19,6 +21,7 @@ const MODE_LABELS: Record<string, string> = {
  * und öffnet den Verbindungs-/Modus-Dialog der Electron-Shell.
  */
 export function ConnectionCard() {
+	const { t } = useI18n();
 	const bridge = getDesktopBridge();
 	const [info, setInfo] = useState<DesktopConnectionInfo | null>(null);
 
@@ -36,24 +39,24 @@ export function ConnectionCard() {
 	return (
 		<Card className="max-w-xl">
 			<CardHeader>
-				<CardTitle>Verbindung &amp; Mehrbenutzer</CardTitle>
+				<CardTitle>{t("settings.cards.connection.title")}</CardTitle>
 				<CardDescription>
-					Betriebsmodus der App. Im Modus „Host“ wird die Datenbank anderen Arbeitsplätzen im lokalen Netzwerk
-					bereitgestellt; im Modus „Client“ verbindet sich diese Installation mit einem Host (keine lokalen Daten).
+					{t("settings.cards.connection.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-3">
 				<div className="flex items-center gap-2 text-sm">
 					<span className={`inline-block size-2.5 rounded-full ${connected ? "bg-emerald-500" : "bg-red-500"}`} />
 					<span>
-						{mode ? MODE_LABELS[mode] : "Nicht konfiguriert"} – {connected ? "verbunden" : "nicht verbunden"}
+						{mode && MODE_LABEL_KEYS[mode] ? t(MODE_LABEL_KEYS[mode]) : t("settings.cards.connection.notConfigured")} –{" "}
+						{connected ? t("settings.cards.connection.connected") : t("settings.cards.connection.disconnected")}
 					</span>
 				</div>
-				{info?.localUrl ? <p className="text-xs text-muted-foreground">Lokaler Server: {info.localUrl}</p> : null}
-				{info?.hostUrl ? <p className="text-xs text-muted-foreground">Host: {info.hostUrl}</p> : null}
+				{info?.localUrl ? <p className="text-xs text-muted-foreground">{t("settings.cards.connection.localServer", { url: info.localUrl })}</p> : null}
+				{info?.hostUrl ? <p className="text-xs text-muted-foreground">{t("settings.cards.connection.hostUrl", { url: info.hostUrl })}</p> : null}
 				<Button variant="outline" onClick={() => bridge.openConnectionSettings()}>
 					<Network />
-					Verbindungseinstellungen öffnen
+					{t("settings.cards.connection.openSettings")}
 				</Button>
 			</CardContent>
 		</Card>

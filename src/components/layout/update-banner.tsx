@@ -5,6 +5,7 @@ import { Download, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getDesktopBridge, type DesktopUpdateState } from "@/lib/desktop-bridge";
+import { useI18n } from "@/lib/i18n/provider";
 
 /**
  * Update-Hinweis für die Desktop-App: blendet eine Leiste oberhalb des
@@ -20,6 +21,7 @@ import { getDesktopBridge, type DesktopUpdateState } from "@/lib/desktop-bridge"
  */
 export function UpdateBanner() {
 	const bridge = getDesktopBridge();
+	const { t } = useI18n();
 	const [state, setState] = useState<DesktopUpdateState | null>(null);
 
 	useEffect(() => {
@@ -38,18 +40,16 @@ export function UpdateBanner() {
 			<Download className="size-4 shrink-0 text-primary" />
 			{state.status === "downloaded" ? (
 				<>
-					<span className="min-w-0 flex-1">
-						Update{versionText} wurde heruntergeladen und wird beim nächsten Start installiert.
-					</span>
+					<span className="min-w-0 flex-1">{t("nav.update.downloaded", { version: versionText })}</span>
 					<Button size="sm" onClick={() => void bridge.installUpdateNow()}>
 						<RefreshCw />
-						Jetzt neu starten
+						{t("nav.update.restartNow")}
 					</Button>
 				</>
 			) : (
 				<span className="min-w-0 flex-1">
-					Update{versionText} wird heruntergeladen
-					{state.status === "downloading" && state.percent !== null ? ` (${state.percent} %)` : " …"}
+					{t("nav.update.downloading", { version: versionText })}
+					{state.status === "downloading" && state.percent !== null ? ` (${state.percent} %)` : t("nav.update.downloadingEllipsis")}
 				</span>
 			)}
 		</div>

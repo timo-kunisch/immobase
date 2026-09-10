@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Loader2, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/lib/i18n/provider";
 import type { PostalShipmentActionState } from "@/lib/postal-shipments";
 
 /**
@@ -20,6 +21,7 @@ import type { PostalShipmentActionState } from "@/lib/postal-shipments";
  * landen nur in der Postbox und werden nach 7 Tagen automatisch gelöscht).
  */
 export function SendByPostButton({ sendAction, disabled = false, disabledReason }: { sendAction: () => Promise<PostalShipmentActionState>; disabled?: boolean; disabledReason?: string }) {
+	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 	const [result, setResult] = useState<PostalShipmentActionState | null>(null);
 
@@ -33,13 +35,21 @@ export function SendByPostButton({ sendAction, disabled = false, disabledReason 
 
 	return (
 		<div className="flex flex-col items-end gap-1">
-			<Button type="button" variant="ghost" size="icon-sm" onClick={handleClick} disabled={isPending || disabled} aria-label="Per Post versenden" title={disabled && disabledReason ? disabledReason : "Per Post versenden"}>
+			<Button
+				type="button"
+				variant="ghost"
+				size="icon-sm"
+				onClick={handleClick}
+				disabled={isPending || disabled}
+				aria-label={t("postal.sendByPost")}
+				title={disabled && disabledReason ? disabledReason : t("postal.sendByPost")}
+			>
 				{isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
 			</Button>
 			{result && "error" in result ? <span className="max-w-[220px] text-right text-xs text-destructive">{result.error}</span> : null}
 			{result && "success" in result ? (
 				<span className="max-w-[220px] text-right text-xs text-emerald-600">
-					Auftrag {result.jobId} übermittelt{result.mode === "test" ? " (Testmodus – wird nicht zugestellt)" : ""}.
+					{t("postal.success.jobSubmitted", { jobId: result.jobId, testHint: result.mode === "test" ? t("postal.success.testModeHint") : "" })}
 				</span>
 			) : null}
 		</div>

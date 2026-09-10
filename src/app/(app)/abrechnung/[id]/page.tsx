@@ -14,14 +14,16 @@ import { FinalizeBillingPeriodButton } from "@/components/abrechnung/finalize-bi
 import { GenerateStatementPdfButton } from "@/components/abrechnung/generate-statement-pdf-button";
 import { GenerateAllStatementPdfsButton } from "@/components/abrechnung/generate-all-statement-pdfs-button";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
-import { allocationKeyLabels, billingPeriodStatusLabels, billingPeriodStatusStyles, calculateBillingResult, costCategoryLabels } from "@/lib/billing";
+import { billingPeriodStatusStyles, calculateBillingResult } from "@/lib/billing";
 
 import { deleteCostItemAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function BillingPeriodDetailPage({ params }: { params: Promise<{ id: string }> }) {
+	const t = await getT();
 	const { id } = await params;
 
 	const detail = getBillingPeriodDetail(id);
@@ -60,18 +62,18 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title={`Abrechnung: ${property.name}`}
+				title={t("billing.detail.title", { name: property.name })}
 				description={`${formatDate(billingPeriod.periodFrom)} – ${formatDate(billingPeriod.periodTo)}`}
 				actions={
 					<div className="flex items-center gap-2">
 						<Button variant="outline" size="sm" asChild>
 							<Link href="/abrechnung">
 								<ChevronLeft />
-								Zurück
+								{t("common.back")}
 							</Link>
 						</Button>
 						<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${billingPeriodStatusStyles[billingPeriod.status]}`}>
-							{billingPeriodStatusLabels[billingPeriod.status]}
+							{t(`billing.status.${billingPeriod.status}`)}
 						</span>
 					</div>
 				}
@@ -79,7 +81,7 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<div className="flex items-center justify-between">
-					<h2 className="text-base font-semibold">Kostenpositionen</h2>
+					<h2 className="text-base font-semibold">{t("billing.detail.costItems")}</h2>
 					{isDraft ? <CostItemFormDialog billingPeriodId={billingPeriod.id} units={units} /> : null}
 				</div>
 
@@ -88,17 +90,17 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 						{costItems.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Noch keine Kostenpositionen erfasst.</p>
+								<p>{t("billing.empty.costItems")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Bezeichnung</TableHead>
-										<TableHead>Kostenart</TableHead>
-										<TableHead>Umlageschlüssel</TableHead>
-										<TableHead className="text-right">Betrag</TableHead>
-										<TableHead className="w-[140px] text-right">Aktionen</TableHead>
+										<TableHead>{t("billing.table.label")}</TableHead>
+										<TableHead>{t("billing.table.category")}</TableHead>
+										<TableHead>{t("billing.table.allocationKey")}</TableHead>
+										<TableHead className="text-right">{t("common.amount")}</TableHead>
+										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -108,22 +110,25 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 												{costItem.label}
 												{costItem.allocationKey === "DIRECT" && costItem.directUnit ? <span className="block text-xs text-muted-foreground">{costItem.directUnit.label}</span> : null}
 											</TableCell>
-											<TableCell className="text-muted-foreground">{costCategoryLabels[costItem.category]}</TableCell>
-											<TableCell className="text-muted-foreground">{allocationKeyLabels[costItem.allocationKey]}</TableCell>
-											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
-											<TableCell>
-												{isDraft ? (
-													<div className="flex items-center justify-end gap-1">
-														{costItem.allocationKey === "CONSUMPTION" ? (
-															<ConsumptionValuesDialog costItemId={costItem.id} costItemLabel={costItem.label} units={units} consumptionValues={costItem.consumptionValues} />
-														) : null}
-														<CostItemFormDialog billingPeriodId={billingPeriod.id} costItem={costItem} units={units} />
-														<ConfirmDeleteButton action={deleteCostItemAction.bind(null, costItem.id)} confirmMessage={`Kostenposition "${costItem.label}" wirklich löschen?`} />
-													</div>
-												) : (
-													<span className="text-xs text-muted-foreground">Finalisiert</span>
-												)}
-											</TableCell>
+										<TableCell className="text-muted-foreground">{t(`billing.category.${costItem.category}`)}</TableCell>
+										<TableCell className="text-muted-foreground">{t(`billing.allocationKey.${costItem.allocationKey}`)}</TableCell>
+										<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
+										<TableCell>
+											{isDraft ? (
+												<div className="flex items-center justify-end gap-1">
+													{costItem.allocationKey === "CONSUMPTION" ? (
+														<ConsumptionValuesDialog costItemId={costItem.id} costItemLabel={costItem.label} units={units} consumptionValues={costItem.consumptionValues} />
+													) : null}
+													<CostItemFormDialog billingPeriodId={billingPeriod.id} costItem={costItem} units={units} />
+													<ConfirmDeleteButton
+														action={deleteCostItemAction.bind(null, costItem.id)}
+														confirmMessage={t("billing.confirm.deleteCostItem", { label: costItem.label })}
+													/>
+												</div>
+											) : (
+												<span className="text-xs text-muted-foreground">{t("billing.detail.finalized")}</span>
+											)}
+										</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
@@ -141,10 +146,8 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 									<div key={`${warning.costItemId}-${index}`} className="flex items-center gap-3">
 										<AlertTriangle className="size-5 shrink-0 text-amber-600" />
 										<p className="text-sm">
-											<span className="font-semibold">{costItem?.label ?? "Kostenposition"}</span> konnte nicht umgelegt werden:{" "}
-											{warning.reason === "NO_OCCUPANTS"
-												? "Für den Zeitraum sind keine bewohnten Personentage vorhanden."
-												: "Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlende Wohnfläche oder Verbrauchswerte)."}
+											<span className="font-semibold">{costItem?.label ?? t("billing.warning.fallbackItem")}</span> {t("billing.warning.notAllocated")}{" "}
+											{warning.reason === "NO_OCCUPANTS" ? t("billing.warning.noOccupants") : t("billing.warning.noAllocationBasis")}
 										</p>
 									</div>
 								);
@@ -154,7 +157,7 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 				) : null}
 
 				<div className="flex items-center justify-between">
-					<h2 className="text-base font-semibold">Abrechnung je Mietverhältnis</h2>
+					<h2 className="text-base font-semibold">{t("billing.detail.statements")}</h2>
 					{isDraft ? (
 						<FinalizeBillingPeriodButton billingPeriodId={billingPeriod.id} />
 					) : tenantStatements.length > 0 ? (
@@ -168,17 +171,17 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 							!liveResult || liveResult.leaseResults.length === 0 ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 									<Calculator className="size-8" />
-									<p>Für den gewählten Zeitraum wurden keine Mietverhältnisse gefunden.</p>
+									<p>{t("billing.empty.leases")}</p>
 								</div>
 							) : (
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Mieter / Einheit</TableHead>
-											<TableHead>Zeitanteil</TableHead>
-											<TableHead className="text-right">Umgelegte Kosten</TableHead>
-											<TableHead className="text-right">Vorauszahlungen</TableHead>
-											<TableHead className="text-right">Saldo</TableHead>
+											<TableHead>{t("billing.table.tenantUnit")}</TableHead>
+											<TableHead>{t("billing.table.timeShare")}</TableHead>
+											<TableHead className="text-right">{t("billing.table.allocatedCosts")}</TableHead>
+											<TableHead className="text-right">{t("billing.table.prepayments")}</TableHead>
+											<TableHead className="text-right">{t("billing.table.balance")}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -195,37 +198,41 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 															{lease?.unit.label}
 														</Link>
 													</TableCell>
-													<TableCell className="text-muted-foreground">
-														{formatDate(leaseResult.occupiedFrom)} – {formatDate(leaseResult.occupiedTo)} ({leaseResult.occupiedDays} Tage)
-													</TableCell>
-													<TableCell className="text-right">{formatCurrency(leaseResult.totalAllocatedCostsCents / 100)}</TableCell>
-													<TableCell className="text-right">{formatCurrency(leaseResult.totalPrepaymentsCents / 100)}</TableCell>
-													<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
-														{balanceEuros > 0 ? `Nachzahlung ${formatCurrency(balanceEuros)}` : balanceEuros < 0 ? `Guthaben ${formatCurrency(Math.abs(balanceEuros))}` : formatCurrency(0)}
-													</TableCell>
+												<TableCell className="text-muted-foreground">
+													{formatDate(leaseResult.occupiedFrom)} – {formatDate(leaseResult.occupiedTo)} ({leaseResult.occupiedDays} {t("billing.detail.days")})
+												</TableCell>
+												<TableCell className="text-right">{formatCurrency(leaseResult.totalAllocatedCostsCents / 100)}</TableCell>
+												<TableCell className="text-right">{formatCurrency(leaseResult.totalPrepaymentsCents / 100)}</TableCell>
+												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
+													{balanceEuros > 0
+														? t("billing.detail.balancePayment", { amount: formatCurrency(balanceEuros) })
+														: balanceEuros < 0
+															? t("billing.detail.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) })
+															: formatCurrency(0)}
+												</TableCell>
 												</TableRow>
 											);
 										})}
 									</TableBody>
 								</Table>
 							)
-						) : tenantStatements.length === 0 ? (
-							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
-								<Calculator className="size-8" />
-								<p>Keine Abrechnungsergebnisse vorhanden.</p>
-							</div>
-						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Mieter / Einheit</TableHead>
-										<TableHead>Zeitanteil</TableHead>
-										<TableHead className="text-right">Umgelegte Kosten</TableHead>
-										<TableHead className="text-right">Vorauszahlungen</TableHead>
-										<TableHead className="text-right">Saldo</TableHead>
-										<TableHead className="w-[220px] text-right">PDF</TableHead>
-									</TableRow>
-								</TableHeader>
+					) : tenantStatements.length === 0 ? (
+						<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
+							<Calculator className="size-8" />
+							<p>{t("billing.empty.statements")}</p>
+						</div>
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>{t("billing.table.tenantUnit")}</TableHead>
+									<TableHead>{t("billing.table.timeShare")}</TableHead>
+									<TableHead className="text-right">{t("billing.table.allocatedCosts")}</TableHead>
+									<TableHead className="text-right">{t("billing.table.prepayments")}</TableHead>
+									<TableHead className="text-right">{t("billing.table.balance")}</TableHead>
+									<TableHead className="w-[220px] text-right">{t("billing.table.pdf")}</TableHead>
+								</TableRow>
+							</TableHeader>
 								<TableBody>
 									{tenantStatements.map((statement) => {
 										const balanceEuros = Number(statement.balance);
@@ -239,14 +246,18 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 														{statement.lease.unit.label}
 													</Link>
 												</TableCell>
-												<TableCell className="text-muted-foreground">
-													{formatDate(statement.occupiedFrom)} – {formatDate(statement.occupiedTo)} ({statement.occupiedDays} Tage)
-												</TableCell>
-												<TableCell className="text-right">{formatCurrency(statement.totalAllocatedCosts)}</TableCell>
-												<TableCell className="text-right">{formatCurrency(statement.totalPrepayments)}</TableCell>
-												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
-													{balanceEuros > 0 ? `Nachzahlung ${formatCurrency(balanceEuros)}` : balanceEuros < 0 ? `Guthaben ${formatCurrency(Math.abs(balanceEuros))}` : formatCurrency(0)}
-												</TableCell>
+											<TableCell className="text-muted-foreground">
+												{formatDate(statement.occupiedFrom)} – {formatDate(statement.occupiedTo)} ({statement.occupiedDays} {t("billing.detail.days")})
+											</TableCell>
+											<TableCell className="text-right">{formatCurrency(statement.totalAllocatedCosts)}</TableCell>
+											<TableCell className="text-right">{formatCurrency(statement.totalPrepayments)}</TableCell>
+											<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
+												{balanceEuros > 0
+													? t("billing.detail.balancePayment", { amount: formatCurrency(balanceEuros) })
+													: balanceEuros < 0
+														? t("billing.detail.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) })
+														: formatCurrency(0)}
+											</TableCell>
 												<TableCell>
 													<div className="flex justify-end">
 														<GenerateStatementPdfButton tenantStatementId={statement.id} pdfPath={statement.pdfPath} pdfFileSize={statement.pdfFileSize} postalConfigured={postalConfigured} />

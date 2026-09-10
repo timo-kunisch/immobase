@@ -4,9 +4,9 @@ import { getUserByEmail } from "@/data/users";
 import { ActionState } from "@/lib/action-state";
 import { createPasswordResetToken } from "@/lib/auth/tokens";
 import { isSmtpConfigured, sendPasswordResetEmail } from "@/lib/email/mailer";
+import { getT } from "@/lib/i18n/server";
 import { isValidEmail, normalizeEmail } from "@/lib/auth/validation";
 
-const GENERIC_MESSAGE = "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir einen Link zum Zurücksetzen des Passworts versendet.";
 
 /**
  * Absichtlich IMMER dieselbe Erfolgsmeldung, unabhängig davon, ob ein
@@ -18,16 +18,17 @@ const GENERIC_MESSAGE = "Falls ein Konto mit dieser E-Mail-Adresse existiert, ha
  * erzeugt noch eine E-Mail versendet.
  */
 export async function forgotPasswordAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const t = await getT();
 	if (!isSmtpConfigured()) {
 		return {
-			error: "Das Zurücksetzen des Passworts ist nicht verfügbar, weil kein E-Mail-Server konfiguriert ist. Bitte wenden Sie sich an einen Administrator.",
+			error: t("auth.errors.resetUnavailable"),
 		};
 	}
 
 	const email = normalizeEmail(String(formData.get("email") ?? ""));
 
 	if (!isValidEmail(email)) {
-		return { error: "Bitte geben Sie eine gültige E-Mail-Adresse an." };
+		return { error: t("auth.errors.invalidEmail") };
 	}
 
 	const user = getUserByEmail(email);
@@ -36,5 +37,5 @@ export async function forgotPasswordAction(_prevState: ActionState, formData: Fo
 		await sendPasswordResetEmail(email, token);
 	}
 
-	return { success: true, message: GENERIC_MESSAGE };
+	return { success: true, message: t("auth.messages.forgotGeneric") };
 }

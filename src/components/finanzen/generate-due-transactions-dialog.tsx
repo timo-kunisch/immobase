@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
 
 import { generateDueTransactionsAction } from "@/app/(app)/finanzen/actions";
 
@@ -17,6 +18,7 @@ function currentMonthValue(): string {
 }
 
 export function GenerateDueTransactionsDialog() {
+	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(generateDueTransactionsAction, initialActionState);
 	const defaultMonth = currentMonthValue();
@@ -26,48 +28,45 @@ export function GenerateDueTransactionsDialog() {
 			<DialogTrigger asChild>
 				<Button type="button" variant="outline">
 					<CalendarClock />
-					Zahlungen für Zeitraum fällig stellen
+					{t("finances.generate.trigger")}
 				</Button>
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-lg">
 				{state.success ? (
 					<>
 						<DialogHeader>
-							<DialogTitle>Fällig gestellt</DialogTitle>
+							<DialogTitle>{t("finances.generate.successTitle")}</DialogTitle>
 							<DialogDescription>{state.message}</DialogDescription>
 						</DialogHeader>
 						<DialogFooter>
 							<Button type="button" onClick={() => setOpen(false)}>
-								Schließen
+								{t("common.close")}
 							</Button>
 						</DialogFooter>
 					</>
 				) : (
 					<form action={formAction}>
 						<DialogHeader>
-							<DialogTitle>Zahlungen automatisch fällig stellen</DialogTitle>
-							<DialogDescription>
-								Legt für alle aktiven Mietverträge und jeden Monat im gewählten Zeitraum eine offene Zahlung an (Kaltmiete + Nebenkosten). Bereits vorhandene Zahlungen für einen
-								Monat werden nicht doppelt angelegt.
-							</DialogDescription>
+							<DialogTitle>{t("finances.generate.title")}</DialogTitle>
+							<DialogDescription>{t("finances.generate.description")}</DialogDescription>
 						</DialogHeader>
 
 						<div className="grid gap-4 py-4">
 							<div className="grid grid-cols-2 gap-4">
 								<div className="grid gap-2">
-									<Label htmlFor="fromMonth">Von (Monat) *</Label>
+									<Label htmlFor="fromMonth">{t("finances.generate.fromMonth")} *</Label>
 									<Input id="fromMonth" name="fromMonth" type="month" defaultValue={defaultMonth} required />
 								</div>
 								<div className="grid gap-2">
-									<Label htmlFor="toMonth">Bis (Monat) *</Label>
+									<Label htmlFor="toMonth">{t("finances.generate.toMonth")} *</Label>
 									<Input id="toMonth" name="toMonth" type="month" defaultValue={defaultMonth} required />
 								</div>
 							</div>
 
 							<div className="grid gap-2">
-								<Label htmlFor="dueDay">Fällig jeweils am (Tag des Monats) *</Label>
+								<Label htmlFor="dueDay">{t("finances.generate.dueDay")} *</Label>
 								<Input id="dueDay" name="dueDay" type="number" min="1" max="28" defaultValue="3" required />
-								<p className="text-xs text-muted-foreground">Tag zwischen 1 und 28, um für jeden Monat ein gültiges Datum zu garantieren.</p>
+								<p className="text-xs text-muted-foreground">{t("finances.generate.dueDayHint")}</p>
 							</div>
 
 							{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
@@ -75,11 +74,11 @@ export function GenerateDueTransactionsDialog() {
 
 						<DialogFooter>
 							<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-								Abbrechen
+								{t("common.cancel")}
 							</Button>
 							<Button type="submit" disabled={isPending}>
 								{isPending ? <Loader2 className="animate-spin" /> : null}
-								Fällig stellen
+								{t("finances.generate.submit")}
 							</Button>
 						</DialogFooter>
 					</form>

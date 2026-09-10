@@ -17,6 +17,7 @@ import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
 import { formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -38,6 +39,7 @@ function describeLease(lease: LeaseWithDetails | null, fallback: string): string
 
 export async function saveLeaseAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const unitId = getString(formData, "unitId");
 	const tenantId = getString(formData, "tenantId");
@@ -52,7 +54,7 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 
 	if (!unitId || !tenantId || !startDateRaw || coldRent === null || serviceCharges === null) {
 		return {
-			error: "Bitte wählen Sie Einheit & Mieter aus und geben Sie Mietbeginn, Kaltmiete sowie Nebenkosten an.",
+			error: t("leases.errors.requiredFields"),
 		};
 	}
 
@@ -82,7 +84,7 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 		}
 	} catch (error) {
 		console.error("saveLeaseAction failed", error);
-		return { error: "Der Mietvertrag konnte nicht gespeichert werden." };
+		return { error: t("leases.errors.saveFailed") };
 	}
 
 	revalidatePath("/vertraege");
@@ -93,13 +95,14 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 
 export async function deleteLeaseAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const lease = getLeaseWithDetails(id);
 	try {
 		deleteLease(id);
 	} catch (error) {
 		console.error("deleteLeaseAction failed", error);
-		return { error: "Der Mietvertrag konnte nicht gelöscht werden." };
+		return { error: t("leases.errors.deleteFailed") };
 	}
 
 	logActivity(user, "DELETE", "vertraege", `Mietvertrag „${describeLease(lease, id)}“ gelöscht`, id);
@@ -122,6 +125,7 @@ export async function deleteLeaseAction(id: string): Promise<ActionState> {
 
 export async function saveRentAdjustmentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const leaseId = getString(formData, "leaseId");
 	const validFromRaw = getString(formData, "validFrom");
@@ -132,19 +136,19 @@ export async function saveRentAdjustmentAction(_prevState: ActionState, formData
 
 	if (!leaseId || !validFromRaw || coldRent === null || serviceCharges === null) {
 		return {
-			error: "Bitte geben Sie Gültigkeitsdatum, Kaltmiete sowie Nebenkosten an.",
+			error: t("leases.errors.adjustmentRequiredFields"),
 		};
 	}
 
 	const lease = getLease(leaseId);
 	if (!lease) {
-		return { error: "Der zugehörige Mietvertrag wurde nicht gefunden." };
+		return { error: t("leases.errors.leaseNotFound") };
 	}
 
 	const validFrom = new Date(validFromRaw);
 	if (validFrom <= new Date(lease.startDate)) {
 		return {
-			error: "Das Gültigkeitsdatum muss nach dem Mietbeginn liegen (der Betrag zum Mietbeginn wird direkt im Vertrag gepflegt).",
+			error: t("leases.errors.validFromAfterStart"),
 		};
 	}
 
@@ -167,7 +171,7 @@ export async function saveRentAdjustmentAction(_prevState: ActionState, formData
 	} catch (error) {
 		console.error("saveRentAdjustmentAction failed", error);
 		return {
-			error: "Die Änderung konnte nicht gespeichert werden. Existiert für dieses Datum bereits ein Eintrag?",
+			error: t("leases.errors.adjustmentSaveFailed"),
 		};
 	}
 
@@ -179,11 +183,12 @@ export async function saveRentAdjustmentAction(_prevState: ActionState, formData
 
 export async function deleteRentAdjustmentAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		deleteRentAdjustment(id);
 	} catch (error) {
 		console.error("deleteRentAdjustmentAction failed", error);
-		return { error: "Die Änderung konnte nicht gelöscht werden." };
+		return { error: t("leases.errors.adjustmentDeleteFailed") };
 	}
 
 	// Keine getRentAdjustment-Funktion im Repository vorhanden - daher ID-Fallback.

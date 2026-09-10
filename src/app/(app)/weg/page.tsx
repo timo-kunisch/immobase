@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { CountLinkBadge } from "@/components/ui/count-link-badge";
 import { HoaFormDialog } from "@/components/weg/hoa-form-dialog";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteHoaAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function WegPage() {
+	const t = await getT();
 	const hoaList = listHoasWithProperty();
 	// Nur Liegenschaften anbieten, die noch keiner WEG zugeordnet sind
 	// (1:1-Beziehung über hoas.property_id).
@@ -23,7 +25,7 @@ export default async function WegPage() {
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="WEG-Verwaltung" description="Wohnungseigentümergemeinschaften verwalten." actions={<HoaFormDialog availableProperties={availableProperties} />} />
+			<SiteHeader title={t("hoa.title")} description={t("hoa.description")} actions={<HoaFormDialog availableProperties={availableProperties} />} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<Card>
@@ -31,16 +33,16 @@ export default async function WegPage() {
 						{hoaList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Building2 className="size-8" />
-								<p>Noch keine WEG angelegt.</p>
+								<p>{t("hoa.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Bezeichnung</TableHead>
-										<TableHead>Liegenschaft</TableHead>
-										<TableHead>Verknüpft</TableHead>
-										<TableHead className="w-[140px] text-right">Aktionen</TableHead>
+										<TableHead>{t("hoa.table.name")}</TableHead>
+										<TableHead>{t("hoa.table.property")}</TableHead>
+										<TableHead>{t("hoa.table.linked")}</TableHead>
+										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -56,19 +58,19 @@ export default async function WegPage() {
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center gap-1.5">
-														<CountLinkBadge href={`/einheiten?propertyId=${hoa.propertyId}`} count={stats?.units ?? 0} label="Einheiten" icon={DoorOpen} />
-														<CountLinkBadge href={`/weg/eigentumsverhaeltnisse?hoaId=${hoa.id}`} count={stats?.ownerships ?? 0} label="Eigentumsverhältnisse" icon={Users} />
+														<CountLinkBadge href={`/einheiten?propertyId=${hoa.propertyId}`} count={stats?.units ?? 0} label={t("hoa.badge.units")} icon={DoorOpen} />
+														<CountLinkBadge href={`/weg/eigentumsverhaeltnisse?hoaId=${hoa.id}`} count={stats?.ownerships ?? 0} label={t("hoa.badge.ownerships")} icon={Users} />
 													</div>
 												</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
 														<HoaFormDialog hoa={hoa} availableProperties={[hoa.property, ...availableProperties]} />
-														<Button variant="ghost" size="icon-sm" aria-label="Details" title="Details" asChild>
+														<Button variant="ghost" size="icon-sm" aria-label={t("common.details")} title={t("common.details")} asChild>
 															<Link href={`/weg/eigentumsverhaeltnisse?hoaId=${hoa.id}`}>
 																<ChevronRight className="size-4" />
 															</Link>
 														</Button>
-														<ConfirmDeleteButton action={deleteHoaAction.bind(null, hoa.id)} confirmMessage={`WEG "${hoa.name}" wirklich löschen?`} />
+														<ConfirmDeleteButton action={deleteHoaAction.bind(null, hoa.id)} confirmMessage={t("hoa.confirm.delete", { name: hoa.name })} />
 													</div>
 												</TableCell>
 											</TableRow>

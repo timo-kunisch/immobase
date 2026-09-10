@@ -10,12 +10,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { initialActionState } from "@/lib/action-state";
-import { AVAILABLE_PLACEHOLDERS, documentTemplateCategoryLabels } from "@/lib/templates";
+import { useI18n } from "@/lib/i18n/provider";
+import { AVAILABLE_PLACEHOLDERS, documentTemplateCategoryLabelKeys } from "@/lib/templates";
 
 import { saveDocumentTemplateAction } from "@/app/(app)/vorlagen/actions";
 import type { DocumentTemplate } from "@/data/types";
 
 export function TemplateFormDialog({ template }: { template?: DocumentTemplate }) {
+	const { t } = useI18n();
 	const isEdit = Boolean(template);
 	const [open, setOpen] = useState(false);
 	const [state, formAction, isPending] = useActionState(saveDocumentTemplateAction, initialActionState);
@@ -30,21 +32,21 @@ export function TemplateFormDialog({ template }: { template?: DocumentTemplate }
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
 				{isEdit ? (
-					<Button variant="ghost" size="icon-sm" aria-label="Bearbeiten" title="Bearbeiten">
+					<Button variant="ghost" size="icon-sm" aria-label={t("common.edit")} title={t("common.edit")}>
 						<Pencil className="size-4" />
 					</Button>
 				) : (
 					<Button type="button">
 						<Plus />
-						Neue Vorlage
+						{t("templates.actions.create")}
 					</Button>
 				)}
 			</DialogTrigger>
 			<DialogContent className="sm:max-w-2xl">
 				<form action={formAction}>
 					<DialogHeader>
-						<DialogTitle>{isEdit ? "Vorlage bearbeiten" : "Neue Dokumentvorlage"}</DialogTitle>
-						<DialogDescription>Text der Vorlage inkl. Platzhaltern, die beim Erzeugen eines konkreten Schreibens automatisch ersetzt werden.</DialogDescription>
+						<DialogTitle>{isEdit ? t("templates.dialog.editTitle") : t("templates.dialog.createTitle")}</DialogTitle>
+						<DialogDescription>{t("templates.dialog.description")}</DialogDescription>
 					</DialogHeader>
 
 					{isEdit ? <input type="hidden" name="id" value={template!.id} /> : null}
@@ -52,19 +54,19 @@ export function TemplateFormDialog({ template }: { template?: DocumentTemplate }
 					<div className="grid gap-4 py-4">
 						<div className="grid grid-cols-3 gap-4">
 							<div className="col-span-2 grid gap-2">
-								<Label htmlFor="title">Titel *</Label>
-								<Input id="title" name="title" defaultValue={template?.title} placeholder="z. B. Mahnung Mietzahlung" required />
+								<Label htmlFor="title">{t("templates.fields.title")} *</Label>
+								<Input id="title" name="title" defaultValue={template?.title} placeholder={t("templates.fields.titlePlaceholder")} required />
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="category">Kategorie</Label>
+								<Label htmlFor="category">{t("templates.fields.category")}</Label>
 								<Select name="category" defaultValue={template?.category ?? "GENERAL"}>
 									<SelectTrigger id="category" className="w-full">
 										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										{Object.entries(documentTemplateCategoryLabels).map(([value, label]) => (
+										{Object.entries(documentTemplateCategoryLabelKeys).map(([value, labelKey]) => (
 											<SelectItem key={value} value={value}>
-												{label}
+												{t(labelKey)}
 											</SelectItem>
 										))}
 									</SelectContent>
@@ -73,33 +75,33 @@ export function TemplateFormDialog({ template }: { template?: DocumentTemplate }
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="subject">Betreff</Label>
-							<Input id="subject" name="subject" defaultValue={template?.subject ?? ""} placeholder="z. B. Abmahnung wegen ausstehender Mietzahlung" />
+							<Label htmlFor="subject">{t("templates.fields.subject")}</Label>
+							<Input id="subject" name="subject" defaultValue={template?.subject ?? ""} placeholder={t("templates.fields.subjectPlaceholder")} />
 						</div>
 
 						<div className="grid gap-2">
-							<Label htmlFor="body">Text *</Label>
+							<Label htmlFor="body">{t("templates.fields.body")} *</Label>
 							<Textarea
 								id="body"
 								name="body"
 								defaultValue={template?.body ?? ""}
 								className="min-h-48"
-								placeholder={"Sehr geehrte/r {{mieter.vorname}} {{mieter.nachname}},\n\n..."}
+								placeholder={t("templates.fields.bodyPlaceholder")}
 								required
 							/>
 						</div>
 
 						<div className="rounded-lg border bg-muted/40 p-3">
-							<p className="mb-2 text-xs font-medium text-muted-foreground">Verfügbare Platzhalter (zum Einfügen anklicken):</p>
+							<p className="mb-2 text-xs font-medium text-muted-foreground">{t("templates.placeholders.hint")}</p>
 							<div className="flex flex-col gap-2">
 								{AVAILABLE_PLACEHOLDERS.map((group) => (
 									<div key={group.group} className="flex flex-wrap items-center gap-1.5">
-										<span className="text-xs text-muted-foreground">{group.groupLabel}:</span>
+										<span className="text-xs text-muted-foreground">{t(group.groupLabelKey)}:</span>
 										{group.placeholders.map((placeholder) => (
 											<button
 												key={placeholder.key}
 												type="button"
-												title={placeholder.label}
+												title={t(placeholder.labelKey)}
 												className="rounded-md border bg-background px-1.5 py-0.5 font-mono text-xs hover:bg-accent"
 												onClick={(event) => {
 													const form = event.currentTarget.closest("form");
@@ -127,11 +129,11 @@ export function TemplateFormDialog({ template }: { template?: DocumentTemplate }
 
 					<DialogFooter>
 						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
-							Abbrechen
+							{t("common.cancel")}
 						</Button>
 						<Button type="submit" disabled={isPending}>
 							{isPending ? <Loader2 className="animate-spin" /> : null}
-							Speichern
+							{t("common.save")}
 						</Button>
 					</DialogFooter>
 				</form>

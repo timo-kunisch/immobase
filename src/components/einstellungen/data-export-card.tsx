@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { getDesktopBridge } from "@/lib/desktop-bridge";
+import { useI18n } from "@/lib/i18n/provider";
 
 type ImportMode = "replace" | "merge";
 
@@ -32,6 +33,7 @@ const MIN_PASSWORD_LENGTH = 8;
  * Admins beschränkt.
  */
 export function DataExportCard() {
+	const { t } = useI18n();
 	const bridge = getDesktopBridge();
 	const [busy, setBusy] = useState<"export" | "import" | null>(null);
 	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -45,11 +47,11 @@ export function DataExportCard() {
 		if (!bridge) return; // Browser-Fallback läuft über den <a href>-Download
 		if (encryptExport) {
 			if (exportPassword.length < MIN_PASSWORD_LENGTH) {
-				setMessage({ kind: "error", text: `Das Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.` });
+				setMessage({ kind: "error", text: t("settings.errors.passwordTooShort", { min: MIN_PASSWORD_LENGTH }) });
 				return;
 			}
 			if (exportPassword !== exportPasswordConfirm) {
-				setMessage({ kind: "error", text: "Die Passwörter stimmen nicht überein." });
+				setMessage({ kind: "error", text: t("settings.errors.passwordMismatch") });
 				return;
 			}
 		}
@@ -67,17 +69,20 @@ export function DataExportCard() {
 			});
 			const payload = (await response.json()) as { ok?: boolean; fileCount?: number; error?: string };
 			if (!response.ok) {
-				setMessage({ kind: "error", text: payload.error ?? "Export fehlgeschlagen." });
+				setMessage({ kind: "error", text: payload.error ?? t("settings.cards.backup.exportFailed") });
 			} else {
 				setMessage({
 					kind: "success",
-					text: `${encryptExport ? "Verschlüsseltes Backup" : "Backup"} gespeichert (${payload.fileCount ?? 0} Dateien): ${targetPath}`,
+					text: t(encryptExport ? "settings.cards.backup.exportSuccessEncrypted" : "settings.cards.backup.exportSuccess", {
+						count: payload.fileCount ?? 0,
+						path: targetPath,
+					}),
 				});
 				setExportPassword("");
 				setExportPasswordConfirm("");
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Export fehlgeschlagen." });
+			setMessage({ kind: "error", text: t("settings.cards.backup.exportFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -90,8 +95,8 @@ export function DataExportCard() {
 		try {
 			const sourcePath = await bridge.chooseBackupOpenPath();
 			if (!sourcePath) return; // Dialog abgebrochen
-			const modeLabel = importMode === "replace" ? "ERSETZT" : "ZUSAMMENGEFÜHRT";
-			if (!window.confirm(`Sicherung wirklich importieren?\n\n${sourcePath}\n\nDer aktuelle Datenbestand wird ${modeLabel}. Vorher wird automatisch ein Backup des aktuellen Standes angelegt.`)) {
+			const modeLabel = t(importMode === "replace" ? "settings.cards.backup.importMode.replaceUpper" : "settings.cards.backup.importMode.mergeUpper");
+			if (!window.confirm(t("settings.cards.backup.importConfirm", { path: sourcePath, mode: modeLabel }))) {
 				return;
 			}
 			const response = await fetch("/api/backup/import", {
@@ -101,16 +106,18 @@ export function DataExportCard() {
 			});
 			const payload = (await response.json()) as { ok?: boolean; backupPath?: string | null; error?: string };
 			if (!response.ok) {
-				setMessage({ kind: "error", text: payload.error ?? "Import fehlgeschlagen." });
+				setMessage({ kind: "error", text: payload.error ?? t("settings.cards.backup.importFailed") });
 			} else {
 				setMessage({
 					kind: "success",
-					text: `Backup importiert.${payload.backupPath ? ` Sicherung des vorherigen Standes: ${payload.backupPath}` : ""} Die Seite wird neu geladen.`,
+					text: payload.backupPath
+						? t("settings.cards.backup.importSuccessWithBackup", { backupPath: payload.backupPath })
+						: t("settings.cards.backup.importSuccess"),
 				});
 				setTimeout(() => window.location.reload(), 1500);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Import fehlgeschlagen." });
+			setMessage({ kind: "error", text: t("settings.cards.backup.importFailed") });
 		} finally {
 			setBusy(null);
 		}
@@ -119,10 +126,9 @@ export function DataExportCard() {
 	return (
 		<Card className="max-w-xl">
 			<CardHeader>
-				<CardTitle>Datensicherung</CardTitle>
+				<CardTitle>{t("settings.cards.backup.title")}</CardTitle>
 				<CardDescription>
-					Sichert die komplette Anwendung (Datenbank + alle Dateien) als eine ZIP-Datei mit Prüfsummen - geeignet für
-					Backups und den Umzug auf ein anderes Gerät. Optional mit Passwort verschlüsselt (AES-256).
+					{t("settings.cards.backup.description")}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
@@ -139,13 +145,13 @@ export function DataExportCard() {
 									}}
 									disabled={busy !== null}
 								/>
-								<Label htmlFor="backup-encrypt">Mit Passwort verschlüsseln (.imbak)</Label>
+								<Label htmlFor="backup-encrypt">{t("settings.password.encryptToggle")}</Label>
 							</div>
 							{encryptExport ? (
 								<div className="grid gap-2 sm:grid-cols-2">
 									<Input
 										type="password"
-										placeholder={`Passwort (min. ${MIN_PASSWORD_LENGTH} Zeichen)`}
+										placeholder={t("settings.password.placeholderMin", { min: MIN_PASSWORD_LENGTH })}
 										value={exportPassword}
 										onChange={(event) => setExportPassword(event.target.value)}
 										disabled={busy !== null}
@@ -153,7 +159,7 @@ export function DataExportCard() {
 									/>
 									<Input
 										type="password"
-										placeholder="Passwort wiederholen"
+										placeholder={t("settings.password.repeatPlaceholder")}
 										value={exportPasswordConfirm}
 										onChange={(event) => setExportPasswordConfirm(event.target.value)}
 										disabled={busy !== null}
@@ -164,7 +170,7 @@ export function DataExportCard() {
 							<div>
 								<Button onClick={handleExport} disabled={busy !== null}>
 									{busy === "export" ? <Loader2 className="animate-spin" /> : <Download />}
-									Backup exportieren ({encryptExport ? ".imbak" : ".zip"})
+									{t("settings.cards.backup.exportButton", { extension: encryptExport ? ".imbak" : ".zip" })}
 								</Button>
 							</div>
 						</>
@@ -172,7 +178,7 @@ export function DataExportCard() {
 						<Button asChild>
 							<a href="/api/backup/export" download>
 								<Download />
-								Backup herunterladen (.zip)
+								{t("settings.cards.backup.downloadButton")}
 							</a>
 						</Button>
 					)}
@@ -187,17 +193,17 @@ export function DataExportCard() {
 								onChange={(event) => setImportMode(event.target.value as ImportMode)}
 								disabled={busy !== null}
 							>
-								<option value="replace">Ersetzen (Bestand wird überschrieben)</option>
-								<option value="merge">Zusammenführen (nur fehlende Einträge ergänzen)</option>
+								<option value="replace">{t("settings.cards.backup.importMode.replace")}</option>
+								<option value="merge">{t("settings.cards.backup.importMode.merge")}</option>
 							</select>
 							<Button variant="outline" onClick={handleImport} disabled={busy !== null}>
 								{busy === "import" ? <Loader2 className="animate-spin" /> : <Upload />}
-								Backup importieren
+								{t("settings.cards.backup.importButton")}
 							</Button>
 						</div>
 						<Input
 							type="password"
-							placeholder="Passwort (nur falls die Sicherung verschlüsselt ist)"
+							placeholder={t("settings.cards.backup.importPasswordPlaceholder")}
 							value={importPassword}
 							onChange={(event) => setImportPassword(event.target.value)}
 							disabled={busy !== null}
@@ -205,15 +211,12 @@ export function DataExportCard() {
 							className="sm:max-w-xs"
 						/>
 						<p className="text-xs text-muted-foreground">
-							Vor dem Import wird automatisch eine Sicherung des aktuellen Standes unter „backups/“ im Datenverzeichnis
-							abgelegt. „Zusammenführen“ übernimmt nur Einträge, die lokal noch nicht existieren (vorhandene lokale
-							Einträge bleiben unverändert). Verschlüsselte Sicherungen (.imbak) werden automatisch erkannt.
+							{t("settings.cards.backup.importHint")}
 						</p>
 					</div>
 				) : (
 					<p className="border-t pt-4 text-xs text-muted-foreground">
-						Import und verschlüsselter Export stehen in der Desktop-App zur Verfügung (nativer Dateidialog,
-						automatische Vor-Sicherung).
+						{t("settings.cards.backup.desktopOnlyHint")}
 					</p>
 				)}
 
@@ -225,8 +228,7 @@ export function DataExportCard() {
 
 				<p className="flex items-start gap-1.5 text-xs text-muted-foreground">
 					<HardDriveDownload className="mt-0.5 size-3.5 shrink-0" />
-					Enthält personenbezogene Daten (Mieter, Eigentümer, Nutzer) - Sicherungsdatei sicher verwahren. Ein
-					vergessenes Passwort kann nicht wiederhergestellt werden.
+					{t("settings.cards.backup.privacyHint")}
 				</p>
 			</CardContent>
 		</Card>

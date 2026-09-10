@@ -5,6 +5,7 @@ import { Eye, EyeOff, Loader2, Lock, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useI18n } from "@/lib/i18n/provider";
 import { encryptExistingFilesAction, getRecoveryKeyAction } from "@/app/(app)/einstellungen/actions";
 
 export interface SecurityStatus {
@@ -27,6 +28,7 @@ export interface SecurityStatus {
  * Wiederherstellungsschlüssels (nur Admins, siehe Layout + Server Actions).
  */
 export function SecurityCard({ status }: { status: SecurityStatus }) {
+	const { t } = useI18n();
 	const [busy, setBusy] = useState(false);
 	const [message, setMessage] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 	const [recoveryKey, setRecoveryKey] = useState<string | null>(null);
@@ -44,14 +46,14 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 					kind: "success",
 					text:
 						(result.encrypted ?? 0) > 0
-							? `${result.encrypted} Datei(en) wurden verschlüsselt.`
-							: "Alle Dateien waren bereits verschlüsselt.",
+							? t("settings.cards.security.encryptSuccess", { count: result.encrypted ?? 0 })
+							: t("settings.cards.security.encryptNone"),
 				});
 				// Statusanzeige aktualisieren (Server Component neu rendern).
 				window.location.reload();
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Die Dateiverschlüsselung konnte nicht ausgeführt werden." });
+			setMessage({ kind: "error", text: t("settings.cards.security.encryptRunFailed") });
 		} finally {
 			setBusy(false);
 		}
@@ -66,60 +68,59 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 		try {
 			const result = await getRecoveryKeyAction();
 			if (result.error || !result.key) {
-				setMessage({ kind: "error", text: result.error ?? "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." });
+				setMessage({ kind: "error", text: result.error ?? t("settings.cards.security.recoveryKey.readFailed") });
 			} else {
 				setRecoveryKey(result.key);
 			}
 		} catch {
-			setMessage({ kind: "error", text: "Der Wiederherstellungsschlüssel konnte nicht gelesen werden." });
+			setMessage({ kind: "error", text: t("settings.cards.security.recoveryKey.readFailed") });
 		} finally {
 			setKeyBusy(false);
 		}
 	}
 
 	const keySourceLabel =
-		status.keySource === "system-keychain" ? "Schlüsselbund des Betriebssystems (Desktop-App)" : "Schlüsseldatei im Datenverzeichnis (Entwicklung)";
+		status.keySource === "system-keychain" ? t("settings.cards.security.keySource.systemKeychain") : t("settings.cards.security.keySource.keyFile");
 
 	return (
 		<Card className="max-w-xl">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2">
 					<ShieldCheck className="size-5" />
-					Lokale Datenverschlüsselung
+					{t("settings.cards.security.title")}
 				</CardTitle>
 				<CardDescription>
-					Dateien und gespeicherte Zugangsdaten (z. B. SMTP-Passwort) werden auf diesem Gerät verschlüsselt
-					abgelegt (AES-256). Der Schlüssel ist an dieses Gerät gebunden: {keySourceLabel}.
+					{t("settings.cards.security.description", { keySource: keySourceLabel })}
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
 				<dl className="space-y-1 text-sm">
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Datenbank</dt>
+						<dt className="text-muted-foreground">{t("settings.cards.security.database")}</dt>
 						<dd>
 							{status.databaseEncrypted
-								? "verschlüsselt abgelegt (Ruhezustand)"
-								: "aktiv entsperrt - wird beim Beenden der App verschlüsselt"}
+								? t("settings.cards.security.database.encrypted")
+								: t("settings.cards.security.database.unlocked")}
 						</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Dateien in der Ablage</dt>
+						<dt className="text-muted-foreground">{t("settings.cards.security.files")}</dt>
 						<dd>
 							{status.filesTotal === 0
-								? "keine vorhanden"
+								? t("settings.cards.security.files.none")
 								: status.filesPlaintext === 0
-									? `${status.filesEncrypted} von ${status.filesTotal} verschlüsselt`
-									: `${status.filesPlaintext} von ${status.filesTotal} noch unverschlüsselt`}
+									? t("settings.cards.security.countEncrypted", { encrypted: status.filesEncrypted, total: status.filesTotal })
+									: t("settings.cards.security.countPlain", { plaintext: status.filesPlaintext, total: status.filesTotal })}
 						</dd>
 					</div>
 					<div className="flex justify-between gap-4">
-						<dt className="text-muted-foreground">Gespeicherte Zugangsdaten</dt>
+						<dt className="text-muted-foreground">{t("settings.cards.security.secrets")}</dt>
 						<dd>
 							{status.secretsSet === 0
-								? "keine konfiguriert"
+								? t("settings.cards.security.secrets.none")
 								: status.secretsEncrypted === status.secretsSet
-									? `${status.secretsEncrypted} von ${status.secretsSet} verschlüsselt`
-									: `${status.secretsSet - status.secretsEncrypted} von ${status.secretsSet} noch unverschlüsselt`}
+									? t("settings.cards.security.countEncrypted", { encrypted: status.secretsEncrypted, total: status.secretsSet })
+									: t("settings.cards.security.countPlain", { plaintext: status.secretsSet - status.secretsEncrypted, total: status.secretsSet })}
 						</dd>
 					</div>
 				</dl>
@@ -128,7 +129,7 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 					<div>
 						<Button variant="outline" onClick={handleEncryptNow} disabled={busy}>
 							{busy ? <Loader2 className="animate-spin" /> : <Lock />}
-							Bestandsdateien jetzt verschlüsseln
+							{t("settings.cards.security.encryptNow")}
 						</Button>
 					</div>
 				) : null}
@@ -136,15 +137,13 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 				<div className="space-y-2 border-t pt-4">
 					<Button variant="ghost" size="sm" onClick={handleToggleRecoveryKey} disabled={keyBusy}>
 						{keyBusy ? <Loader2 className="animate-spin" /> : recoveryKey !== null ? <EyeOff /> : <Eye />}
-						{recoveryKey !== null ? "Wiederherstellungsschlüssel ausblenden" : "Wiederherstellungsschlüssel anzeigen"}
+						{recoveryKey !== null ? t("settings.cards.security.recoveryKey.hide") : t("settings.cards.security.recoveryKey.show")}
 					</Button>
 					{recoveryKey !== null ? (
 						<div className="space-y-1">
 							<code className="block break-all rounded-md border bg-muted p-2 text-xs select-all">{recoveryKey}</code>
 							<p className="text-xs text-muted-foreground">
-								Den Schlüssel wie ein Passwort sicher verwahren und niemandem zeigen: Er entschlüsselt sämtliche
-								Dateien und gespeicherten Zugangsdaten dieses Geräts. Er wird benötigt, falls der Schlüsselbund des
-								Betriebssystems verloren geht (z. B. nach einer Neuinstallation ohne Datensicherung).
+								{t("settings.cards.security.recoveryKey.hint")}
 							</p>
 						</div>
 					) : null}
@@ -157,10 +156,7 @@ export function SecurityCard({ status }: { status: SecurityStatus }) {
 				) : null}
 
 				<p className="text-xs text-muted-foreground">
-					Hinweis: Die Datenbank liegt nur im beendeten Zustand als verschlüsselter Container vor - während die App
-					läuft (und nach einem Absturz ohne sauberes Beenden) ist sie entsperrt. Für vollständigen Schutz in diesen
-					Zuständen wird zusätzlich die Festplattenverschlüsselung des Betriebssystems (FileVault/BitLocker/LUKS)
-					empfohlen.
+					{t("settings.cards.security.databaseNote")}
 				</p>
 			</CardContent>
 		</Card>

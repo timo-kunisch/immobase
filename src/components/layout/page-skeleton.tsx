@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getT } from "@/lib/i18n/server";
 
 /**
  * Ladeplatzhalter für Seiten im App-Bereich (src/app/(app)/loading.tsx).
@@ -8,9 +9,10 @@ import { Skeleton } from "@/components/ui/skeleton";
  * Sidebar-Trigger + Titel, dann Inhaltskarte mit Tabellenzeilen), damit
  * der Übergang zur fertigen Seite ohne Layout-Sprung wirkt.
  */
-export function PageSkeleton() {
+export async function PageSkeleton() {
+	const t = await getT();
 	return (
-		<div className="flex flex-1 flex-col" aria-busy="true" aria-label="Seite wird geladen">
+		<div className="flex flex-1 flex-col" aria-busy="true" aria-label={t("common.pageLoading")}>
 			<header className="flex flex-col gap-4 border-b bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
 				<div className="flex items-center gap-3">
 					<Skeleton className="size-8" />

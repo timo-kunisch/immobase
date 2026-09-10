@@ -13,13 +13,15 @@ import { CountLinkBadge } from "@/components/ui/count-link-badge";
 import { TemplateFormDialog } from "@/components/vorlagen/template-form-dialog";
 import { formatDate } from "@/lib/format";
 import { formatFileSize } from "@/lib/format";
-import { documentTemplateCategoryLabels } from "@/lib/templates";
+import { getT } from "@/lib/i18n/server";
+import { documentTemplateCategoryLabelKeys } from "@/lib/templates";
 
 import { deleteDocumentTemplateAction, deleteGeneratedDocumentAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function VorlagenPage({ searchParams }: { searchParams: Promise<{ tenantId?: string; leaseId?: string }> }) {
+	const t = await getT();
 	const { tenantId, leaseId } = await searchParams;
 
 	// Bei aktivem Filter (Verlinkung von Mieter/Vertrag aus) wird statt der
@@ -39,13 +41,13 @@ export default async function VorlagenPage({ searchParams }: { searchParams: Pro
 
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Erzeugte Schreiben" description="Aus Dokumentvorlagen erzeugte, gespeicherte Schreiben." />
+				<SiteHeader title={t("templates.generated.title")} description={t("templates.generated.description")} />
 				<div className="flex-1 space-y-4 p-4 sm:p-6">
 					{filterLabel ? (
 						<p className="text-sm text-muted-foreground">
-							Gefiltert nach: <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
+							{t("templates.filter.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
 							<Link href="/vorlagen" className="text-primary hover:underline">
-								Filter zurücksetzen
+								{t("common.resetFilters")}
 							</Link>
 						</p>
 					) : null}
@@ -54,16 +56,16 @@ export default async function VorlagenPage({ searchParams }: { searchParams: Pro
 							{documentList.length === 0 ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 									<FileText className="size-8" />
-									<p>Keine erzeugten Schreiben für diese Auswahl gefunden.</p>
+									<p>{t("templates.generated.empty")}</p>
 								</div>
 							) : (
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Betreff</TableHead>
-											<TableHead>Vorlage</TableHead>
-											<TableHead>Erzeugt am</TableHead>
-											<TableHead className="w-[100px] text-right">Aktionen</TableHead>
+											<TableHead>{t("templates.generated.table.subject")}</TableHead>
+											<TableHead>{t("templates.generated.table.template")}</TableHead>
+											<TableHead>{t("templates.generated.table.createdAt")}</TableHead>
+											<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -88,7 +90,7 @@ export default async function VorlagenPage({ searchParams }: { searchParams: Pro
 												<TableCell className="text-muted-foreground">{formatDate(document.createdAt)}</TableCell>
 												<TableCell>
 													<div className="flex items-center justify-end gap-1">
-														<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage="Dieses erzeugte Schreiben wirklich löschen?" />
+														<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage={t("templates.generated.confirmDelete")} />
 													</div>
 												</TableCell>
 											</TableRow>
@@ -108,26 +110,26 @@ export default async function VorlagenPage({ searchParams }: { searchParams: Pro
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Dokumentvorlagen" description="Vorlagen für Schreiben an Mieter (Abmahnungen, Abrechnungen, allgemeine Briefe)." actions={<TemplateFormDialog />} />
+		<SiteHeader title={t("templates.title")} description={t("templates.description")} actions={<TemplateFormDialog />} />
 
-			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				<Card>
-					<CardContent className="p-0">
-						{templateList.length === 0 ? (
-							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
-								<FileText className="size-8" />
-								<p>Noch keine Vorlagen angelegt.</p>
-							</div>
-						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Titel</TableHead>
-										<TableHead>Kategorie</TableHead>
-										<TableHead>Erzeugte Schreiben</TableHead>
-										<TableHead className="w-[160px] text-right">Aktionen</TableHead>
-									</TableRow>
-								</TableHeader>
+		<div className="flex-1 space-y-4 p-4 sm:p-6">
+			<Card>
+				<CardContent className="p-0">
+					{templateList.length === 0 ? (
+						<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+							<FileText className="size-8" />
+							<p>{t("templates.empty")}</p>
+						</div>
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>{t("templates.table.title")}</TableHead>
+									<TableHead>{t("templates.table.category")}</TableHead>
+									<TableHead>{t("templates.table.generatedCount")}</TableHead>
+									<TableHead className="w-[160px] text-right">{t("common.actions")}</TableHead>
+								</TableRow>
+							</TableHeader>
 								<TableBody>
 									{templateList.map((template) => (
 										<TableRow key={template.id} id={`template-${template.id}`}>
@@ -135,26 +137,26 @@ export default async function VorlagenPage({ searchParams }: { searchParams: Pro
 												{template.title}
 												{template.subject ? <span className="block text-xs text-muted-foreground">{template.subject}</span> : null}
 											</TableCell>
-											<TableCell>
-												<Badge variant="secondary">{documentTemplateCategoryLabels[template.category]}</Badge>
-											</TableCell>
-											<TableCell>
-												<CountLinkBadge href={`/vorlagen/${template.id}`} count={generatedCountMap.get(template.id) ?? 0} label="Schreiben" icon={FileText} />
-											</TableCell>
-											<TableCell>
-												<div className="flex items-center justify-end gap-1">
-													<Button variant="ghost" size="icon-sm" aria-label="Anwenden / Schreiben erzeugen" title="Anwenden / Schreiben erzeugen" asChild>
-														<Link href={`/vorlagen/${template.id}`}>
-															<FilePlus2 className="size-4" />
-														</Link>
-													</Button>
-													<TemplateFormDialog template={template} />
-													<ConfirmDeleteButton
-														action={deleteDocumentTemplateAction.bind(null, template.id)}
-														confirmMessage={`Vorlage "${template.title}" wirklich löschen? Bereits erzeugte Schreiben bleiben erhalten.`}
-													/>
-												</div>
-											</TableCell>
+										<TableCell>
+											<Badge variant="secondary">{t(documentTemplateCategoryLabelKeys[template.category])}</Badge>
+										</TableCell>
+										<TableCell>
+											<CountLinkBadge href={`/vorlagen/${template.id}`} count={generatedCountMap.get(template.id) ?? 0} label={t("templates.generated.countLabel")} icon={FileText} />
+										</TableCell>
+										<TableCell>
+											<div className="flex items-center justify-end gap-1">
+												<Button variant="ghost" size="icon-sm" aria-label={t("templates.actions.apply")} title={t("templates.actions.apply")} asChild>
+													<Link href={`/vorlagen/${template.id}`}>
+														<FilePlus2 className="size-4" />
+													</Link>
+												</Button>
+												<TemplateFormDialog template={template} />
+												<ConfirmDeleteButton
+													action={deleteDocumentTemplateAction.bind(null, template.id)}
+													confirmMessage={t("templates.confirm.deleteTemplate", { title: template.title })}
+												/>
+											</div>
+										</TableCell>
 										</TableRow>
 									))}
 								</TableBody>

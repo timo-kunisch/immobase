@@ -97,6 +97,3 @@ export const ALL_ATTACHMENT_EXTENSIONS: string[] = [
 /** Wert für das accept-Attribut des <input type="file"> im Chat-Dialog. */
 export const ACCEPTED_FILE_TYPES = ALL_ATTACHMENT_EXTENSIONS.map((extension) => `.${extension}`).join(",");
 
-/** Kurze, nutzerfreundliche Aufzählung der unterstützten Typen (Fehlermeldungen/Hinweise). */
-export const SUPPORTED_TYPES_HINT =
-	"PDF, Word/PowerPoint/OpenDocument (.docx, .pptx, .odt, .ods, .odp), Excel (.xlsx), Bilder (.png, .jpg, .gif, .webp) sowie Text-/Datendateien (.csv, .txt, .md, .json, .xml, .log, Code-Dateien u. a.)";

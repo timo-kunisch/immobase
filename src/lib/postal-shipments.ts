@@ -10,6 +10,15 @@ import {
 import type { PostalShipmentSourceType, PostalShipmentStatus } from "@/data/types";
 import { getUploadedFile } from "@/lib/storage";
 import { getLetterXpressMode, isLetterXpressConfigured, LetterXpressError, sendPdfByPost } from "@/lib/letterxpress";
+import { deMessages } from "@/lib/i18n/messages/de";
+import { createTranslator, type TranslateFn } from "@/lib/i18n/translator";
+
+/**
+ * Standard-Übersetzer (Deutsch) für Aufrufe ohne eigenen t()-Parameter -
+ * u. a. die Unit-Tests, die ohne next/headers-Kontext laufen. Die Server
+ * Actions übergeben `await getT()` (gewählte Sprache des Nutzers).
+ */
+const defaultT = createTranslator(deMessages);
 
 /**
  * Generische Postversand-Orchestrierung (LetterXpress API, siehe
@@ -82,19 +91,20 @@ export type PostalShipmentActionState =
 export async function sendPdfByPostForSource(
 	sourceType: PostalShipmentSourceType,
 	sourceId: string,
-	requestedByUserId: string | null
+	requestedByUserId: string | null,
+	t: TranslateFn = defaultT
 ): Promise<PostalShipmentActionState> {
 	// Zentrales Gate für die optionale Online-Integration: Ohne hinterlegte
 	// Zugangsdaten ist der Postversand deaktiviert. Frühabbruch OHNE
 	// Protokoll-Eintrag - ein Versuch kann ohne Konfiguration nie erfolgreich
 	// sein und soll die Sendungsübersicht nicht mit FAILED-Zeilen füllen.
 	if (!isLetterXpressConfigured()) {
-		return { error: "Der Postversand ist nicht eingerichtet. Bitte hinterlegen Sie die LetterXpress-Zugangsdaten unter Einstellungen → Integrationen & KI." };
+		return { error: t("postal.errors.notConfigured") };
 	}
 
 	const source = loadSourceFile(sourceType, sourceId);
 	if (!source) {
-		return { error: "Für diese Quelle wurde kein versandfertiges PDF gefunden." };
+		return { error: t("postal.errors.noPdf") };
 	}
 
 	const mode = getLetterXpressMode();
@@ -106,7 +116,7 @@ export async function sendPdfByPostForSource(
 	try {
 		const fileObject = await getUploadedFile(source.filePath);
 		if (!fileObject) {
-			throw new LetterXpressError("Die PDF-Datei wurde in der Dateiablage nicht gefunden.");
+			throw new LetterXpressError(t("postal.errors.fileMissing"));
 		}
 		const pdfBuffer = await streamToUint8Array(fileObject.body);
 		const result = await sendPdfByPost({ pdfBuffer, fileName: source.fileName });
@@ -114,7 +124,7 @@ export async function sendPdfByPostForSource(
 		externalStatus = result.status;
 		status = "REGISTERED";
 	} catch (error) {
-		errorMessage = error instanceof LetterXpressError ? error.message : "Der Postversand ist fehlgeschlagen.";
+		errorMessage = error instanceof LetterXpressError ? error.message : t("postal.errors.sendFailed");
 		console.error(`sendPdfByPostForSource (${sourceType}/${sourceId}) failed`, error);
 	}
 
@@ -135,11 +145,14 @@ export async function sendPdfByPostForSource(
 		// Fehler an den Nutzer, da ohne DB-Eintrag keine verlässliche Auskunft
 		// über den Sendungsstatus mehr möglich ist.
 		console.error("sendPdfByPostForSource: Speichern des Sendungsprotokolls fehlgeschlagen", dbError);
-		return { error: "Der Sendungsstatus konnte nicht gespeichert werden. Bitte prüfen Sie ggf. das LetterXpress-Postfach." };
+		return { error: t("postal.errors.logFailed") };
 	}
 
 	if (status === "FAILED") {
-		return { error: errorMessage ?? "Der Postversand ist fehlgeschlagen." };
+		// Die detaillierte (technische) Fehlerursache bleibt im Protokoll
+		// (DB, deutsch); die UI erhält die übersetzte Meldung mit der
+		// Ursache als Parameter.
+		return { error: errorMessage ? t("postal.errors.sendFailedWithReason", { reason: errorMessage }) : t("postal.errors.sendFailed") };
 	}
 
 	return { success: true, jobId: jobId!, externalStatus, mode };

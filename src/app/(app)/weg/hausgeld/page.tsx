@@ -17,18 +17,12 @@ import { HousingChargeFormDialog } from "@/components/weg/housing-charge-form-di
 import { MarkHousingChargePaidButton } from "@/components/weg/mark-housing-charge-paid-button";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatCurrency, formatDate } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { resolvePagination } from "@/lib/pagination";
 
 import { deleteHousingChargeAction } from "./actions";
 
 export const dynamic = "force-dynamic";
-
-const statusLabels: Record<string, string> = {
-	OPEN: "Fällig",
-	PAID: "Bezahlt",
-	OVERDUE: "Überfällig",
-	CANCELLED: "Storniert",
-};
 
 const statusStyles: Record<string, string> = {
 	OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
@@ -38,16 +32,24 @@ const statusStyles: Record<string, string> = {
 };
 
 export default async function HausgeldPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+	const t = await getT();
 	const { hoaId, page: pageParam } = await searchParams;
+
+	const statusLabels: Record<string, string> = {
+		OPEN: t("hoaFinance.charges.status.OPEN"),
+		PAID: t("hoaFinance.charges.status.PAID"),
+		OVERDUE: t("hoaFinance.charges.status.OVERDUE"),
+		CANCELLED: t("hoaFinance.charges.status.CANCELLED"),
+	};
 
 	const hoaList = listHoasSortedByName();
 
 	if (hoaList.length === 0) {
 		return (
 			<div className="flex flex-1 flex-col">
-				<SiteHeader title="Hausgeld" description="Hausgeld-Sollstellungen je WEG und Eigentümer." />
+				<SiteHeader title={t("hoaFinance.charges.title")} description={t("hoaFinance.charges.description")} />
 				<div className="flex-1 p-4 sm:p-6">
-					<p className="text-sm text-muted-foreground">Legen Sie zuerst unter „WEG-Verwaltung“ eine WEG an.</p>
+					<p className="text-sm text-muted-foreground">{t("hoaFinance.noHoas")}</p>
 				</div>
 			</div>
 		);
@@ -70,7 +72,7 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title="Hausgeld" description="Hausgeld-Sollstellungen je WEG und Eigentümer." actions={selectedHoa ? <HousingChargeFormDialog hoaId={selectedHoa.id} units={units} owners={ownerList} /> : undefined} />
+			<SiteHeader title={t("hoaFinance.charges.title")} description={t("hoaFinance.charges.description")} actions={selectedHoa ? <HousingChargeFormDialog hoaId={selectedHoa.id} units={units} owners={ownerList} /> : undefined} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/hausgeld" />
@@ -80,7 +82,7 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 						<CardContent className="flex items-center gap-3 py-4">
 							<AlertTriangle className="size-5 text-red-600" />
 							<p className="text-sm">
-								<span className="font-semibold">{formatCurrency(arrears)}</span> an Hausgeld-Rückständen (fällige/überfällige Sollstellungen).
+								<span className="font-semibold">{formatCurrency(arrears)}</span> {t("hoaFinance.charges.arrears.suffix")}
 							</p>
 						</CardContent>
 					</Card>
@@ -91,19 +93,19 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 						{chargeList.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 								<Wallet className="size-8" />
-								<p>Noch keine Hausgeld-Sollstellungen erfasst.</p>
+								<p>{t("hoaFinance.charges.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										{!selectedHoa ? <TableHead>WEG</TableHead> : null}
-										<TableHead>Eigentümer / Einheit</TableHead>
-										<TableHead>Verwendungszweck</TableHead>
-										<TableHead>Fällig am</TableHead>
-										<TableHead className="text-right">Betrag</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className="w-[120px] text-right">Aktionen</TableHead>
+										{!selectedHoa ? <TableHead>{t("hoaFinance.charges.table.hoa")}</TableHead> : null}
+										<TableHead>{t("hoaFinance.charges.table.ownerUnit")}</TableHead>
+										<TableHead>{t("hoaFinance.charges.table.purpose")}</TableHead>
+										<TableHead>{t("hoaFinance.charges.table.dueDate")}</TableHead>
+										<TableHead className="text-right">{t("common.amount")}</TableHead>
+										<TableHead>{t("common.status")}</TableHead>
+										<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -126,7 +128,7 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 													<div className="flex items-center justify-end gap-1">
 														{charge.status !== "PAID" && chargeHoa ? <MarkHousingChargePaidButton housingChargeId={charge.id} hoaId={chargeHoa.id} /> : null}
 														{chargeHoa ? <HousingChargeFormDialog hoaId={chargeHoa.id} units={units} owners={ownerList} housingCharge={charge} /> : null}
-														{chargeHoa ? <ConfirmDeleteButton action={deleteHousingChargeAction.bind(null, charge.id, chargeHoa.id)} confirmMessage="Diese Hausgeld-Sollstellung wirklich löschen?" /> : null}
+														{chargeHoa ? <ConfirmDeleteButton action={deleteHousingChargeAction.bind(null, charge.id, chargeHoa.id)} confirmMessage={t("hoaFinance.charges.confirm.delete")} /> : null}
 													</div>
 												</TableCell>
 											</TableRow>

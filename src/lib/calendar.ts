@@ -81,7 +81,10 @@ export function buildCalendarItems(input: {
 	events: CalendarEvent[];
 	leases: LeaseWithDetails[];
 	meetings: OwnerMeetingWithHoaName[];
+	/** Titel-Präfixe der automatischen Termine (Standard: deutsche Texte). */
+	labels?: { leaseStart: string; leaseEnd: string; meeting: string };
 }): CalendarItem[] {
+	const labels = input.labels ?? { leaseStart: "Einzug", leaseEnd: "Auszug", meeting: "Versammlung" };
 	const items: CalendarItem[] = [];
 
 	for (const event of input.events) {
@@ -103,7 +106,7 @@ export function buildCalendarItems(input: {
 			items.push({
 				kind: "LEASE_START",
 				dayKey: startDay,
-				title: `Einzug: ${tenantName}`,
+				title: `${labels.leaseStart}: ${tenantName}`,
 				subtitle,
 				href: `/vertraege#lease-${lease.id}`,
 				event: null,
@@ -114,7 +117,7 @@ export function buildCalendarItems(input: {
 			items.push({
 				kind: "LEASE_END",
 				dayKey: endDay,
-				title: `Auszug: ${tenantName}`,
+				title: `${labels.leaseEnd}: ${tenantName}`,
 				subtitle,
 				href: `/vertraege#lease-${lease.id}`,
 				event: null,
@@ -130,7 +133,7 @@ export function buildCalendarItems(input: {
 		items.push({
 			kind: "MEETING",
 			dayKey: day,
-			title: `Versammlung: ${meeting.title}`,
+			title: `${labels.meeting}: ${meeting.title}`,
 			subtitle: meeting.hoaName,
 			href: `/weg/versammlungen#meeting-${meeting.id}`,
 			event: null,

@@ -123,7 +123,7 @@ describe("sendPdfByPostForSource", () => {
 
 		const result = await sendPdfByPostForSource("TENANT_STATEMENT", "s1", "user-1");
 
-		expect(result).toEqual({ error: "LetterXpress-Fehler: Unauthorized." });
+		expect(result).toEqual({ error: "Der Postversand ist fehlgeschlagen: LetterXpress-Fehler: Unauthorized." });
 		expect(insertedRows).toEqual([
 			expect.objectContaining({
 				sourceType: "TENANT_STATEMENT",

@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { MessageKey } from "@/lib/i18n/translator";
+
 import {
 	deletePasswordResetTokenByToken,
 	deletePasswordResetTokensForIdentifier,
@@ -40,7 +42,9 @@ export async function createVerificationToken(identifier: string): Promise<strin
 	return token;
 }
 
-type ConsumeResult = { success: true; identifier: string } | { success: false; error: string };
+// Fehler werden als Übersetzungsschlüssel (errorKey) zurückgegeben und erst
+// an der Aufrufstelle in die gewählte Sprache übersetzt.
+type ConsumeResult = { success: true; identifier: string } | { success: false; errorKey: MessageKey };
 
 /**
  * Löst einen Verifizierungs-Token ein (einmalig – wird danach gelöscht).
@@ -50,7 +54,7 @@ export async function consumeVerificationToken(token: string): Promise<ConsumeRe
 	const record = getVerificationTokenByToken(token);
 
 	if (!record) {
-		return { success: false, error: "Der Verifizierungslink ist ungültig." };
+		return { success: false, errorKey: "auth.errors.verificationInvalid" };
 	}
 
 	deleteVerificationTokenByToken(token);
@@ -58,7 +62,7 @@ export async function consumeVerificationToken(token: string): Promise<ConsumeRe
 	if (new Date(record.expires) < new Date()) {
 		return {
 			success: false,
-			error: "Der Verifizierungslink ist abgelaufen. Bitte fordern Sie einen neuen an.",
+			errorKey: "auth.errors.verificationExpired",
 		};
 	}
 
@@ -83,7 +87,7 @@ export async function consumePasswordResetToken(token: string): Promise<ConsumeR
 	const record = getPasswordResetTokenByToken(token);
 
 	if (!record) {
-		return { success: false, error: "Der Link ist ungültig." };
+		return { success: false, errorKey: "auth.errors.linkInvalid" };
 	}
 
 	deletePasswordResetTokenByToken(token);
@@ -91,7 +95,7 @@ export async function consumePasswordResetToken(token: string): Promise<ConsumeR
 	if (new Date(record.expires) < new Date()) {
 		return {
 			success: false,
-			error: "Der Link ist abgelaufen. Bitte fordern Sie einen neuen an.",
+			errorKey: "auth.errors.linkExpired",
 		};
 	}
 

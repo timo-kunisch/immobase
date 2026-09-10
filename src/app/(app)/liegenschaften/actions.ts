@@ -6,6 +6,7 @@ import { createProperty, deleteProperty, getProperty, updateProperty } from "@/d
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { ActionState } from "@/lib/action-state";
+import { getT } from "@/lib/i18n/server";
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -18,6 +19,7 @@ function getString(formData: FormData, key: string): string {
  */
 export async function savePropertyAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const id = getString(formData, "id");
 	const name = getString(formData, "name");
 	const street = getString(formData, "street");
@@ -27,7 +29,7 @@ export async function savePropertyAction(_prevState: ActionState, formData: Form
 	const notes = getString(formData, "notes");
 
 	if (!name || !street || !zipCode || !city) {
-		return { error: "Bitte füllen Sie alle Pflichtfelder aus." };
+		return { error: t("properties.errors.requiredFields") };
 	}
 
 	const data = {
@@ -49,7 +51,7 @@ export async function savePropertyAction(_prevState: ActionState, formData: Form
 		}
 	} catch (error) {
 		console.error("savePropertyAction failed", error);
-		return { error: "Die Liegenschaft konnte nicht gespeichert werden." };
+		return { error: t("properties.errors.saveFailed") };
 	}
 
 	revalidatePath("/liegenschaften");
@@ -59,6 +61,7 @@ export async function savePropertyAction(_prevState: ActionState, formData: Form
 
 export async function deletePropertyAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	// Bezeichnung vor dem Löschen ermitteln (für den Log-Eintrag).
 	const property = getProperty(id);
 	try {
@@ -66,7 +69,7 @@ export async function deletePropertyAction(id: string): Promise<ActionState> {
 	} catch (error) {
 		console.error("deletePropertyAction failed", error);
 		return {
-			error: "Löschen fehlgeschlagen. Bitte entfernen Sie zuerst alle zugehörigen Einheiten.",
+			error: t("properties.errors.deleteFailed"),
 		};
 	}
 

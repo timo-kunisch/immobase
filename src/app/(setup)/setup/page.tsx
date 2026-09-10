@@ -4,10 +4,12 @@ import { redirect } from "next/navigation";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { getCompanySettings } from "@/data/company-settings";
 import { countUsers } from "@/data/users";
+import { getT } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-	title: "Ersteinrichtung – ImmoBase",
-};
+export async function generateMetadata(): Promise<Metadata> {
+	const t = await getT();
+	return { title: t("setup.meta.title") };
+}
 
 // DB-Zugriff (countUsers) – niemals statisch prerendern.
 export const dynamic = "force-dynamic";

@@ -6,6 +6,7 @@ import { createDocument, deleteDocument, getDocument } from "@/data/documents";
 import type { DocumentType } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
+import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
 import { deleteUploadedFile, saveUploadedFile } from "@/lib/storage";
 import { sendPdfByPostForSource, type PostalShipmentActionState } from "@/lib/postal-shipments";
@@ -28,6 +29,7 @@ function getOptionalId(formData: FormData, key: string): string | null {
 
 export async function uploadDocumentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const file = formData.get("file");
 	const typeRaw = getString(formData, "type") as DocumentType;
 	const propertyId = getOptionalId(formData, "propertyId");
@@ -35,7 +37,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 	const tenantId = getOptionalId(formData, "tenantId");
 
 	if (!(file instanceof File) || file.size === 0) {
-		return { error: "Bitte wählen Sie eine Datei aus." };
+		return { error: t("documents.errors.noFile") };
 	}
 
 	// Autoritative Prüfung des Dateityps (Defense-in-Depth): Das `accept`-
@@ -43,7 +45,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 	// Aktuell wird bewusst nur PDF unterstützt (siehe upload-constraints.ts),
 	// künftig ggf. um weitere Dateitypen erweiterbar.
 	if (!isAllowedDocumentFile(file)) {
-		return { error: `Es werden aktuell nur ${ALLOWED_DOCUMENT_TYPES_LABEL}-Dateien unterstützt.` };
+		return { error: t("documents.errors.unsupportedType", { types: ALLOWED_DOCUMENT_TYPES_LABEL }) };
 	}
 
 	const type: DocumentType = DOCUMENT_TYPES.includes(typeRaw) ? typeRaw : "OTHER";
@@ -64,7 +66,7 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 		logActivity(user, "CREATE", "dokumente", `Dokument „${saved.fileName}“ hochgeladen`, document.id);
 	} catch (error) {
 		console.error("uploadDocumentAction failed", error);
-		return { error: "Die Datei konnte nicht hochgeladen werden." };
+		return { error: t("documents.errors.uploadFailed") };
 	}
 
 	revalidatePath("/dokumente");
@@ -73,10 +75,11 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 
 export async function deleteDocumentAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	try {
 		const document = getDocument(id);
 		if (!document) {
-			return { error: "Dokument nicht gefunden." };
+			return { error: t("documents.errors.notFound") };
 		}
 
 		deleteDocument(id);
@@ -84,7 +87,7 @@ export async function deleteDocumentAction(id: string): Promise<ActionState> {
 		logActivity(user, "DELETE", "dokumente", `Dokument „${document.fileName}“ gelöscht`, id);
 	} catch (error) {
 		console.error("deleteDocumentAction failed", error);
-		return { error: "Das Dokument konnte nicht gelöscht werden." };
+		return { error: t("documents.errors.deleteFailed") };
 	}
 
 	revalidatePath("/dokumente");
@@ -103,15 +106,16 @@ export async function deleteDocumentAction(id: string): Promise<ActionState> {
  */
 export async function sendDocumentByPostAction(documentId: string): Promise<PostalShipmentActionState> {
 	const user = await requireUser();
+	const t = await getT();
 	const document = getDocument(documentId);
 	if (!document) {
-		return { error: "Das Dokument wurde nicht gefunden." };
+		return { error: t("documents.errors.notFoundDetailed") };
 	}
 	if (document.mimeType !== "application/pdf") {
-		return { error: "Nur PDF-Dokumente können per Post versendet werden." };
+		return { error: t("documents.errors.onlyPdf") };
 	}
 
-	const result = await sendPdfByPostForSource("DOCUMENT", documentId, user.id);
+	const result = await sendPdfByPostForSource("DOCUMENT", documentId, user.id, t);
 
 	// Nur bei tatsächlich erfolgtem Versand protokollieren (bei einem Fehler
 	// liegt kein Versand vor - ggf. nur ein FAILED-Eintrag im Sendungsprotokoll).
@@ -143,7 +147,8 @@ export async function sendDocumentByPostAction(documentId: string): Promise<Post
 export async function deleteAnyDocumentAction(sourceType: DocumentSourceType, id: string): Promise<ActionState> {
 	if (sourceType === "DOCUMENT") return deleteDocumentAction(id);
 	if (sourceType === "GENERATED_DOCUMENT") return deleteGeneratedDocumentAction(id);
-	return { error: "Abrechnungs-PDFs können nur über die jeweilige Abrechnungsperiode gelöscht werden." };
+	const t = await getT();
+	return { error: t("documents.errors.statementDelete") };
 }
 
 export async function sendAnyDocumentByPostAction(sourceType: DocumentSourceType, id: string): Promise<PostalShipmentActionState> {

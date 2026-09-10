@@ -12,8 +12,8 @@ import { HoaCostItemFormDialog } from "@/components/weg/hoa-cost-item-form-dialo
 import { FinalizeEconomicPlanButton } from "@/components/weg/finalize-economic-plan-button";
 import { GenerateHousingChargesDialog } from "@/components/weg/generate-housing-charges-dialog";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { economicPlanStatusLabels, economicPlanStatusStyles, hoaCostCategoryLabels, calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
-import { hoaAllocationKeyLabels } from "@/lib/hoa-allocation";
+import { economicPlanStatusStyles, calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
+import { getT } from "@/lib/i18n/server";
 
 import { deleteEconomicPlanCostItemAction, saveEconomicPlanCostItemAction } from "../actions";
 
@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function EconomicPlanDetailPage({ params }: { params: Promise<{ planId: string }> }) {
 	const { planId } = await params;
+	const t = await getT();
 
 	const detail = getEconomicPlanDetail(planId);
 
@@ -51,24 +52,24 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
-				title={`Wirtschaftsplan: ${hoa.name}`}
+				title={t("hoaPlan.detail.title", { name: hoa.name })}
 				description={`${formatDate(plan.fiscalYearFrom)} – ${formatDate(plan.fiscalYearTo)}`}
 				actions={
 					<div className="flex items-center gap-2">
 						<Button variant="outline" size="sm" asChild>
 							<Link href={`/weg/wirtschaftsplan?hoaId=${plan.hoaId}`}>
 								<ChevronLeft />
-								Zurück
+								{t("common.back")}
 							</Link>
 						</Button>
-						<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${economicPlanStatusStyles[plan.status]}`}>{economicPlanStatusLabels[plan.status]}</span>
+						<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${economicPlanStatusStyles[plan.status]}`}>{t(`hoaPlan.status.${plan.status}`)}</span>
 					</div>
 				}
 			/>
 			<div className="flex-1 space-y-6 p-4 sm:p-6">
 				<div className="flex items-center justify-between">
 					<h2 className="text-base font-semibold">
-						Kostenpositionen ({formatDate(plan.fiscalYearFrom)} – {formatDate(plan.fiscalYearTo)})
+						{t("hoaPlan.costItems.heading", { from: formatDate(plan.fiscalYearFrom), to: formatDate(plan.fiscalYearTo) })}
 					</h2>
 					{isDraft ? <HoaCostItemFormDialog action={saveEconomicPlanCostItemAction} parentIdFieldName="economicPlanId" parentId={plan.id} hoaId={plan.hoaId} units={units} customAllocationKeys={customAllocationKeys} /> : null}
 				</div>
@@ -78,17 +79,17 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 						{costItems.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Noch keine Kostenpositionen erfasst.</p>
+								<p>{t("hoaPlan.costItems.empty")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Bezeichnung</TableHead>
-										<TableHead>Kostenart</TableHead>
-										<TableHead>Umlageschlüssel</TableHead>
-										<TableHead className="text-right">Betrag</TableHead>
-										<TableHead className="w-[100px] text-right">Aktionen</TableHead>
+										<TableHead>{t("hoaPlan.table.label")}</TableHead>
+										<TableHead>{t("hoaPlan.table.category")}</TableHead>
+										<TableHead>{t("hoaPlan.table.allocationKey")}</TableHead>
+										<TableHead className="text-right">{t("common.amount")}</TableHead>
+										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -98,17 +99,17 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 												{costItem.label}
 												{costItem.allocationKey === "DIRECT" && costItem.directUnitId ? <span className="block text-xs text-muted-foreground">{unitById.get(costItem.directUnitId)?.label}</span> : null}
 											</TableCell>
-											<TableCell className="text-muted-foreground">{hoaCostCategoryLabels[costItem.category]}</TableCell>
-											<TableCell className="text-muted-foreground">{hoaAllocationKeyLabels[costItem.allocationKey]}</TableCell>
+											<TableCell className="text-muted-foreground">{t(`hoaPlan.category.${costItem.category}`)}</TableCell>
+											<TableCell className="text-muted-foreground">{t(`hoaPlan.allocationKey.${costItem.allocationKey}`)}</TableCell>
 											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
 											<TableCell>
 												{isDraft ? (
 													<div className="flex items-center justify-end gap-1">
 														<HoaCostItemFormDialog action={saveEconomicPlanCostItemAction} parentIdFieldName="economicPlanId" parentId={plan.id} hoaId={plan.hoaId} costItem={costItem} units={units} customAllocationKeys={customAllocationKeys} />
-														<ConfirmDeleteButton action={deleteEconomicPlanCostItemAction.bind(null, costItem.id, plan.hoaId, plan.id)} confirmMessage={`Kostenposition "${costItem.label}" wirklich löschen?`} />
+														<ConfirmDeleteButton action={deleteEconomicPlanCostItemAction.bind(null, costItem.id, plan.hoaId, plan.id)} confirmMessage={t("hoaPlan.confirm.deleteCostItem", { label: costItem.label })} />
 													</div>
 												) : (
-													<span className="text-xs text-muted-foreground">Finalisiert</span>
+													<span className="text-xs text-muted-foreground">{t("hoaPlan.status.FINALIZED")}</span>
 												)}
 											</TableCell>
 										</TableRow>
@@ -128,7 +129,7 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 									<div key={`${warning.costItemId}-${index}`} className="flex items-center gap-3">
 										<AlertTriangle className="size-5 shrink-0 text-amber-600" />
 										<p className="text-sm">
-											<span className="font-semibold">{costItem?.label ?? "Kostenposition"}</span> konnte nicht umgelegt werden: Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlender MEA-Anteil oder fehlende Wohnfläche).
+											<span className="font-semibold">{costItem?.label ?? t("hoaPlan.costItems.fallbackLabel")}</span> {t("hoaPlan.warnings.noBasis")}
 										</p>
 									</div>
 								);
@@ -138,7 +139,7 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 				) : null}
 
 				<div className="flex items-center justify-between">
-					<h2 className="text-base font-semibold">Einzelwirtschaftsplan je Einheit</h2>
+					<h2 className="text-base font-semibold">{t("hoaPlan.unitShares.heading")}</h2>
 					{isDraft ? <FinalizeEconomicPlanButton economicPlanId={plan.id} hoaId={plan.hoaId} /> : <GenerateHousingChargesDialog economicPlanId={plan.id} hoaId={plan.hoaId} />}
 				</div>
 
@@ -148,15 +149,15 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 							!liveResult || liveResult.unitShares.every((s) => s.annualAmountCents === 0) ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 									<Calculator className="size-8" />
-									<p>Noch keine berechenbaren Kostenpositionen vorhanden.</p>
+									<p>{t("hoaPlan.unitShares.emptyDraft")}</p>
 								</div>
 							) : (
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>Einheit</TableHead>
-											<TableHead className="text-right">Jahresbetrag</TableHead>
-											<TableHead className="text-right">Monatsbetrag</TableHead>
+											<TableHead>{t("common.unit")}</TableHead>
+											<TableHead className="text-right">{t("hoaPlan.table.annualAmount")}</TableHead>
+											<TableHead className="text-right">{t("hoaPlan.table.monthlyAmount")}</TableHead>
 										</TableRow>
 									</TableHeader>
 									<TableBody>
@@ -173,15 +174,15 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 						) : unitShares.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
-								<p>Keine Einzelwirtschaftsplan-Ergebnisse vorhanden.</p>
+								<p>{t("hoaPlan.unitShares.emptyFinalized")}</p>
 							</div>
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Einheit</TableHead>
-										<TableHead className="text-right">Jahresbetrag</TableHead>
-										<TableHead className="text-right">Monatsbetrag</TableHead>
+										<TableHead>{t("common.unit")}</TableHead>
+										<TableHead className="text-right">{t("hoaPlan.table.annualAmount")}</TableHead>
+										<TableHead className="text-right">{t("hoaPlan.table.monthlyAmount")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
