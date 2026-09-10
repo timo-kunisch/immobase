@@ -284,6 +284,22 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
     Repository `src/data/prompt-templates.ts` – strikt user_id-scoped, Route
     `src/app/api/chat/prompt-templates/route.ts` mit GET/POST/PUT/DELETE; Limits in
     `src/lib/ai/prompt-templates.ts`: Titel 100 / Text 4000 Zeichen, max. 50 je Nutzer).
+- **Globale Suche (Command-Palette)**: Suche über ALLE Fachdaten beider Bereiche + Navigations-/
+  Einstellungsseiten, erreichbar über den Trigger im Sidebar-Kopf und **Cmd/Ctrl+K** auf jeder
+  App-Seite. UI: `src/components/layout/global-search.tsx` (shadcn `command`/cmdk, Dialog,
+  debounced fetch ab 2 Zeichen, Tastatur-Navigation; `shouldFilter={false}`, da die
+  Daten-Treffer serverseitig ermittelt werden). Daten: Repository `src/data/search.ts`
+  (`searchDatabase(query, {limitPerType, includeUsers})`) lädt je Entität minimale
+  Anzeigespalten und filtert per JS-Heuhaufen (`toLowerCase`) - bewusst KEIN SQL-LIKE, weil
+  SQLite LIKE/lower() nur ASCII falten („münchen" fände „München" nicht); einzig der DMS-OCR-
+  Volltext läuft per SQL LIKE (kann groß sein, wird nicht in JS geladen). Append-lastige
+  Tabellen werden auf die jüngsten 2000 Zeilen begrenzt. Route `/api/search` (GET `?q=`,
+  JSON-401-Muster wie `/api/chat`); Benutzerkonten (E-Mails) durchsucht NUR die Rolle ADMIN
+  (`includeUsers`). Entitäten ohne Detailseite verweisen auf Listen-Anker (`#property-<id>` …),
+  Dokumente auf `/dokumente?q=<dateiname>`, Einstellungen auf Hash-Deep-Links
+  (`/einstellungen#datensicherung` …). Statischer Seiten-Katalog client-seitig:
+  `src/lib/search-pages.ts` (i18n-Schlüssel + Suchbegriffe), geteilte Typen/Konstanten:
+  `src/lib/search-types.ts`.
 - **Backup/Restore**: `src/data/backup.ts` (ZIP: `manifest.json` mit SHA-256 je Datei + `data.db`
   via `db.backup()` + `files/`; `archiver`/`yauzl` streaming, Multi-GB). Optional
   passwortverschlüsselt: `src/lib/backup-crypto.ts` (AES-256-GCM + scrypt, eigener
@@ -429,12 +445,13 @@ src/
     api/chat/route.ts       # KI-Assistent-Chat (Session, alle Nutzer; Rolle bestimmt Werkzeug-Scope)
     api/chat/history/route.ts  # Persistenter Chat-Verlauf (GET laden / DELETE löschen, pro Nutzer)
     api/chat/prompt-templates/route.ts  # Eigene Prompt-Vorlagen (CRUD, pro Nutzer)
+    api/search/route.ts     # Globale Suche (Session, alle Nutzer; ADMIN sieht zusätzlich Benutzerkonten)
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
     ui/                     # shadcn/ui-Basiskomponenten (via `npx shadcn add`)
     <modul>/                # Modul-spezifische Dialoge/Formulare (Client Components)
-    layout/                 # AppSidebar, SiteHeader, ChatbotDialog, UpdateBanner
+    layout/                 # AppSidebar, SiteHeader, GlobalSearch, ChatbotDialog, UpdateBanner
   data/                     # REPOSITORY-LAYER - EINZIGER Ort mit SQL
     db.ts                   # better-sqlite3 Lazy-Singleton + Pragmas + Shutdown-Versiegelung
     db-vault.ts             # Container-Verschlüsselung der DB at rest (unlock/lock)
@@ -445,6 +462,7 @@ src/
     reset.ts                # Zurücksetzen: Inhalts-Reset + vollständiger App-Reset (nur Admins)
     audit-log.ts            # Aktivitätsprotokoll (append-only, Aufrufe via src/lib/audit.ts)
     app-settings.ts         # Key/Value-App-Konfiguration (SMTP, LetterXpress, KI-Endpunkt, URL-Overrides)
+    search.ts               # Globale Suche (alle Fachdaten, JS-Heuhaufen statt SQL-LIKE)
     <domain>.ts             # Repositories (createX/listY/...)
   lib/
     auth/                   # dal.ts, session.ts, tokens.ts, password.ts, validation.ts, bootstrap.ts, actions.ts
@@ -489,6 +507,8 @@ src/
     desktop-bridge.ts       # Typen für window.iv (Electron-Brücke)
     format.ts, action-state.ts, form-data.ts, id.ts, utils.ts
     pagination.ts           # Seitengröße, resolvePagination (page-Param clampen), buildPageNumbers
+    search-pages.ts         # Statischer Seiten-Katalog der globalen Suche (client-sicher)
+    search-types.ts         # Geteilte Typen/Konstanten der globalen Suche (client-sicher)
   proxy.ts                  # Auth-Guard (optimistischer Cookie-Check)
   instrumentation.ts        # Server-Start-Hook: Bestandsmigration der Datenverschlüsselung
 scripts/dump-schema.mjs     # Regeneriert src/data/schema.sql aus den Migrationen
@@ -772,8 +792,10 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Batch-Ausführung mit UI-Aufschlüsselung der Einzelaufrufe) und `src/lib/ai/ocr.test.ts`
   (echter OCR-Durchstich ohne Mocks: Bild-PDF ohne Textebene → pdfjs-Rasterung → tesseract.js)
   sowie
-  `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich) und
-  `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster). Es gibt weiterhin
+  `src/lib/hoa-*.test.ts` (reine WEG-Berechnungen inkl. End-to-End-Durchstich),
+  `src/lib/calendar.test.ts` (Kalender-Aggregation/Monatsraster) und
+  `src/data/search.test.ts` (globale Suche: Umlaut-Faltung, href-Verweise, OCR-LIKE-Pfad,
+  Admin-Gating der Benutzerkonten, Limit je Entitätsart). Es gibt weiterhin
   **keine** Tests für Server Actions, React-Komponenten oder E2E-Abdeckung.
 - **Import „Zusammenführen"** ist zeilenbasiert (`INSERT OR IGNORE`, lokaler Bestand gewinnt) –
   kein Sync-Protokoll für parallele Mehrgeräte-Bearbeitung.

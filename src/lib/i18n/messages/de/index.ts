@@ -23,6 +23,7 @@ import { leases } from "./leases";
 import { nav } from "./nav";
 import { postal } from "./postal";
 import { properties } from "./properties";
+import { search } from "./search";
 import { settings } from "./settings";
 import { setup } from "./setup";
 import { templates } from "./templates";
@@ -51,6 +52,7 @@ export const deMessages = {
 	nav,
 	postal,
 	properties,
+	search,
 	settings,
 	setup,
 	templates,

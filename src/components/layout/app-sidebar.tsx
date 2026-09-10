@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { ChatbotDialog } from "@/components/layout/chatbot-dialog";
+import { GlobalSearch } from "@/components/layout/global-search";
 import { logoutAction } from "@/lib/auth/actions";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n/translator";
@@ -186,6 +187,10 @@ export function AppSidebar({
 						<span className="text-xs text-muted-foreground">{t("nav.appTagline")}</span>
 					</div>
 				</a>
+				{/* Globale Suche (Command-Palette, Cmd/Ctrl+K): Trigger hier im
+				    Kopf, damit sie auf jeder App-Seite erreichbar ist; der Dialog
+				    samt Tastenkürzel-Lauscher lebt in der Komponente selbst. */}
+				<GlobalSearch isAdmin={user.role === "ADMIN"} />
 			</SidebarHeader>
 			{/* Der Wrapper macht die Scroll-Overlays positionsverankert
 			    (relative) und erhält den Flex-Platz, den sonst SidebarContent
