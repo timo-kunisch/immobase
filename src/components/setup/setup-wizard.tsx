@@ -478,6 +478,12 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 	// bzw. "/login?...&emailSent=1" bei konfiguriertem SMTP).
 	const [state, formAction, isPending] = useActionState(setupAccountAction, initialActionState);
 
+	// E-Mail als kontrolliertes Feld führen: React setzt das Formular nach
+	// einer Server Action zurück (die Passwort-Felder werden bewusst geleert),
+	// die bereits eingegebene E-Mail-Adresse bleibt so erhalten, z. B. bei
+	// nicht übereinstimmenden Passwörtern.
+	const [email, setEmail] = useState("");
+
 	return (
 		<Card>
 			<form action={formAction}>
@@ -490,7 +496,15 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 				<CardContent className={`${STEP_CONTENT} grid gap-4`}>
 					<div className="grid gap-2">
 						<Label htmlFor="setup-email">{t("auth.fields.email")}</Label>
-						<Input id="setup-email" name="email" type="email" autoComplete="email" required />
+						<Input
+							id="setup-email"
+							name="email"
+							type="email"
+							autoComplete="email"
+							required
+							value={email}
+							onChange={(event) => setEmail(event.target.value)}
+						/>
 					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="setup-password">{t("auth.fields.password")}</Label>
