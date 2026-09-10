@@ -1,9 +1,10 @@
 /**
  * Namespace "billing" (Deutsch): Modul "Abrechnung" (Nebenkostenabrechnung
- * nach § 2 BetrKV) - Übersicht, Detailseite einer Abrechnungsperiode inkl.
- * Kostenpositionen/Verbrauchswerten/Finalisierung und die Fehlertexte der
- * Server Actions. Das erzeugte Abrechnungs-PDF bleibt bewusst deutsch und
- * ist hier nicht Teil der Übersetzung.
+ * nach § 2 BetrKV) - Übersicht inkl. frei definierbarer Umlageschlüssel,
+ * Detailseite einer Abrechnungsperiode inkl. Kostenpositionen/
+ * Verbrauchswerten/Finalisierung und die Fehlertexte der Server Actions.
+ * Das erzeugte Abrechnungs-PDF bleibt bewusst deutsch und ist hier nicht
+ * Teil der Übersetzung.
  */
 export const billing = {
 	title: "Abrechnung",
@@ -18,6 +19,9 @@ export const billing = {
 	// Status der Abrechnungsperiode (Enum BillingPeriodStatus)
 	"status.DRAFT": "Entwurf",
 	"status.FINALIZED": "Finalisiert",
+	// Reiter der Übersicht
+	"tabs.periods": "Perioden",
+	"tabs.allocationKeys": "Umlageschlüssel",
 	// Detailseite
 	"detail.title": "Abrechnung: {name}",
 	"detail.costItems": "Kostenpositionen",
@@ -26,11 +30,11 @@ export const billing = {
 	"detail.days": "Tage",
 	"detail.balancePayment": "Nachzahlung {amount}",
 	"detail.balanceCredit": "Guthaben {amount}",
+	"detail.noPaidPrepayments": "Keine als bezahlt erfassten Vorauszahlungen",
 	// Tabellenköpfe
 	"table.period": "Zeitraum",
 	"table.costItems": "Kostenpositionen",
 	"table.label": "Bezeichnung",
-	"table.category": "Kostenart",
 	"table.allocationKey": "Umlageschlüssel",
 	"table.tenantUnit": "Mieter / Einheit",
 	"table.timeShare": "Zeitanteil",
@@ -40,6 +44,8 @@ export const billing = {
 	"table.pdf": "PDF",
 	// Bestätigungsdialoge
 	"confirm.deletePeriod": "Diese Abrechnungsperiode inkl. aller Kostenpositionen wirklich löschen?",
+	"confirm.deleteFinalizedPeriod":
+		"Diese finalisierte Abrechnungsperiode wirklich löschen? Alle Kostenpositionen, Abrechnungsergebnisse und erzeugten PDFs werden mitgelöscht.",
 	"confirm.deleteCostItem": "Kostenposition \"{label}\" wirklich löschen?",
 	"confirm.finalize":
 		"Diese Abrechnungsperiode wirklich finalisieren? Danach können Kostenpositionen, Verbrauchswerte und Zeitraum nicht mehr geändert werden.",
@@ -47,7 +53,7 @@ export const billing = {
 	"warning.fallbackItem": "Kostenposition",
 	"warning.notAllocated": "konnte nicht umgelegt werden:",
 	"warning.noOccupants": "Für den Zeitraum sind keine bewohnten Personentage vorhanden.",
-	"warning.noAllocationBasis": "Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlende Wohnfläche oder Verbrauchswerte).",
+	"warning.noAllocationBasis": "Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlende Wohnfläche, Verbrauchswerte oder Gewichte).",
 	// Filter
 	"filter.allProperties": "Alle Liegenschaften",
 	// Aktionen / Buttons
@@ -61,18 +67,45 @@ export const billing = {
 	"periodDialog.createTitle": "Neue Abrechnungsperiode",
 	"periodDialog.editTitle": "Abrechnungsperiode bearbeiten",
 	"periodDialog.description": "Zeitraum (i. d. R. ein Kalenderjahr) für die Nebenkostenabrechnung einer Liegenschaft.",
+	// Dialog "Notizen der Abrechnungsperiode" (jederzeit bearbeitbar)
+	"notesDialog.trigger": "Notizen",
+	"notesDialog.title": "Notizen der Abrechnungsperiode",
+	"notesDialog.description": "Interne Anmerkungen - jederzeit bearbeitbar, auch nach der Finalisierung.",
 	// Dialog "Kostenposition"
 	"costItemDialog.trigger": "Kostenposition",
 	"costItemDialog.createTitle": "Neue Kostenposition",
 	"costItemDialog.editTitle": "Kostenposition bearbeiten",
-	"costItemDialog.description": "Kostenart nach § 2 BetrKV inkl. Umlageschlüssel.",
+	"costItemDialog.description": "Bezeichnung, Gesamtbetrag und Umlageschlüssel der Kostenposition.",
 	"costItemDialog.consumptionHint":
 		"Die Verbrauchswerte je Einheit können nach dem Speichern über die Tabellenzeile dieser Kostenposition erfasst werden.",
+	"costItemDialog.noCustomKeys": "Für diese Liegenschaft gibt es noch keinen individuellen Umlageschlüssel (Reiter \"Umlageschlüssel\").",
 	// Dialog "Verbrauchswerte"
 	"consumption.trigger": "Verbrauchswerte erfassen",
 	"consumption.title": "Verbrauchswerte: {label}",
 	"consumption.description": "Verbrauch je Einheit für den Abrechnungszeitraum (z. B. m³ Wasser oder Verbrauchseinheiten Heizung).",
 	"consumption.noUnits": "Diese Liegenschaft hat noch keine Einheiten.",
+	// Frei definierbare Umlageschlüssel (Reiter der Übersicht)
+	"allocationKeys.info":
+		"Individuelle Umlageschlüssel verteilen Kostenpositionen nach frei hinterlegten Gewichten je Einheit (z. B. Anzahl Stellplätze). Sie werden bei Kostenpositionen mit Umlageschlüssel \"Individuell\" ausgewählt.",
+	"allocationKeys.management": "Individuelle Umlageschlüssel dieser Liegenschaft",
+	"allocationKeys.selectProperty": "Bitte eine Liegenschaft auswählen, um ihre Umlageschlüssel zu verwalten.",
+	"allocationKeys.empty": "Noch keine individuellen Umlageschlüssel angelegt.",
+	"allocationKeys.actions.create": "Neuer Umlageschlüssel",
+	"allocationKeys.dialog.createTitle": "Neuer Umlageschlüssel",
+	"allocationKeys.dialog.editTitle": "Umlageschlüssel bearbeiten",
+	"allocationKeys.dialog.description": "Frei definierbarer Schlüssel mit Gewichten je Einheit (z. B. Anzahl Stellplätze).",
+	"allocationKeys.placeholder.label": "z. B. Stellplätze",
+	"allocationKeys.weights.open": "Gewichte erfassen",
+	"allocationKeys.weights.title": "Gewichte: {name}",
+	"allocationKeys.weights.description": "Gewicht je Einheit der Liegenschaft (beliebige positive Zahlen, Verhältnis zueinander entscheidet).",
+	"allocationKeys.weights.noUnits": "Diese Liegenschaft hat noch keine Einheiten.",
+	"allocationKeys.confirm.delete": "Umlageschlüssel \"{name}\" wirklich löschen?",
+	"allocationKeys.errors.requiredFields": "Bitte eine Bezeichnung angeben.",
+	"allocationKeys.errors.saveFailed": "Der Umlageschlüssel konnte nicht gespeichert werden.",
+	"allocationKeys.errors.deleteFailed": "Der Umlageschlüssel konnte nicht gelöscht werden.",
+	"allocationKeys.errors.notFound": "Der Umlageschlüssel wurde nicht gefunden.",
+	"allocationKeys.errors.invalidKey": "Ungültiger Umlageschlüssel.",
+	"allocationKeys.errors.weightsSaveFailed": "Die Gewichte konnten nicht gespeichert werden.",
 	// Formular-Felder
 	"fields.propertyPlaceholder": "Liegenschaft auswählen",
 	"fields.periodFrom": "Zeitraum von",
@@ -80,35 +113,19 @@ export const billing = {
 	"fields.notesPlaceholder": "Optionale interne Anmerkungen",
 	"fields.label": "Bezeichnung",
 	"fields.labelPlaceholder": "z. B. Gebäudeversicherung",
-	"fields.category": "Kostenart (§ 2 BetrKV)",
 	"fields.totalAmount": "Gesamtbetrag (€)",
 	"fields.allocationKey": "Umlageschlüssel",
 	"fields.directUnit": "Einheit (direkte Zuordnung)",
 	"fields.directUnitPlaceholder": "Einheit auswählen",
+	"fields.customAllocationKey": "Individueller Umlageschlüssel",
+	"fields.customAllocationKeyPlaceholder": "Umlageschlüssel auswählen",
 	// Umlageschlüssel (Enum AllocationKey)
 	"allocationKey.LIVING_SPACE": "Wohnfläche",
 	"allocationKey.OCCUPANTS": "Personen",
 	"allocationKey.UNITS": "Einheiten",
 	"allocationKey.CONSUMPTION": "Verbrauch",
 	"allocationKey.DIRECT": "Direkte Zuordnung",
-	// Kostenarten nach § 2 BetrKV (Enum CostCategory, Nr. 1-17)
-	"category.PUBLIC_CHARGES": "1. Laufende öffentliche Lasten des Grundstücks",
-	"category.WATER_SUPPLY": "2. Wasserversorgung",
-	"category.DRAINAGE": "3. Entwässerung",
-	"category.HEATING": "4. Heizung",
-	"category.HOT_WATER": "5. Warmwasser",
-	"category.HEATING_HOT_WATER_COMBINED": "6. Verbundene Heizungs-/Warmwasseranlagen",
-	"category.ELEVATOR": "7. Aufzug",
-	"category.STREET_CLEANING_WASTE": "8. Straßenreinigung und Müllabfuhr",
-	"category.BUILDING_CLEANING_PEST_CONTROL": "9. Gebäudereinigung und Ungezieferbekämpfung",
-	"category.GARDEN_MAINTENANCE": "10. Gartenpflege",
-	"category.LIGHTING": "11. Beleuchtung",
-	"category.CHIMNEY_CLEANING": "12. Schornsteinreinigung",
-	"category.INSURANCE": "13. Sach- und Haftpflichtversicherung",
-	"category.CARETAKER": "14. Hauswart",
-	"category.CABLE_ANTENNA": "15. Gemeinschafts-Antennenanlage / Kabelanschluss",
-	"category.LAUNDRY_FACILITIES": "16. Betrieb der Einrichtungen für die Wäschepflege",
-	"category.OTHER": "17. Sonstige Betriebskosten",
+	"allocationKey.CUSTOM": "Individuell",
 	// Fehlermeldungen (Server Actions)
 	"errors.periodNotFound": "Die Abrechnungsperiode wurde nicht gefunden.",
 	"errors.periodFinalized": "Diese Abrechnungsperiode ist bereits finalisiert und kann nicht mehr geändert werden.",
@@ -120,6 +137,8 @@ export const billing = {
 	"errors.costItemFieldsRequired": "Bitte Bezeichnung, Betrag und Umlageschlüssel für die Kostenposition angeben.",
 	"errors.invalidAllocationKey": "Ungültiger Umlageschlüssel.",
 	"errors.directUnitRequired": "Bei direkter Zuordnung muss eine Einheit ausgewählt werden.",
+	"errors.customKeyRequired": "Bei individuellem Umlageschlüssel muss ein Schlüssel ausgewählt werden.",
+	"errors.customKeyNotFound": "Der ausgewählte Umlageschlüssel gehört nicht zu der Liegenschaft dieser Abrechnungsperiode.",
 	"errors.costItemSaveFailed": "Die Kostenposition konnte nicht gespeichert werden.",
 	"errors.costItemNotFound": "Die Kostenposition wurde nicht gefunden.",
 	"errors.costItemDeleteFailed": "Die Kostenposition konnte nicht gelöscht werden.",

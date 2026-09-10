@@ -111,9 +111,10 @@ export interface TransactionInput {
 	status: TransactionStatus;
 }
 
-/** Filter der Listen-Funktionen: nach Vertrag und/oder Zahlungsstatus. */
+/** Filter der Listen-Funktionen: nach Vertrag, Liegenschaft und/oder Zahlungsstatus. */
 export interface TransactionFilter {
 	leaseId?: string;
+	propertyId?: string;
 	status?: TransactionStatus;
 }
 
@@ -124,6 +125,12 @@ function buildTransactionWhere(filter: TransactionFilter): { where: string; para
 	if (filter.leaseId) {
 		conditions.push("tr.lease_id = ?");
 		params.push(filter.leaseId);
+	}
+	if (filter.propertyId) {
+		// u/p sind in TRANSACTION_JOIN_FROM beständig gejoint (Einheit ->
+		// Liegenschaft des Vertrags).
+		conditions.push("u.property_id = ?");
+		params.push(filter.propertyId);
 	}
 	if (filter.status) {
 		conditions.push("tr.status = ?");
@@ -185,6 +192,23 @@ export function listOpenTransactionArrearAmounts(date: Date, filter: { leaseId?:
 /** Einzelne Zahlung inkl. Vertrags-Relationen (für Detailabfragen). */
 export function getTransaction(id: string): TransactionWithLease | null {
 	return listTransactions().find((transaction) => transaction.id === id) ?? null;
+}
+
+/**
+ * Offene (noch nicht ausgeglichene) Sollstellungen einer Liegenschaft -
+ * Auswahl im Zuordnen-Dialog der Buchhaltung (dort werden sie gegen
+ * tatsächliche Banktransaktionen gebucht, siehe
+ * src/data/bank-transactions.ts).
+ */
+export function listOpenTransactionsForProperty(propertyId: string): TransactionWithLease[] {
+	const rows = getDb()
+		.prepare(
+			`SELECT ${TRANSACTION_JOIN_COLUMNS} ${TRANSACTION_JOIN_FROM}
+			 WHERE u.property_id = ? AND tr.status IN ('OPEN', 'OVERDUE')
+			 ORDER BY tr.due_date ASC, tr.id ASC`
+		)
+		.all(propertyId) as TransactionJoinRow[];
+	return rows.map(mapTransactionRow);
 }
 
 export function createTransaction(input: TransactionInput): Transaction {

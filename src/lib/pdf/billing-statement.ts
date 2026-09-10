@@ -25,7 +25,6 @@ import { formatCurrency, formatDate } from "@/lib/format";
 
 export type BillingStatementLine = {
 	label: string;
-	categoryLabel: string;
 	/** Gesamtbetrag dieser Kostenposition für die gesamte Abrechnungsperiode (Euro, Decimal-String). */
 	totalAmount: string;
 	allocationKeyLabel: string;
@@ -166,17 +165,16 @@ export function generateBillingStatementPdf(input: BillingStatementInput): Promi
 
 		drawTableHeader();
 
-		// Jede Zeile besteht aus zwei Textzeilen (Bezeichnung + darunter die
-		// Kostenart nach § 2 BetrKV in klein/grau) - daher etwas mehr als
-		// ROW_HEIGHT an Platz je Position einplanen.
-		const LINE_ROW_HEIGHT = ROW_HEIGHT + 11;
+		// Zeilenhöhe je Kostenposition (Bezeichnung in einer Zeile - die
+		// frühere Zusatzzeile mit der BetrKV-Kategorie entfällt mit dem Feld).
+		const LINE_ROW_HEIGHT = ROW_HEIGHT;
 
 		if (lines.length === 0) {
 			doc.fillColor("#666666").text("Keine Kostenpositionen vorhanden.");
 			doc.fillColor("#000000");
 		} else {
 			for (const line of lines) {
-				ensureSpace(LINE_ROW_HEIGHT);
+				ensureSpace(ROW_HEIGHT);
 				const y = doc.y;
 				doc.text(line.label, columnX(0), y, {
 					width: columns[0].width,
@@ -194,14 +192,6 @@ export function generateBillingStatementPdf(input: BillingStatementInput): Promi
 					width: columns[3].width,
 					align: columns[3].align,
 				});
-				doc
-					.fontSize(8)
-					.fillColor("#666666")
-					.text(line.categoryLabel, columnX(0), y + 12, {
-						width: columns[0].width,
-						align: columns[0].align,
-					});
-				doc.fillColor("#000000").fontSize(9.5);
 				doc.y = y + LINE_ROW_HEIGHT;
 			}
 		}

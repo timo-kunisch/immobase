@@ -21,6 +21,7 @@ export const nav = {
 	"item.leases": "Verträge",
 	"item.finances": "Finanzen",
 	"item.billing": "Abrechnung",
+	"item.accounting": "Buchhaltung",
 	"item.templates": "Vorlagen",
 	"item.hoas": "WEGs",
 	"item.owners": "Eigentümer",

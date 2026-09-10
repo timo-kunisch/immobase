@@ -428,11 +428,11 @@ export async function bridgeToBetrKvAction(_prevState: ActionState, formData: Fo
 		for (const item of bridgedItems) {
 			createCostItem({
 				billingPeriodId,
-				category: item.category,
 				label: item.label,
 				amount: item.amount,
 				allocationKey: item.allocationKey,
 				directUnitId: bridgeData.unitResult.unitId,
+				customAllocationKeyId: null,
 				notes: item.notes,
 			});
 		}

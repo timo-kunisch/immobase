@@ -56,6 +56,7 @@ export const admin: typeof deAdmin = {
 	"category.mieter": "Tenants",
 	"category.vertraege": "Leases",
 	"category.finanzen": "Finances",
+	"category.buchhaltung": "Accounting",
 	"category.abrechnung": "Billing",
 	"category.vorlagen": "Templates",
 	"category.weg": "HOAs",

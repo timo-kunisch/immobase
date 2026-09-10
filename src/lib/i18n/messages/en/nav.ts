@@ -20,6 +20,7 @@ export const nav: typeof deNav = {
 	"item.leases": "Leases",
 	"item.finances": "Finances",
 	"item.billing": "Utility billing",
+	"item.accounting": "Accounting",
 	"item.templates": "Templates",
 	"item.hoas": "HOAs",
 	"item.owners": "Owners",

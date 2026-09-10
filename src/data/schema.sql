@@ -2,6 +2,16 @@
 -- src/data/migrations/ - NICHT händisch editieren; Quelle der Wahrheit sind die Migrationen.
 -- Konsistenz wird durch src/data/schema.test.ts sichergestellt.)
 
+CREATE TABLE accounts (
+	id text PRIMARY KEY NOT NULL,
+	property_id text NOT NULL,
+	label text NOT NULL,
+	notes text,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (property_id) REFERENCES properties(id) ON UPDATE no action ON DELETE cascade
+);
+
 CREATE TABLE annual_statement_unit_result_lines (
 	id text PRIMARY KEY NOT NULL,
 	unit_result_id text NOT NULL,
@@ -64,6 +74,32 @@ CREATE TABLE audit_log_entries (
 	FOREIGN KEY (user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
 );
 
+CREATE TABLE bank_transaction_allocations (
+	id text PRIMARY KEY NOT NULL,
+	bank_transaction_id text NOT NULL,
+	account_id text,
+	transaction_id text,
+	amount text NOT NULL,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (bank_transaction_id) REFERENCES bank_transactions(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (account_id) REFERENCES accounts(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON UPDATE no action ON DELETE cascade
+);
+
+CREATE TABLE bank_transactions (
+	id text PRIMARY KEY NOT NULL,
+	property_id text NOT NULL,
+	booking_date text NOT NULL,
+	amount text NOT NULL,
+	description text NOT NULL,
+	partner text,
+	notes text,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (property_id) REFERENCES properties(id) ON UPDATE no action ON DELETE cascade
+);
+
 CREATE TABLE billing_periods (
 	id text PRIMARY KEY NOT NULL,
 	property_id text NOT NULL,
@@ -121,16 +157,36 @@ CREATE TABLE consumption_values (
 CREATE TABLE cost_items (
 	id text PRIMARY KEY NOT NULL,
 	billing_period_id text NOT NULL,
-	category text DEFAULT 'OTHER' NOT NULL,
 	label text NOT NULL,
 	amount text NOT NULL,
 	allocation_key text NOT NULL,
 	direct_unit_id text,
 	notes text,
 	created_at text NOT NULL,
-	updated_at text NOT NULL,
+	updated_at text NOT NULL, custom_allocation_key_id text REFERENCES custom_allocation_keys(id) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (billing_period_id) REFERENCES billing_periods(id) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (direct_unit_id) REFERENCES units(id) ON UPDATE no action ON DELETE set null
+);
+
+CREATE TABLE custom_allocation_key_weights (
+	id text PRIMARY KEY NOT NULL,
+	custom_allocation_key_id text NOT NULL,
+	unit_id text NOT NULL,
+	weight real NOT NULL,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (custom_allocation_key_id) REFERENCES custom_allocation_keys(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (unit_id) REFERENCES units(id) ON UPDATE no action ON DELETE cascade
+);
+
+CREATE TABLE custom_allocation_keys (
+	id text PRIMARY KEY NOT NULL,
+	property_id text NOT NULL,
+	label text NOT NULL,
+	notes text,
+	created_at text NOT NULL,
+	updated_at text NOT NULL,
+	FOREIGN KEY (property_id) REFERENCES properties(id) ON UPDATE no action ON DELETE cascade
 );
 
 CREATE TABLE deposits (
@@ -651,6 +707,8 @@ CREATE TABLE verification_tokens (
 	created_at text NOT NULL
 );
 
+CREATE INDEX accounts_property_id_idx ON accounts (property_id);
+
 CREATE INDEX annual_statement_unit_result_lines_cost_item_id_idx ON annual_statement_unit_result_lines (cost_item_id);
 
 CREATE INDEX annual_statement_unit_result_lines_unit_result_id_idx ON annual_statement_unit_result_lines (unit_result_id);
@@ -669,6 +727,16 @@ CREATE INDEX audit_log_entries_created_at_idx ON audit_log_entries (created_at D
 
 CREATE INDEX audit_log_entries_user_id_idx ON audit_log_entries (user_id);
 
+CREATE INDEX bank_transaction_allocations_account_id_idx ON bank_transaction_allocations (account_id);
+
+CREATE INDEX bank_transaction_allocations_bank_transaction_id_idx ON bank_transaction_allocations (bank_transaction_id);
+
+CREATE INDEX bank_transaction_allocations_transaction_id_idx ON bank_transaction_allocations (transaction_id);
+
+CREATE INDEX bank_transactions_booking_date_idx ON bank_transactions (booking_date);
+
+CREATE INDEX bank_transactions_property_id_idx ON bank_transactions (property_id);
+
 CREATE INDEX billing_periods_property_id_idx ON billing_periods (property_id);
 
 CREATE INDEX calendar_events_start_date_idx ON calendar_events (start_date);
@@ -681,7 +749,15 @@ CREATE INDEX consumption_values_unit_id_idx ON consumption_values (unit_id);
 
 CREATE INDEX cost_items_billing_period_id_idx ON cost_items (billing_period_id);
 
+CREATE INDEX cost_items_custom_allocation_key_id_idx ON cost_items (custom_allocation_key_id);
+
 CREATE INDEX cost_items_direct_unit_id_idx ON cost_items (direct_unit_id);
+
+CREATE UNIQUE INDEX custom_allocation_key_weights_key_unit_key ON custom_allocation_key_weights (custom_allocation_key_id, unit_id);
+
+CREATE INDEX custom_allocation_key_weights_unit_id_idx ON custom_allocation_key_weights (unit_id);
+
+CREATE INDEX custom_allocation_keys_property_id_idx ON custom_allocation_keys (property_id);
 
 CREATE UNIQUE INDEX deposits_lease_id_unique ON deposits (lease_id);
 

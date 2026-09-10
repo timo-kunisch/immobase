@@ -61,6 +61,7 @@ export const admin = {
 	"category.mieter": "Mieter",
 	"category.vertraege": "Verträge",
 	"category.finanzen": "Finanzen",
+	"category.buchhaltung": "Buchhaltung",
 	"category.abrechnung": "Abrechnung",
 	"category.vorlagen": "Vorlagen",
 	"category.weg": "WEGs",

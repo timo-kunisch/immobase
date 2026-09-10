@@ -23,16 +23,16 @@ export type HousingChargeForStatementInput = {
 
 /**
  * Summiert die Hausgeld-Vorauszahlungen eines Eigentümers für eine Einheit
- * im Zeitanteil [ownedFrom, ownedTo]. Anders als bei der Nebenkosten-
- * abrechnung der Mietverwaltung (die den VERTRAGLICH VEREINBARTEN Betrag
- * taggenau umrechnet, siehe computePrepaymentsCents in src/lib/billing.ts)
- * werden hier die TATSÄCHLICH FÄLLIG GESTELLTEN housingCharges-Datensätze
- * anhand ihres Fälligkeitsdatums dem Zeitanteil zugeordnet - das bildet die
- * WEG-Praxis besser ab, in der das Hausgeld nicht wie eine Miete
+ * im Zeitanteil [ownedFrom, ownedTo]. Wie bei der Nebenkostenabrechnung der
+ * Mietverwaltung (computePaidPrepaymentsCents in src/lib/billing.ts, dort
+ * bezogene auf bezahlte Monats-Sollstellungen und taggenau anteilig) fließen
+ * nur TATSÄCHLICH GELEISTETE Vorauszahlungen ein - hier die als "PAID"
+ * erfassten housingCharges-Datensätze, die anhand ihres Fälligkeitsdatums
+ * dem Zeitanteil als GANZES zugeordnet werden (keine Tag-umrechnung): Das
+ * bildet die WEG-Praxis ab, in der das Hausgeld nicht wie eine Miete
  * "taggenau" anfällt, sondern als monatliche Sollstellung mit festem
  * Fälligkeitstag (siehe economicPlanUnitShares/generateHousingChargesAction).
- * Nur der Status "PAID" (tatsächlich geleistete Vorauszahlung) fließt ein -
- * offene/überfällige/stornierte Sollstellungen sind keine Vorauszahlung.
+ * Offene/überfällige/stornierte Sollstellungen sind keine Vorauszahlung.
  */
 export function calculatePrepaymentsCents(charges: HousingChargeForStatementInput[], unitId: string, ownerId: string, ownedFrom: Date, ownedTo: Date): number {
 	return charges

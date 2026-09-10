@@ -11,7 +11,7 @@ describe("buildBetrKvCostItemsFromHoaStatement", () => {
 		]);
 
 		expect(items).toHaveLength(1);
-		expect(items[0]).toMatchObject({ label: "Wasser/Abwasser", category: "WATER_SUPPLY", allocationKey: "DIRECT", amount: "120.00" });
+		expect(items[0]).toMatchObject({ label: "Wasser/Abwasser", allocationKey: "DIRECT", amount: "120.00" });
 	});
 
 	it("filtert Positionen mit Betrag 0 heraus", () => {

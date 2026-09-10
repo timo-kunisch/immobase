@@ -46,6 +46,7 @@ const categoryLabelKeys: Record<AuditCategory, MessageKey> = {
 	mieter: "admin.category.mieter",
 	vertraege: "admin.category.vertraege",
 	finanzen: "admin.category.finanzen",
+	buchhaltung: "admin.category.buchhaltung",
 	abrechnung: "admin.category.abrechnung",
 	vorlagen: "admin.category.vorlagen",
 	weg: "admin.category.weg",

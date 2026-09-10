@@ -7,6 +7,7 @@ import type { Messages } from "../de";
 
 import { admin } from "./admin";
 import { auth } from "./auth";
+import { banking } from "./banking";
 import { billing } from "./billing";
 import { calendar } from "./calendar";
 import { chat } from "./chat";
@@ -34,6 +35,7 @@ import { units } from "./units";
 export const enMessages: Messages = {
 	admin,
 	auth,
+	banking,
 	billing,
 	calendar,
 	chat,

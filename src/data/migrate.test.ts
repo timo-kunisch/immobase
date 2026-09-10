@@ -105,22 +105,19 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0009:
-		// Spalte attachments an chat_messages).
-		const hasAttachmentsColumn = () =>
-			(db.prepare("PRAGMA table_info(chat_messages)").all() as { name: string }[]).some(
-				(column) => column.name === "attachments"
-			);
-		expect(hasAttachmentsColumn()).toBe(true);
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0011:
+		// Buchhaltungs-Tabellen accounts/bank_transactions).
+		const hasAccountsTable = () => tableNames(db).includes("accounts");
+		expect(hasAccountsTable()).toBe(true);
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(hasAttachmentsColumn()).toBe(false);
+		expect(hasAccountsTable()).toBe(false);
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(hasAttachmentsColumn()).toBe(true);
+		expect(hasAccountsTable()).toBe(true);
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

@@ -68,6 +68,19 @@ export function getLatestPostalShipmentForSource(sourceType: PostalShipmentSourc
 	return row ?? null;
 }
 
+/**
+ * Löscht die Versand-Protokolle einer PDF-Quelle (wird beim Löschen der
+ * Quelle selbst aufgerufen, z. B. Abrechnungs-PDFs einer finalisierten
+ * Periode, damit keine Protokolle auf gelöschte Quellen verweisen).
+ */
+export function deletePostalShipmentsForSource(sourceType: PostalShipmentSourceType, sourceIds: string[]): void {
+	if (sourceIds.length === 0) return;
+	const placeholders = sourceIds.map(() => "?").join(", ");
+	getDb()
+		.prepare(`DELETE FROM postal_shipments WHERE source_type = ? AND source_id IN (${placeholders})`)
+		.run(sourceType, ...sourceIds);
+}
+
 // ------------------------------------------------------------
 // Auflösung der polymorphen PDF-Quellen (Lesezugriffe)
 // ------------------------------------------------------------

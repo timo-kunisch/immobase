@@ -247,29 +247,90 @@ export interface Transaction {
 }
 
 // ============================================================
+// Buchhaltung (Konten, Banktransaktionen, Buchungszeilen)
+// ============================================================
+
+/** Konto des liegenschaftsbezogenen Kontenrahmens (z. B. "Gebäudeversicherung"). */
+export interface Account {
+	id: string;
+	propertyId: string;
+	label: string;
+	notes: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
+ * Eine tatsächliche Bewegung auf dem Bankkonto einer Liegenschaft.
+ * Betrag signed: positiv = Eingang (Gutschrift), negativ = Ausgang
+ * (Belastung) - Decimal-String, siehe src/lib/money.ts.
+ */
+export interface BankTransaction {
+	id: string;
+	propertyId: string;
+	bookingDate: string;
+	amount: string;
+	description: string;
+	/** Zahlungspartner laut Kontoauszug (z. B. Mieter, Versicherung). */
+	partner: string | null;
+	notes: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
+ * Buchungszeile: ordnet einen Teilbetrag einer Banktransaktion entweder
+ * einem Konto (accountId) oder einer fälligen Sollstellung (transactionId)
+ * zu. Genau eines von beiden ist gesetzt (anwendungsseitig geprüft).
+ */
+export interface BankTransactionAllocation {
+	id: string;
+	bankTransactionId: string;
+	accountId: string | null;
+	transactionId: string | null;
+	/** Signed wie die zugeordnete Banktransaktion (Teilbetrag). */
+	amount: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/**
+ * Abgeleiteter Zuordnungsstatus einer Banktransaktion (nicht gespeichert,
+ * in der Listenabfrage aus der Summe der Buchungszeilen berechnet):
+ * RECONCILED = vollständig zugeordnet, PARTIAL = teilweise, OPEN = gar nicht.
+ */
+export type BankTransactionStatus = "OPEN" | "PARTIAL" | "RECONCILED";
+
+// ============================================================
 // Nebenkostenabrechnung
 // ============================================================
 
 export type BillingPeriodStatus = "DRAFT" | "FINALIZED";
-export type AllocationKey = "LIVING_SPACE" | "OCCUPANTS" | "UNITS" | "CONSUMPTION" | "DIRECT";
-export type CostCategory =
-	| "PUBLIC_CHARGES"
-	| "WATER_SUPPLY"
-	| "DRAINAGE"
-	| "HEATING"
-	| "HOT_WATER"
-	| "HEATING_HOT_WATER_COMBINED"
-	| "ELEVATOR"
-	| "STREET_CLEANING_WASTE"
-	| "BUILDING_CLEANING_PEST_CONTROL"
-	| "GARDEN_MAINTENANCE"
-	| "LIGHTING"
-	| "CHIMNEY_CLEANING"
-	| "INSURANCE"
-	| "CARETAKER"
-	| "CABLE_ANTENNA"
-	| "LAUNDRY_FACILITIES"
-	| "OTHER";
+export type AllocationKey = "LIVING_SPACE" | "OCCUPANTS" | "UNITS" | "CONSUMPTION" | "DIRECT" | "CUSTOM";
+
+/**
+ * Frei definierbarer Umlageschlüssel einer Liegenschaft (allocationKey
+ * "CUSTOM", z. B. "Anzahl Stellplätze") - die Gewichte je Einheit liegen in
+ * `CustomAllocationKeyWeight`.
+ */
+export interface CustomAllocationKey {
+	id: string;
+	propertyId: string;
+	label: string;
+	notes: string | null;
+	createdAt: string;
+	updatedAt: string;
+}
+
+/** Gewicht einer Einheit für einen frei definierten Umlageschlüssel (Upsert je Einheit). */
+export interface CustomAllocationKeyWeight {
+	id: string;
+	customAllocationKeyId: string;
+	unitId: string;
+	weight: number;
+	createdAt: string;
+	updatedAt: string;
+}
 
 export interface BillingPeriod {
 	id: string;
@@ -286,11 +347,12 @@ export interface BillingPeriod {
 export interface CostItem {
 	id: string;
 	billingPeriodId: string;
-	category: CostCategory;
 	label: string;
 	amount: string;
 	allocationKey: AllocationKey;
 	directUnitId: string | null;
+	/** Nur gesetzt bei allocationKey = "CUSTOM" (sonst null). */
+	customAllocationKeyId: string | null;
 	notes: string | null;
 	createdAt: string;
 	updatedAt: string;
@@ -806,6 +868,7 @@ export type AuditCategory =
 	| "mieter"
 	| "vertraege"
 	| "finanzen"
+	| "buchhaltung"
 	| "abrechnung"
 	| "vorlagen"
 	| "weg"

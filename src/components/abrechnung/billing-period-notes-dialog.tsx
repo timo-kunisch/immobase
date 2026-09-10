@@ -1,0 +1,70 @@
+"use client";
+
+import { useActionState, useEffect, useState } from "react";
+import { Loader2, StickyNote } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { initialActionState } from "@/lib/action-state";
+import { useI18n } from "@/lib/i18n/provider";
+
+import { updateBillingPeriodNotesAction } from "@/app/(app)/abrechnung/actions";
+import type { BillingPeriod } from "@/data/types";
+
+/**
+ * Notizen einer Abrechnungsperiode erfassen/bearbeiten - bewusst jederzeit
+ * möglich, auch nach der Finalisierung (Notizen sind interne Anmerkungen,
+ * keine Abrechnungsdaten; Zeitraum/Kostenpositionen bleiben gesperrt).
+ */
+export function BillingPeriodNotesDialog({ billingPeriod }: { billingPeriod: BillingPeriod }) {
+	const { t } = useI18n();
+	const [open, setOpen] = useState(false);
+	const [state, formAction, isPending] = useActionState(updateBillingPeriodNotesAction, initialActionState);
+
+	useEffect(() => {
+		if (state.success) {
+			setOpen(false);
+		}
+	}, [state.success]);
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogTrigger asChild>
+				<Button variant="outline" size="sm">
+					<StickyNote />
+					{t("billing.notesDialog.trigger")}
+				</Button>
+			</DialogTrigger>
+			<DialogContent className="sm:max-w-lg">
+				<form action={formAction}>
+					<DialogHeader>
+						<DialogTitle>{t("billing.notesDialog.title")}</DialogTitle>
+						<DialogDescription>{t("billing.notesDialog.description")}</DialogDescription>
+					</DialogHeader>
+
+					<input type="hidden" name="id" value={billingPeriod.id} />
+
+					<div className="grid gap-4 py-4">
+						<div className="grid gap-2">
+							<Label htmlFor="notes">{t("common.notes")}</Label>
+							<Textarea id="notes" name="notes" placeholder={t("billing.fields.notesPlaceholder")} defaultValue={billingPeriod.notes ?? ""} />
+						</div>
+						{state.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+					</div>
+
+					<DialogFooter>
+						<Button type="button" variant="outline" onClick={() => setOpen(false)}>
+							{t("common.cancel")}
+						</Button>
+						<Button type="submit" disabled={isPending}>
+							{isPending ? <Loader2 className="animate-spin" /> : null}
+							{t("common.save")}
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}

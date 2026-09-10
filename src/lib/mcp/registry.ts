@@ -282,7 +282,12 @@ export interface CrudToolConfig<TInput> {
 	get?: (id: string) => unknown;
 	create: (input: TInput) => unknown;
 	update: (id: string, input: TInput) => void;
-	delete: (id: string) => void;
+	/**
+	 * Darf async sein (z. B. wenn beim Löschen zusätzlich Dateien aus der
+	 * Ablage entfernt werden müssen, siehe deleteBillingPeriodWithArtifacts)
+	 * - der Handler des _delete-Werkzeugs wartet dann darauf.
+	 */
+	delete: (id: string) => void | Promise<void>;
 	/** Optionale Filter-Felder für das list-Werkzeug. */
 	listFilters?: Record<string, FieldSpec>;
 	/** true = alle fünf Werkzeuge der Entität stehen nur im Scope "ADMIN". */
@@ -375,12 +380,12 @@ export function registerCrudTools<TInput>(config: CrudToolConfig<TInput>): void 
 		description: `Löscht eine ${entityLabel} unwiderruflich.`,
 		inputSchema: buildInputSchema({ id: { type: "string", description: "ID des Datensatzes" } }),
 		adminOnly,
-		handler: (args) => {
+		handler: async (args) => {
 			const id = requireId(args);
 			if (config.get && !config.get(id)) throw new McpToolError(`${entityLabel} mit ID "${id}" wurde nicht gefunden.`);
 			const guardError = config.beforeDelete?.(id);
 			if (guardError) throw new McpToolError(guardError);
-			config.delete(id);
+			await config.delete(id);
 			return { success: true, id };
 		},
 	});

@@ -482,8 +482,21 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 		await expect(callTool("documents_get", { id: created.id })).rejects.toThrow(/nicht gefunden/);
 	});
 
-	it("billing_periods: Finalisierungs- und Lösch-Sperren für finalisierte Perioden", async () => {
+	it("billing_periods: Finalisierungs-Sperren; finalisierte Perioden bleiben löschbar, Notizen jederzeit pflegbar", async () => {
 		const property = createProperty({ name: "Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const unit = createUnit({ propertyId: property.id, label: "Whg 1", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: null });
+		const tenant = createTenant({ firstName: "Max", lastName: "Muster", email: null, phone: null, notes: null });
+		createLease({
+			unitId: unit.id,
+			tenantId: tenant.id,
+			startDate: new Date("2025-01-01").toISOString(),
+			endDate: null,
+			coldRent: "800.00",
+			serviceCharges: "150.00",
+			numberOfOccupants: 1,
+			deposit: null,
+			notes: null,
+		});
 		const period = createBillingPeriod({
 			propertyId: property.id,
 			periodFrom: new Date("2025-01-01").toISOString(),
@@ -494,9 +507,240 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 		// Ohne Kostenpositionen ist die Finalisierung fachlich gesperrt.
 		await expect(callTool("billing_periods_finalize", { id: period.id })).rejects.toThrow(/Kostenposition/);
 
-		// Entwurf löschbar; danach nicht mehr vorhanden.
+		// Kostenposition anlegen und finalisieren.
+		const costItem = (await callTool("billing_cost_items_create", {
+			billingPeriodId: period.id,
+			label: "Wasser",
+			amount: "100.00",
+			allocationKey: "UNITS",
+			directUnitId: null,
+			customAllocationKeyId: null,
+			notes: null,
+		})) as { id: string };
+		await callTool("billing_periods_finalize", { id: period.id });
+		expect(getBillingPeriod(period.id)?.status).toBe("FINALIZED");
+
+		// Kostenpositionen/Periode sind gesperrt ...
+		await expect(
+			callTool("billing_periods_update", { id: period.id, propertyId: property.id, periodFrom: period.periodFrom, periodTo: period.periodTo, notes: null })
+		).rejects.toThrow(/finalisiert/);
+		await expect(
+			callTool("billing_cost_items_update", {
+				id: costItem.id,
+				billingPeriodId: period.id,
+				label: "Wasser",
+				amount: "120.00",
+				allocationKey: "UNITS",
+				directUnitId: null,
+				customAllocationKeyId: null,
+				notes: null,
+			})
+		).rejects.toThrow(/finalisiert/);
+
+		// ... aber die internen Notizen bleiben jederzeit pflegbar.
+		await callTool("billing_periods_set_notes", { id: period.id, notes: "Geprüft am 05.03." });
+		expect(getBillingPeriod(period.id)?.notes).toBe("Geprüft am 05.03.");
+
+		// Finalisierte Perioden sind nicht mehr bearbeitbar, ihre Löschung
+		// bleibt möglich (inkl. Abrechnungs-PDFs + Postversand-Protokolle).
 		await callTool("billing_periods_delete", { id: period.id });
 		expect(getBillingPeriod(period.id)).toBeNull();
+	});
+
+	it("custom_allocation_keys + billing_cost_items mit CUSTOM: Gewichte, Validierung, Umlage", async () => {
+		const property = createProperty({ name: "Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const unit = createUnit({ propertyId: property.id, label: "Whg 1", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: null });
+
+		const customKey = (await callTool("custom_allocation_keys_create", {
+			propertyId: property.id,
+			label: "Stellplätze",
+			notes: null,
+		})) as { id: string };
+		await callTool("custom_allocation_keys_set_weight", { customAllocationKeyId: customKey.id, unitId: unit.id, weight: 2.5 });
+
+		const keys = (await callTool("custom_allocation_keys_list", { propertyId: property.id })) as { weights: { unitId: string; weight: number }[] }[];
+		expect(keys[0].weights[0]).toMatchObject({ unitId: unit.id, weight: 2.5 });
+
+		const period = createBillingPeriod({
+			propertyId: property.id,
+			periodFrom: new Date("2026-01-01").toISOString(),
+			periodTo: new Date("2026-12-31").toISOString(),
+			notes: null,
+		});
+
+		// CUSTOM ohne customAllocationKeyId wird abgelehnt.
+		await expect(
+			callTool("billing_cost_items_create", {
+				billingPeriodId: period.id,
+				label: "Garage",
+				amount: "50.00",
+				allocationKey: "CUSTOM",
+				directUnitId: null,
+				customAllocationKeyId: null,
+				notes: null,
+			})
+		).rejects.toThrow(/customAllocationKeyId/);
+
+		// Individueller Schlüssel einer ANDEREN Liegenschaft wird abgelehnt.
+		const otherProperty = createProperty({ name: "Anderes Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const otherKey = (await callTool("custom_allocation_keys_create", { propertyId: otherProperty.id, label: "Fremd", notes: null })) as { id: string };
+		await expect(
+			callTool("billing_cost_items_create", {
+				billingPeriodId: period.id,
+				label: "Garage",
+				amount: "50.00",
+				allocationKey: "CUSTOM",
+				directUnitId: null,
+				customAllocationKeyId: otherKey.id,
+				notes: null,
+			})
+		).rejects.toThrow(/nicht zu der Liegenschaft/);
+
+		const created = (await callTool("billing_cost_items_create", {
+			billingPeriodId: period.id,
+			label: "Garage",
+			amount: "50.00",
+			allocationKey: "CUSTOM",
+			directUnitId: null,
+			customAllocationKeyId: customKey.id,
+			notes: null,
+		})) as { customAllocationKeyId: string | null; allocationKey: string };
+		expect(created.allocationKey).toBe("CUSTOM");
+		expect(created.customAllocationKeyId).toBe(customKey.id);
+	});
+
+	it("buchhaltung: Kontoauszug-Import mit Zuordnung markiert Sollstellungen als bezahlt", async () => {
+		const property = createProperty({ name: "Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const unit = createUnit({ propertyId: property.id, label: "Whg 1", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: null });
+		const tenant = createTenant({ firstName: "Max", lastName: "Muster", email: null, phone: null, notes: null });
+		createLease({
+			unitId: unit.id,
+			tenantId: tenant.id,
+			startDate: new Date("2026-01-01").toISOString(),
+			endDate: null,
+			coldRent: "800.00",
+			serviceCharges: "150.00",
+			numberOfOccupants: 1,
+			deposit: null,
+			notes: null,
+		});
+		await callTool("transactions_generate_due", { fromMonth: "2026-02", toMonth: "2026-02", dueDay: 3 });
+
+		const account = (await callTool("accounts_create", { propertyId: property.id, label: "Gebäudeversicherung", notes: null })) as { id: string };
+
+		// Offene Sollstellungen der Liegenschaft über den propertyId-Filter ermitteln.
+		const open = (await callTool("transactions_list", { propertyId: property.id, status: "OPEN" })) as { id: string; amount: string }[];
+		expect(open).toHaveLength(1);
+
+		const importResult = (await callTool("bank_transactions_import", {
+			propertyId: property.id,
+			transactions: [
+				{
+					bookingDate: "2026-02-05",
+					amount: "950.00",
+					description: "Überweisung Miete Februar",
+					partner: "Max Muster",
+					notes: null,
+					allocations: [{ accountId: null, transactionId: open[0].id, amount: "950.00" }],
+				},
+				{
+					bookingDate: "2026-02-10",
+					amount: "-120.00",
+					description: "Abbuchung Gebäudeversicherung",
+					partner: "Versicherung AG",
+					notes: null,
+					allocations: [{ accountId: account.id, transactionId: null, amount: "-120.00" }],
+				},
+			],
+		})) as { created: number };
+		expect(importResult.created).toBe(2);
+
+		// Die vollständig zugeordnete Sollstellung gilt als bezahlt.
+		const transactions = listTransactions({ propertyId: property.id });
+		expect(transactions[0].status).toBe("PAID");
+		expect(transactions[0].paidDate).toBe(new Date("2026-02-05T00:00:00.000Z").toISOString());
+
+		// Konten-Statistik + abgeleiteter Zuordnungsstatus.
+		const accounts = (await callTool("accounts_list", { propertyId: property.id })) as { label: string; allocatedAmount: string; bookingCount: number }[];
+		expect(accounts[0]).toMatchObject({ label: "Gebäudeversicherung", allocatedAmount: "-120.00", bookingCount: 1 });
+
+		const reconciled = (await callTool("bank_transactions_list", { propertyId: property.id, status: "RECONCILED" })) as { id: string }[];
+		expect(reconciled).toHaveLength(2);
+
+		// Konto mit Buchungen ist über MCP löschgeschützt.
+		await expect(callTool("accounts_delete", { id: account.id })).rejects.toThrow(/Buchungen/);
+	});
+
+	it("buchhaltung: Zuordnungs-Fachregeln (Vorzeichen, fremde Liegenschaft, Überzuordnung)", async () => {
+		const propertyA = createProperty({ name: "Haus A", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const propertyB = createProperty({ name: "Haus B", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const unit = createUnit({ propertyId: propertyA.id, label: "Whg 1", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: null });
+		const tenant = createTenant({ firstName: "Max", lastName: "Muster", email: null, phone: null, notes: null });
+		const lease = createLease({
+			unitId: unit.id,
+			tenantId: tenant.id,
+			startDate: new Date("2026-01-01").toISOString(),
+			endDate: null,
+			coldRent: "800.00",
+			serviceCharges: "150.00",
+			numberOfOccupants: 1,
+			deposit: null,
+			notes: null,
+		});
+		const due = (await callTool("transactions_generate_due", { fromMonth: "2026-02", toMonth: "2026-02", dueDay: 3 })) as { created: number };
+		expect(due.created).toBe(1);
+		const openA = (await callTool("transactions_list", { propertyId: propertyA.id, status: "OPEN" })) as { id: string }[];
+
+		const bankTransaction = (await callTool("bank_transactions_create", {
+			propertyId: propertyA.id,
+			bookingDate: "2026-02-05",
+			amount: "1000.00",
+			description: "Eingang",
+			partner: null,
+			notes: null,
+		})) as { id: string };
+
+		// Vorzeichen der Buchungszeile muss dem der Banktransaktion entsprechen.
+		await expect(
+			callTool("bank_transactions_allocate", { id: bankTransaction.id, allocations: [{ accountId: null, transactionId: openA[0].id, amount: "-500.00" }] })
+		).rejects.toThrow(/Vorzeichen/);
+
+		// Sollstellung einer anderen Liegenschaft wird abgelehnt.
+		const unitB = createUnit({ propertyId: propertyB.id, label: "Whg B", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: null });
+		const tenantB = createTenant({ firstName: "Berta", lastName: "Beispiel", email: null, phone: null, notes: null });
+		createLease({
+			unitId: unitB.id,
+			tenantId: tenantB.id,
+			startDate: new Date("2026-01-01").toISOString(),
+			endDate: null,
+			coldRent: "700.00",
+			serviceCharges: "120.00",
+			numberOfOccupants: 1,
+			deposit: null,
+			notes: null,
+		});
+		await callTool("transactions_generate_due", { fromMonth: "2026-02", toMonth: "2026-02", dueDay: 3 });
+		const openB = (await callTool("transactions_list", { propertyId: propertyB.id, status: "OPEN" })) as { id: string }[];
+		await expect(
+			callTool("bank_transactions_allocate", { id: bankTransaction.id, allocations: [{ accountId: null, transactionId: openB[0].id, amount: "500.00" }] })
+		).rejects.toThrow(/anderen Liegenschaft/);
+
+		// Überzuordnung wird abgelehnt.
+		await expect(
+			callTool("bank_transactions_allocate", { id: bankTransaction.id, allocations: [{ accountId: null, transactionId: openA[0].id, amount: "1200.00" }] })
+		).rejects.toThrow(/übersteigen/);
+
+		// Korrekte Zuordnung klappt (Split in Teilbeträge, Rest auf Konto).
+		const account = (await callTool("accounts_create", { propertyId: propertyA.id, label: "Kaution", notes: null })) as { id: string };
+		const allocateResult = (await callTool("bank_transactions_allocate", {
+			id: bankTransaction.id,
+			allocations: [
+				{ accountId: null, transactionId: openA[0].id, amount: "950.00" },
+				{ accountId: account.id, transactionId: null, amount: "50.00" },
+			],
+		})) as { success: boolean };
+		expect(allocateResult.success).toBe(true);
+		expect(listTransactions({ leaseId: lease.id })[0].status).toBe("PAID");
 	});
 });
 

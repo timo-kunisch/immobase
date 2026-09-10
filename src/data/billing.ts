@@ -1,9 +1,11 @@
 import { getDb } from "./db";
 import { newId, now } from "./helpers";
+import { deletePostalShipmentsForSource } from "./postal-shipments";
 import type {
 	BillingPeriod,
 	ConsumptionValue,
 	CostItem,
+	CustomAllocationKey,
 	Lease,
 	Property,
 	RentAdjustment,
@@ -12,6 +14,7 @@ import type {
 	TenantStatementLine,
 	Unit,
 } from "./types";
+import { deleteUploadedFile } from "@/lib/storage";
 
 /**
  * Repository für die Nebenkostenabrechnung (Tabellen `billing_periods`,
@@ -36,8 +39,9 @@ const BILLING_PERIOD_COLUMNS = `
 `;
 
 const COST_ITEM_COLUMNS = `
-	id, billing_period_id AS billingPeriodId, category, label, amount,
-	allocation_key AS allocationKey, direct_unit_id AS directUnitId, notes,
+	id, billing_period_id AS billingPeriodId, label, amount,
+	allocation_key AS allocationKey, direct_unit_id AS directUnitId,
+	custom_allocation_key_id AS customAllocationKeyId, notes,
 	created_at AS createdAt, updated_at AS updatedAt
 `;
 
@@ -177,11 +181,45 @@ export function updateBillingPeriod(id: string, input: BillingPeriodInput): void
  * Löscht eine Abrechnungsperiode. Kostenpositionen, Verbrauchswerte sowie
  * etwaige TenantStatements (inkl. Zeilen) werden per ON DELETE CASCADE
  * der Datenbank mitentfernt (foreign_keys-Pragma ist aktiv, siehe
- * src/data/db.ts). Löschbar sind ohnehin nur Entwürfe (geprüft in der
- * Server Action), sodass hier niemals bereits erzeugte PDFs existieren.
+ * src/data/db.ts).
+ *
+ * Löschbar sind seit Wegfall der Löschsperre auch FINALISIERTE Perioden
+ * (bewusste Entscheidung: Sie sind nicht mehr bearbeitbar, ihre Löschung
+ * bleibt aber möglich, z. B. um fehlerhafte Abrechnungen zu entsorgen) -
+ * deshalb räumen die aufrufenden Schichten (Server Action/MCP) vorher die
+ * erzeugten Abrechnungs-PDFs aus der Dateiablage sowie die Postversand-
+ * Protokolle weg, siehe deleteBillingPeriodWithArtifacts.
  */
 export function deleteBillingPeriod(id: string): void {
 	getDb().prepare("DELETE FROM billing_periods WHERE id = ?").run(id);
+}
+
+/**
+ * Dateipfade aller erzeugten Abrechnungs-PDFs einer Periode (null-Werte
+ * ausgelassen) - Grundlage der Aufräumlogik beim Löschen.
+ */
+export function listTenantStatementPdfPathsForPeriod(billingPeriodId: string): string[] {
+	const rows = getDb()
+		.prepare("SELECT pdf_path AS pdfPath FROM tenant_statements WHERE billing_period_id = ? AND pdf_path IS NOT NULL")
+		.all(billingPeriodId) as { pdfPath: string }[];
+	return rows.map((row) => row.pdfPath);
+}
+
+/**
+ * Löscht eine Abrechnungsperiode inkl. aller erzeugten Artefakte: die
+ * erzeugten Abrechnungs-PDFs aus der Dateiablage, die Postversand-Protokolle
+ * (postal_shipments) der Einzelabrechnungen sowie die Periode selbst
+ * (Kostenpositionen/Verbrauchswerte/Einzelabrechnungen per ON DELETE
+ * CASCADE). Wird von Server Action und MCP identisch genutzt.
+ */
+export async function deleteBillingPeriodWithArtifacts(id: string): Promise<void> {
+	const pdfPaths = listTenantStatementPdfPathsForPeriod(id);
+	const statementIds = listTenantStatementIdsForPeriod(id);
+	deletePostalShipmentsForSource("TENANT_STATEMENT", statementIds);
+	deleteBillingPeriod(id);
+	for (const pdfPath of pdfPaths) {
+		await deleteUploadedFile(pdfPath);
+	}
 }
 
 /** Anzahl der Kostenpositionen je Abrechnungsperiode (für die Listenansicht). */
@@ -207,11 +245,12 @@ export function listPropertiesSortedByName(): Property[] {
 
 export interface CostItemInput {
 	billingPeriodId: string;
-	category: CostItem["category"];
 	label: string;
 	amount: string;
 	allocationKey: CostItem["allocationKey"];
 	directUnitId: string | null;
+	/** Nur gesetzt bei allocationKey = "CUSTOM" (sonst null). */
+	customAllocationKeyId: string | null;
 	notes: string | null;
 }
 
@@ -225,17 +264,17 @@ export function createCostItem(input: CostItemInput): CostItem {
 	const timestamp = now();
 	getDb()
 		.prepare(
-			`INSERT INTO cost_items (id, billing_period_id, category, label, amount, allocation_key, direct_unit_id, notes, created_at, updated_at)
+			`INSERT INTO cost_items (id, billing_period_id, label, amount, allocation_key, direct_unit_id, custom_allocation_key_id, notes, created_at, updated_at)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			id,
 			input.billingPeriodId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
 			input.directUnitId,
+			input.customAllocationKeyId,
 			input.notes,
 			timestamp,
 			timestamp
@@ -247,16 +286,16 @@ export function updateCostItem(id: string, input: CostItemInput): void {
 	getDb()
 		.prepare(
 			`UPDATE cost_items
-			 SET billing_period_id = ?, category = ?, label = ?, amount = ?, allocation_key = ?, direct_unit_id = ?, notes = ?, updated_at = ?
+			 SET billing_period_id = ?, label = ?, amount = ?, allocation_key = ?, direct_unit_id = ?, custom_allocation_key_id = ?, notes = ?, updated_at = ?
 			 WHERE id = ?`
 		)
 		.run(
 			input.billingPeriodId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
 			input.directUnitId,
+			input.customAllocationKeyId,
 			input.notes,
 			now(),
 			id
@@ -303,10 +342,21 @@ export function saveConsumptionValuesForCostItem(costItemId: string, values: Con
 // Zusammengesetzte Lade-Funktion (Detailansicht/Finalisierung)
 // ============================================================
 
-/** Mietvertrag inkl. Mieter und Mietanpassungs-Verlauf. */
+/** Eine als bezahlt markierte Monats-Sollstellung eines Mietvertrags. */
+export interface BillingPaidTransaction {
+	/** Fälligkeitsdatum (der zugehörige Monat zählt als geleistete Vorauszahlung). */
+	dueDate: string;
+	/** Sollbetrag der Zahlung (nur Anzeige). */
+	amount: string;
+	purpose: string | null;
+}
+
+/** Mietvertrag inkl. Mieter, Mietanpassungs-Verlauf und bezahlten Sollstellungen. */
 export interface BillingLease extends Lease {
 	tenant: Tenant;
 	rentAdjustments: RentAdjustment[];
+	/** Als bezahlt (status "PAID") markierte Sollstellungen des Vertrags - Grundlage der tatsächlich geleisteten Vorauszahlungen (computePaidPrepaymentsCents). */
+	paidTransactions: BillingPaidTransaction[];
 }
 
 /** Einheit inkl. aller Mietverträge (mit Mieter + Verlauf). */
@@ -314,10 +364,12 @@ export interface BillingUnit extends Unit {
 	leases: BillingLease[];
 }
 
-/** Kostenposition inkl. Verbrauchswerte und (bei DIRECT) der Ziel-Einheit. */
+/** Kostenposition inkl. Verbrauchswerten, (bei DIRECT) Ziel-Einheit und (bei CUSTOM) Umlageschlüssel. */
 export interface BillingCostItem extends CostItem {
 	consumptionValues: ConsumptionValue[];
 	directUnit: Unit | null;
+	/** Aufgelöster frei definierbarer Umlageschlüssel (nur bei allocationKey = "CUSTOM"). */
+	customAllocationKey: CustomAllocationKey | null;
 }
 
 /** Eine Zeile der eingefrorenen Einzelabrechnung inkl. Kostenposition. */
@@ -337,7 +389,18 @@ export interface BillingPeriodDetail {
 	property: Property;
 	units: BillingUnit[];
 	costItems: BillingCostItem[];
+	/** Frei definierbare Umlageschlüssel der Liegenschaft (für CUSTOM-Kostenpositionen). */
+	customAllocationKeys: CustomAllocationKey[];
 	tenantStatements: BillingTenantStatement[];
+}
+
+function listPaidTransactionsForLease(leaseId: string): BillingPaidTransaction[] {
+	return getDb()
+		.prepare(
+			`SELECT due_date AS dueDate, amount, purpose FROM transactions
+			 WHERE lease_id = ? AND status = 'PAID' ORDER BY due_date`
+		)
+		.all(leaseId) as BillingPaidTransaction[];
 }
 
 function listLeasesForUnit(unitId: string): BillingLease[] {
@@ -349,10 +412,11 @@ function listLeasesForUnit(unitId: string): BillingLease[] {
 		// tenant_id ist eine restrict-FK - der Mieter existiert garantiert.
 		tenant: getTenantRow(lease.tenantId)!,
 		rentAdjustments: listRentAdjustmentRows(lease.id),
+		paidTransactions: listPaidTransactionsForLease(lease.id),
 	}));
 }
 
-function listCostItemsForPeriod(billingPeriodId: string): BillingCostItem[] {
+function listCostItemsForPeriod(billingPeriodId: string, keyById: Map<string, CustomAllocationKey>): BillingCostItem[] {
 	const costItems = getDb()
 		.prepare(`SELECT ${COST_ITEM_COLUMNS} FROM cost_items WHERE billing_period_id = ? ORDER BY created_at`)
 		.all(billingPeriodId) as CostItem[];
@@ -362,6 +426,7 @@ function listCostItemsForPeriod(billingPeriodId: string): BillingCostItem[] {
 			.prepare(`SELECT ${CONSUMPTION_VALUE_COLUMNS} FROM consumption_values WHERE cost_item_id = ?`)
 			.all(costItem.id) as ConsumptionValue[],
 		directUnit: costItem.directUnitId ? getUnitRow(costItem.directUnitId) : null,
+		customAllocationKey: costItem.customAllocationKeyId ? keyById.get(costItem.customAllocationKeyId) ?? null : null,
 	}));
 }
 
@@ -403,8 +468,9 @@ function listStatementsForPeriod(billingPeriodId: string): BillingTenantStatemen
 /**
  * Lädt eine Abrechnungsperiode mit allem, was die Detailansicht und die
  * Finalisierung benötigen: Liegenschaft, Einheiten inkl. Mietverträge
- * (+ Mieter, Mietanpassungen), Kostenpositionen inkl. Verbrauchswerte und
- * bereits eingefrorene Einzelabrechnungen.
+ * (+ Mieter, Mietanpassungen, bezahlte Sollstellungen), Kostenpositionen
+ * inkl. Verbrauchswerten, frei definierbare Umlageschlüssel der Liegenschaft
+ * und bereits eingefrorene Einzelabrechnungen.
  */
 export function getBillingPeriodDetail(id: string): BillingPeriodDetail | null {
 	const billingPeriod = getBillingPeriod(id);
@@ -416,11 +482,19 @@ export function getBillingPeriodDetail(id: string): BillingPeriodDetail | null {
 		.prepare(`SELECT ${UNIT_COLUMNS} FROM units WHERE property_id = ? ORDER BY created_at`)
 		.all(billingPeriod.propertyId) as Unit[];
 
+	const customAllocationKeys = getDb()
+		.prepare(
+			`SELECT id, property_id AS propertyId, label, notes, created_at AS createdAt, updated_at AS updatedAt
+			 FROM custom_allocation_keys WHERE property_id = ? ORDER BY created_at`
+		)
+		.all(billingPeriod.propertyId) as CustomAllocationKey[];
+
 	return {
 		billingPeriod,
 		property,
 		units: unitRows.map((unit) => ({ ...unit, leases: listLeasesForUnit(unit.id) })),
-		costItems: listCostItemsForPeriod(billingPeriod.id),
+		costItems: listCostItemsForPeriod(billingPeriod.id, new Map(customAllocationKeys.map((key) => [key.id, key]))),
+		customAllocationKeys,
 		tenantStatements: listStatementsForPeriod(billingPeriod.id),
 	};
 }

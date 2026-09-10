@@ -15,6 +15,7 @@ import {
 	FolderOpen,
 	Gavel,
 	Inbox,
+	Landmark,
 	LayoutDashboard,
 	LogOut,
 	PiggyBank,
@@ -74,6 +75,7 @@ const rentalNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutD
 	{ titleKey: "nav.item.tenants", href: "/mieter", icon: Users },
 	{ titleKey: "nav.item.leases", href: "/vertraege", icon: FileSignature },
 	{ titleKey: "nav.item.finances", href: "/finanzen", icon: Wallet },
+	{ titleKey: "nav.item.accounting", href: "/buchhaltung", icon: Landmark },
 	{ titleKey: "nav.item.billing", href: "/abrechnung", icon: Calculator },
 	{ titleKey: "nav.item.templates", href: "/vorlagen", icon: FileText },
 ];

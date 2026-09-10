@@ -1,4 +1,4 @@
-import type { AllocationKey, CostCategory, HoaCostCategory } from "@/data/types";
+import type { AllocationKey, HoaCostCategory } from "@/data/types";
 import { centsToDecimalString } from "@/lib/money";
 
 /**
@@ -15,12 +15,11 @@ import { centsToDecimalString } from "@/lib/money";
  * Rechtsberatung, Bankgebühren - das sind reine Verwaltungskosten des
  * Eigentümers, § 1 Abs. 2 Nr. 1 BetrKV/BGH-Rechtsprechung).
  *
- * Diese Datei kapselt ausschließlich die REINE Umwandlungslogik (Mapping
- * der Kostenarten, Filterung nach isApportionable, Betragsübernahme) - der
- * eigentliche "Import" (Anlegen von costItems/consumptionValues in einer
- * bestehenden Nebenkostenabrechnungsperiode) erfolgt als Server Action
- * (siehe src/app/(app)/weg/jahresabrechnung/actions.ts), die diese
- * Funktionen aufruft.
+ * Diese Datei kapselt ausschließlich die REINE Umwandlungslogik (Filterung
+ * nach isApportionable, Betragsübernahme) - der eigentliche "Import"
+ * (Anlegen von costItems/consumptionValues in einer bestehenden Nebenkosten-
+ * abrechnungsperiode) erfolgt als Server Action (siehe src/app/(app)/weg/
+ * jahresabrechnung/actions.ts), die diese Funktionen aufruft.
  *
  * Getroffene Annahme: Der Übertrag erfolgt je Kostenposition als eigene,
  * DIREKT der vermieteten Einheit zugeordnete Position (allocationKey
@@ -55,33 +54,6 @@ export const hoaCostCategoryDefaultApportionable: Record<HoaCostCategory, boolea
 	OTHER: false,
 };
 
-/**
- * Mapping der WEG-Kostenarten auf die entsprechende BetrKV-Kostenart (§ 2
- * BetrKV Nr. 1-17, siehe CostCategory in src/data/types.ts) für den
- * Übertrag in die Nebenkostenabrechnung. Kategorien ohne sinnvolle
- * BetrKV-Entsprechung (Verwaltervergütung, Rücklage, Rechtsberatung,
- * Bankgebühren) werden nicht umlagefähig vorbelegt (siehe oben) und daher
- * i. d. R. nicht übertragen - das Mapping ist trotzdem für alle Kategorien
- * vollständig definiert, falls ein Nutzer eine dieser Kategorien manuell
- * doch als umlagefähig markiert.
- */
-export const hoaCostCategoryToBetrKvCategory: Record<HoaCostCategory, CostCategory> = {
-	RESERVE_CONTRIBUTION: "OTHER",
-	ADMINISTRATOR_FEE: "OTHER",
-	INSURANCE: "INSURANCE",
-	CARETAKER: "CARETAKER",
-	MAINTENANCE_REPAIR: "OTHER",
-	WATER_DRAINAGE: "WATER_SUPPLY",
-	HEATING: "HEATING",
-	ELECTRICITY_COMMON: "LIGHTING",
-	CLEANING: "BUILDING_CLEANING_PEST_CONTROL",
-	GARDEN_MAINTENANCE: "GARDEN_MAINTENANCE",
-	ELEVATOR: "ELEVATOR",
-	LEGAL_ADVICE: "OTHER",
-	BANK_FEES: "OTHER",
-	OTHER: "OTHER",
-};
-
 export type HoaAnnualStatementLineForBridge = {
 	costItemId: string;
 	label: string;
@@ -92,7 +64,6 @@ export type HoaAnnualStatementLineForBridge = {
 
 export type BridgedBetrKvCostItem = {
 	label: string;
-	category: CostCategory;
 	allocationKey: AllocationKey;
 	amount: string;
 	notes: string;
@@ -113,7 +84,6 @@ export function buildBetrKvCostItemsFromHoaStatement(lines: HoaAnnualStatementLi
 		.filter((line) => line.isApportionable && line.amountCents !== 0)
 		.map((line) => ({
 			label: line.label,
-			category: hoaCostCategoryToBetrKvCategory[line.category],
 			allocationKey: "DIRECT" as AllocationKey,
 			amount: centsToDecimalString(line.amountCents),
 			notes: "Übernommen aus der WEG-Jahresabrechnung.",

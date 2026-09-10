@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
 	createBillingPeriod,
 	createCostItem,
-	deleteBillingPeriod,
+	deleteBillingPeriodWithArtifacts,
 	deleteCostItem,
 	finalizeBillingPeriod,
 	getBillingPeriod,
@@ -19,39 +19,22 @@ import {
 	updateTenantStatementPdf,
 	type TenantStatementPdfData,
 } from "@/data/billing";
+import { buildCustomAllocationWeightsByKey, createCustomAllocationKey, deleteCustomAllocationKey as deleteCustomAllocationKeyRow, getCustomAllocationKey, updateCustomAllocationKey, upsertCustomAllocationKeyWeight } from "@/data/custom-allocation-keys";
 import { companySettingsToAddressLines, getCompanySettings } from "@/data/company-settings";
-import type { AllocationKey, CostCategory } from "@/data/types";
+import type { AllocationKey } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
-import { allocationKeyLabels, calculateBillingResult, costCategoryLabels } from "@/lib/billing";
+import { allocationKeyLabels, calculateBillingResult } from "@/lib/billing";
 import { centsToDecimalString } from "@/lib/money";
 import { generateBillingStatementPdf } from "@/lib/pdf/billing-statement";
 import { deleteUploadedFile, saveGeneratedFile } from "@/lib/storage";
 import { formatDate } from "@/lib/format";
+import { getOptionalFloat } from "@/lib/form-data";
 import { sendPdfByPostForSource, type PostalShipmentActionState } from "@/lib/postal-shipments";
 
-const COST_CATEGORIES: CostCategory[] = [
-	"PUBLIC_CHARGES",
-	"WATER_SUPPLY",
-	"DRAINAGE",
-	"HEATING",
-	"HOT_WATER",
-	"HEATING_HOT_WATER_COMBINED",
-	"ELEVATOR",
-	"STREET_CLEANING_WASTE",
-	"BUILDING_CLEANING_PEST_CONTROL",
-	"GARDEN_MAINTENANCE",
-	"LIGHTING",
-	"CHIMNEY_CLEANING",
-	"INSURANCE",
-	"CARETAKER",
-	"CABLE_ANTENNA",
-	"LAUNDRY_FACILITIES",
-	"OTHER",
-];
-const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT"];
+const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -140,27 +123,78 @@ export async function saveBillingPeriodAction(_prevState: ActionState, formData:
 	return { success: true };
 }
 
+/**
+ * Löscht eine Abrechnungsperiode - seit Wegfall der Löschsperre auch
+ * FINALISIERTE Perioden (sie sind nicht mehr bearbeitbar, ihre Löschung
+ * bleibt aber möglich, z. B. um fehlerhafte Abrechnungen zu entsorgen).
+ * Mit ihr werden die Kostenpositionen, Verbrauchswerte, Einzelabrechnungen,
+ * die erzeugten PDFs aus der Dateiablage sowie die Postversand-Protokolle
+ * entfernt (atomar in der DB, siehe deleteBillingPeriodWithArtifacts).
+ */
 export async function deleteBillingPeriodAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
-	const existing = await requireDraftBillingPeriod(id);
-	if ("error" in existing) return { error: existing.error };
+	const existing = getBillingPeriod(id);
+	if (!existing) {
+		return { error: t("billing.errors.periodNotFound") };
+	}
 
 	try {
-		deleteBillingPeriod(id);
+		await deleteBillingPeriodWithArtifacts(id);
 	} catch (error) {
 		console.error("deleteBillingPeriodAction failed", error);
 		return { error: t("billing.errors.periodDeleteFailed") };
 	}
 
-	logActivity(user, "DELETE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(existing.billingPeriod)}“ gelöscht`, id);
+	logActivity(user, "DELETE", "abrechnung", `Abrechnungszeitraum „${billingPeriodLabel(existing)}“ gelöscht`, id);
 
 	revalidatePath("/abrechnung");
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/**
+ * Speichert ausschließlich die internen Notizen einer Abrechnungsperiode -
+ * jederzeit erlaubt, auch nach der Finalisierung (die eigentlichen
+ * Abrechnungsdaten - Zeitraum/Liegenschaft/Kostenpositionen - bleiben
+ * gesperrt).
+ */
+export async function updateBillingPeriodNotesAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const id = getString(formData, "id");
+	const notes = getString(formData, "notes");
+
+	if (!id) {
+		return { error: t("billing.errors.periodNotFound") };
+	}
+
+	const billingPeriod = getBillingPeriod(id);
+	if (!billingPeriod) {
+		return { error: t("billing.errors.periodNotFound") };
+	}
+
+	try {
+		updateBillingPeriod(id, {
+			propertyId: billingPeriod.propertyId,
+			periodFrom: billingPeriod.periodFrom,
+			periodTo: billingPeriod.periodTo,
+			notes: notes || null,
+		});
+	} catch (error) {
+		console.error("updateBillingPeriodNotesAction failed", error);
+		return { error: t("billing.errors.periodSaveFailed") };
+	}
+
+	logActivity(user, "UPDATE", "abrechnung", `Notizen der Abrechnungsperiode „${billingPeriodLabel(billingPeriod)}“ aktualisiert`, id);
+
+	revalidatePath("/abrechnung");
+	revalidatePath(`/abrechnung/${id}`);
 	return { success: true };
 }
 
 // ============================================================
-// Kostenpositionen (CostItem) nach § 2 BetrKV
+// Kostenpositionen (CostItem)
 // ============================================================
 
 export async function saveCostItemAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -168,11 +202,11 @@ export async function saveCostItemAction(_prevState: ActionState, formData: Form
 	const t = await getT();
 	const id = getString(formData, "id");
 	const billingPeriodId = getString(formData, "billingPeriodId");
-	const categoryRaw = getString(formData, "category") as CostCategory;
 	const label = getString(formData, "label");
 	const amount = getDecimalString(formData, "amount");
 	const allocationKeyRaw = getString(formData, "allocationKey") as AllocationKey;
 	const directUnitId = getString(formData, "directUnitId");
+	const customAllocationKeyId = getString(formData, "customAllocationKeyId");
 	const notes = getString(formData, "notes");
 
 	if (!billingPeriodId || !label || amount === null || !allocationKeyRaw) {
@@ -180,8 +214,6 @@ export async function saveCostItemAction(_prevState: ActionState, formData: Form
 			error: t("billing.errors.costItemFieldsRequired"),
 		};
 	}
-
-	const category: CostCategory = COST_CATEGORIES.includes(categoryRaw) ? categoryRaw : "OTHER";
 
 	if (!ALLOCATION_KEYS.includes(allocationKeyRaw)) {
 		return { error: t("billing.errors.invalidAllocationKey") };
@@ -193,16 +225,32 @@ export async function saveCostItemAction(_prevState: ActionState, formData: Form
 		};
 	}
 
+	if (allocationKeyRaw === "CUSTOM" && !customAllocationKeyId) {
+		return {
+			error: t("billing.errors.customKeyRequired"),
+		};
+	}
+
 	const existing = await requireDraftBillingPeriod(billingPeriodId);
 	if ("error" in existing) return { error: existing.error };
 
+	if (allocationKeyRaw === "CUSTOM" && customAllocationKeyId) {
+		const customKey = getCustomAllocationKey(customAllocationKeyId);
+		// Die Kostenposition wird mit dem Umlageschlüssel der Liegenschaft der
+		// Abrechnungsperiode verrechnet - ein Schlüssel einer anderen
+		// Liegenschaft wäre ein Datenfehler.
+		if (!customKey || customKey.propertyId !== existing.billingPeriod.propertyId) {
+			return { error: t("billing.errors.customKeyNotFound") };
+		}
+	}
+
 	const data = {
 		billingPeriodId,
-		category,
 		label,
 		amount,
 		allocationKey: allocationKeyRaw,
 		directUnitId: allocationKeyRaw === "DIRECT" ? directUnitId : null,
+		customAllocationKeyId: allocationKeyRaw === "CUSTOM" ? customAllocationKeyId : null,
 		notes: notes || null,
 	};
 
@@ -328,6 +376,14 @@ export async function finalizeBillingPeriodAction(billingPeriodId: string): Prom
 		};
 	}
 
+	// Gewichte der frei definierbaren Umlageschlüssel (allocationKey
+	// "CUSTOM") in der Form auflösen, die die Berechnung erwartet - geteilter
+	// Helfer des Repositories, identisch zur Live-Vorschau und zum
+	// MCP-Finalisierungs-Werkzeug.
+	const customWeightsByKey = buildCustomAllocationWeightsByKey(
+		[...new Set(detail.costItems.map((costItem) => costItem.customAllocationKeyId).filter((keyId): keyId is string => keyId !== null))]
+	);
+
 	const result = calculateBillingResult({
 		periodFrom: new Date(detail.billingPeriod.periodFrom),
 		periodTo: new Date(detail.billingPeriod.periodTo),
@@ -342,6 +398,7 @@ export async function finalizeBillingPeriodAction(billingPeriodId: string): Prom
 			allocationKey: costItem.allocationKey,
 			directUnitId: costItem.directUnitId,
 			consumptionValues: costItem.consumptionValues,
+			customAllocationWeights: costItem.customAllocationKeyId ? customWeightsByKey.get(costItem.customAllocationKeyId) ?? [] : [],
 		})),
 	});
 
@@ -412,7 +469,6 @@ async function buildAndSaveStatementPdf(data: TenantStatementPdfData): Promise<A
 		occupiedDays: data.statement.occupiedDays,
 		lines: data.lines.map((line) => ({
 			label: line.costItem.label,
-			categoryLabel: costCategoryLabels[line.costItem.category],
 			totalAmount: line.costItem.amount,
 			allocationKeyLabel: allocationKeyLabels[line.costItem.allocationKey],
 			tenantShare: line.amount,
@@ -549,4 +605,93 @@ export async function sendStatementByPostAction(tenantStatementId: string): Prom
 
 	revalidatePath(`/abrechnung/${data.statement.billingPeriodId}`);
 	return result;
+}
+
+// ============================================================
+// Frei definierbare Umlageschlüssel (allocationKey "CUSTOM")
+// ============================================================
+
+export async function saveCustomAllocationKeyAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const id = getString(formData, "id");
+	const propertyId = getString(formData, "propertyId");
+	const label = getString(formData, "label");
+	const notes = getString(formData, "notes");
+
+	if (!propertyId || !label) {
+		return { error: t("billing.allocationKeys.errors.requiredFields") };
+	}
+
+	try {
+		if (id) {
+			updateCustomAllocationKey(id, { label, notes: notes || null });
+			logActivity(user, "UPDATE", "abrechnung", `Umlageschlüssel „${label}“ bearbeitet`, id);
+		} else {
+			const allocationKey = createCustomAllocationKey({ propertyId, label, notes: notes || null });
+			logActivity(user, "CREATE", "abrechnung", `Umlageschlüssel „${label}“ angelegt`, allocationKey.id);
+		}
+	} catch (error) {
+		console.error("saveCustomAllocationKeyAction failed", error);
+		return { error: t("billing.allocationKeys.errors.saveFailed") };
+	}
+
+	revalidatePath("/abrechnung");
+	return { success: true };
+}
+
+export async function deleteCustomAllocationKeyAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const allocationKey = getCustomAllocationKey(id);
+	if (!allocationKey) {
+		return { error: t("billing.allocationKeys.errors.notFound") };
+	}
+
+	try {
+		deleteCustomAllocationKeyRow(id);
+	} catch (error) {
+		console.error("deleteCustomAllocationKeyAction failed", error);
+		return { error: t("billing.allocationKeys.errors.deleteFailed") };
+	}
+
+	logActivity(user, "DELETE", "abrechnung", `Umlageschlüssel „${allocationKey.label}“ gelöscht`, id);
+
+	revalidatePath("/abrechnung");
+	return { success: true };
+}
+
+export async function saveCustomAllocationWeightsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const customAllocationKeyId = getString(formData, "customAllocationKeyId");
+	if (!customAllocationKeyId) {
+		return { error: t("billing.allocationKeys.errors.invalidKey") };
+	}
+
+	const allocationKey = getCustomAllocationKey(customAllocationKeyId);
+	if (!allocationKey) {
+		return { error: t("billing.allocationKeys.errors.notFound") };
+	}
+
+	const unitIds: string[] = [];
+	for (const key of formData.keys()) {
+		const match = /^weight-(.+)$/.exec(key);
+		if (match) unitIds.push(match[1]);
+	}
+
+	// Bewusst sequenzielle Einzel-Upserts (Muster wie saveConsumptionValuesAction).
+	try {
+		for (const unitId of unitIds) {
+			const weight = getOptionalFloat(formData, `weight-${unitId}`) ?? 0;
+			upsertCustomAllocationKeyWeight(customAllocationKeyId, unitId, weight);
+		}
+		logActivity(user, "UPDATE", "abrechnung", `Gewichte des Umlageschlüssels „${allocationKey.label}“ aktualisiert`, customAllocationKeyId);
+	} catch (error) {
+		console.error("saveCustomAllocationWeightsAction failed", error);
+		return { error: t("billing.allocationKeys.errors.weightsSaveFailed") };
+	}
+
+	revalidatePath("/abrechnung");
+	return { success: true };
 }

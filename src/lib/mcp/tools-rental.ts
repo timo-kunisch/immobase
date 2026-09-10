@@ -1,7 +1,7 @@
 import {
 	createBillingPeriod,
 	createCostItem,
-	deleteBillingPeriod,
+	deleteBillingPeriodWithArtifacts,
 	deleteCostItem,
 	finalizeBillingPeriod,
 	getBillingPeriod,
@@ -14,6 +14,35 @@ import {
 	type BillingPeriodInput,
 	type CostItemInput,
 } from "@/data/billing";
+import {
+	buildCustomAllocationWeightsByKey,
+	createCustomAllocationKey,
+	deleteCustomAllocationKey,
+	getCustomAllocationKey,
+	listCustomAllocationKeysWithWeights,
+	updateCustomAllocationKey,
+	upsertCustomAllocationKeyWeight,
+	type CustomAllocationKeyInput,
+} from "@/data/custom-allocation-keys";
+import {
+	countAllocationsForAccount,
+	createAccount,
+	deleteAccount,
+	getAccount,
+	listAccountsWithStats,
+	updateAccount,
+	type AccountInput,
+} from "@/data/accounts";
+import {
+	createBankTransaction,
+	deleteBankTransaction,
+	getBankTransaction,
+	listBankTransactions,
+	setBankTransactionAllocations,
+	updateBankTransaction,
+	type BankTransactionAllocationInput,
+	type BankTransactionInput,
+} from "@/data/bank-transactions";
 import { getCompanySettings, saveCompanySettings, type CompanySettingsInput } from "@/data/company-settings";
 import { upsertDepositForLease, getDepositByLeaseId, type DepositInput } from "@/data/deposits";
 import { createDocument, deleteDocument, getDocument, listUploadedDocumentOverviewRows } from "@/data/documents";
@@ -84,35 +113,20 @@ import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, register
 
 const TICKET_STATUS = ["OPEN", "IN_PROGRESS", "DONE"] as const;
 const TRANSACTION_STATUS = ["OPEN", "PAID", "OVERDUE", "CANCELLED"] as const;
+const BANK_TRANSACTION_STATUS = ["OPEN", "PARTIAL", "RECONCILED"] as const;
 const DEPOSIT_TYPES = ["CASH", "BANK_GUARANTEE", "BLOCKED_ACCOUNT"] as const;
 const DEPOSIT_STATUS = ["PENDING", "RECEIVED", "PARTIALLY_REFUNDED", "REFUNDED"] as const;
 const DOCUMENT_TYPES = ["CONTRACT", "INVOICE", "FLOORPLAN", "OTHER"] as const;
 const TEMPLATE_CATEGORIES = ["WARNING", "BILLING", "GENERAL", "TERMINATION", "OTHER"] as const;
-const ALLOCATION_KEYS = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT"] as const;
-const COST_CATEGORIES = [
-	"PUBLIC_CHARGES",
-	"WATER_SUPPLY",
-	"DRAINAGE",
-	"HEATING",
-	"HOT_WATER",
-	"HEATING_HOT_WATER_COMBINED",
-	"ELEVATOR",
-	"STREET_CLEANING_WASTE",
-	"BUILDING_CLEANING_PEST_CONTROL",
-	"GARDEN_MAINTENANCE",
-	"LIGHTING",
-	"CHIMNEY_CLEANING",
-	"INSURANCE",
-	"CARETAKER",
-	"CABLE_ANTENNA",
-	"LAUNDRY_FACILITIES",
-	"OTHER",
-] as const;
+const ALLOCATION_KEYS = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"] as const;
 
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
 /** Maximale Dateigröße für Upload/Download über MCP (Base64 im JSON). */
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024;
+
+/** Obergrenze der Banktransaktionen je Aufruf des Import-Werkzeugs. */
+const MAX_BANK_TRANSACTION_IMPORT = 200;
 
 function requireBillingPeriodDraft(billingPeriodId: string, action: string): void {
 	const period = getBillingPeriod(billingPeriodId);
@@ -537,8 +551,17 @@ registerCrudTools<TransactionInput>({
 	entity: "transactions",
 	entityLabel: "Zahlung (Mieteingang)",
 	fields: transactionFields,
-	listFilters: { leaseId: { type: "string", nullable: true } },
-	list: (filter) => listTransactions(filter.leaseId ? { leaseId: filter.leaseId as string } : {}),
+	listFilters: {
+		leaseId: { type: "string", nullable: true },
+		propertyId: { type: "string", nullable: true, description: "ID der Liegenschaft (alle Verträge ihrer Einheiten)" },
+		status: { type: "enum", values: TRANSACTION_STATUS, nullable: true },
+	},
+	list: (filter) =>
+		listTransactions({
+			leaseId: (filter.leaseId as string) ?? undefined,
+			propertyId: (filter.propertyId as string) ?? undefined,
+			status: (filter.status as TransactionInput["status"]) ?? undefined,
+		}),
 	get: (id) => getTransaction(id),
 	beforeCreate: (input) => (getLeaseWithDetails(input.leaseId) ? null : "Der angegebene Mietvertrag existiert nicht."),
 	beforeUpdate: (_id, input) => (getLeaseWithDetails(input.leaseId) ? null : "Der angegebene Mietvertrag existiert nicht."),
@@ -772,25 +795,65 @@ registerCrudTools<BillingPeriodInput>({
 		if (!getProperty(input.propertyId)) return "Die angegebene Liegenschaft existiert nicht.";
 		return null;
 	},
-	beforeDelete: (id) => {
-		const period = getBillingPeriod(id);
-		if (period && period.status !== "DRAFT") return "Nur Abrechnungsperioden im Entwurfsstatus können gelöscht werden.";
-		return null;
-	},
 	create: (input) => createBillingPeriod(input),
 	update: (id, input) => updateBillingPeriod(id, input),
-	delete: (id) => deleteBillingPeriod(id),
+	// Finalisierte Perioden sind nicht mehr bearbeitbar, ihre Löschung bleibt
+	// möglich (inkl. aller erzeugten PDFs + Postversand-Protokolle).
+	delete: (id) => deleteBillingPeriodWithArtifacts(id),
+});
+
+registerTool({
+	name: "billing_periods_set_notes",
+	description:
+		"Setzt die internen Notizen einer Abrechnungsperiode - jederzeit erlaubt, auch nach der Finalisierung " +
+		"(die eigentlichen Abrechnungsdaten bleiben gesperrt).",
+	inputSchema: buildInputSchema({
+		id: { type: "string", description: "ID der Abrechnungsperiode" },
+		notes: { type: "string", nullable: true, description: "Interne Anmerkungen (null = leeren)" },
+	}),
+	handler: (args) => {
+		const { id, notes } = coerceArgs({ id: { type: "string" }, notes: { type: "string", nullable: true } }, args);
+		const period = getBillingPeriod(id as string);
+		if (!period) throw new McpToolError(`Abrechnungsperiode mit ID "${id as string}" wurde nicht gefunden.`);
+		updateBillingPeriod(id as string, {
+			propertyId: period.propertyId,
+			periodFrom: period.periodFrom,
+			periodTo: period.periodTo,
+			notes: (notes as string | null) ?? null,
+		});
+		return { success: true, id };
+	},
 });
 
 const costItemFields: Record<string, FieldSpec> = {
 	billingPeriodId: { type: "string", description: "ID der Abrechnungsperiode" },
-	category: { type: "enum", values: COST_CATEGORIES, description: "BetrKV-Kostenkategorie" },
 	label: { type: "string" },
 	amount: { type: "decimal", description: "Gesamtbetrag der Position" },
-	allocationKey: { type: "enum", values: ALLOCATION_KEYS, description: "Verteilerschlüssel (bei DIRECT: directUnitId setzen)" },
+	allocationKey: {
+		type: "enum",
+		values: ALLOCATION_KEYS,
+		description: "Umlageschlüssel (bei DIRECT: directUnitId setzen; bei CUSTOM: customAllocationKeyId setzen)",
+	},
 	directUnitId: { type: "string", nullable: true, description: "Ziel-Einheit bei allocationKey = DIRECT" },
+	customAllocationKeyId: { type: "string", nullable: true, description: "ID des individuellen Umlageschlüssels bei allocationKey = CUSTOM" },
 	notes: { type: "string", nullable: true },
 };
+
+/** Validiert die CUSTOM-/DIRECT-Felder einer Kostenposition gegen die Periode. */
+function validateCostItemReferences(billingPeriodId: string, allocationKey: string, directUnitId: string | null, customAllocationKeyId: string | null): string | null {
+	const period = getBillingPeriod(billingPeriodId);
+	if (!period) return `Abrechnungsperiode mit ID "${billingPeriodId}" wurde nicht gefunden.`;
+	if (allocationKey === "CUSTOM") {
+		if (!customAllocationKeyId) return "Bei allocationKey CUSTOM muss customAllocationKeyId gesetzt sein.";
+		const customKey = getCustomAllocationKey(customAllocationKeyId);
+		if (!customKey) return "Der angegebene individuelle Umlageschlüssel existiert nicht.";
+		if (customKey.propertyId !== period.propertyId) {
+			return "Der individuelle Umlageschlüssel gehört nicht zu der Liegenschaft dieser Abrechnungsperiode.";
+		}
+	}
+	if (allocationKey === "DIRECT" && !directUnitId) return "Bei allocationKey DIRECT muss directUnitId gesetzt sein.";
+	return null;
+}
 
 registerCrudTools<CostItemInput>({
 	entity: "billing_cost_items",
@@ -809,9 +872,9 @@ registerCrudTools<CostItemInput>({
 		} catch (error) {
 			return (error as Error).message;
 		}
-		return null;
+		return validateCostItemReferences(input.billingPeriodId, input.allocationKey, input.directUnitId, input.customAllocationKeyId);
 	},
-	beforeUpdate: (id) => {
+	beforeUpdate: (id, input) => {
 		const costItem = getCostItem(id);
 		if (!costItem) return `Kostenposition mit ID "${id}" wurde nicht gefunden.`;
 		try {
@@ -819,7 +882,7 @@ registerCrudTools<CostItemInput>({
 		} catch (error) {
 			return (error as Error).message;
 		}
-		return null;
+		return validateCostItemReferences(input.billingPeriodId, input.allocationKey, input.directUnitId, input.customAllocationKeyId);
 	},
 	beforeDelete: (id) => {
 		const costItem = getCostItem(id);
@@ -831,8 +894,26 @@ registerCrudTools<CostItemInput>({
 		}
 		return null;
 	},
-	create: (input) => createCostItem(input),
-	update: (id, input) => updateCostItem(id, input),
+	create: (input) =>
+		createCostItem({
+			billingPeriodId: input.billingPeriodId,
+			label: input.label,
+			amount: input.amount,
+			allocationKey: input.allocationKey,
+			directUnitId: input.allocationKey === "DIRECT" ? input.directUnitId : null,
+			customAllocationKeyId: input.allocationKey === "CUSTOM" ? input.customAllocationKeyId : null,
+			notes: input.notes,
+		}),
+	update: (id, input) =>
+		updateCostItem(id, {
+			billingPeriodId: input.billingPeriodId,
+			label: input.label,
+			amount: input.amount,
+			allocationKey: input.allocationKey,
+			directUnitId: input.allocationKey === "DIRECT" ? input.directUnitId : null,
+			customAllocationKeyId: input.allocationKey === "CUSTOM" ? input.customAllocationKeyId : null,
+			notes: input.notes,
+		}),
 	delete: (id) => deleteCostItem(id),
 });
 
@@ -886,7 +967,8 @@ registerTool({
 	name: "billing_periods_finalize",
 	description:
 		"Berechnet die vollständige Kostenumlage einer Abrechnungsperiode und friert das Ergebnis dauerhaft als " +
-		"Einzelabrechnungen (tenant_statements) ein. Danach ist die Periode unveränderlich. Läuft atomar in einer Transaktion.",
+		"Einzelabrechnungen (tenant_statements) ein. Danach ist die Periode unveränderlich. Läuft atomar in einer Transaktion. " +
+		"Berücksichtigt werden nur tatsächlich geleistete Vorauszahlungen (als bezahlt markierte Sollstellungen).",
 	inputSchema: buildInputSchema({ id: { type: "string", description: "ID der Abrechnungsperiode" } }),
 	handler: (args) => {
 		const { id } = coerceArgs({ id: { type: "string" } }, args);
@@ -897,7 +979,12 @@ registerTool({
 
 		// Berechnung identisch zur Server Action finalizeBillingPeriodAction
 		// (src/app/(app)/abrechnung/actions.ts) über die reine Funktion
-		// calculateBillingResult (src/lib/billing.ts).
+		// calculateBillingResult (src/lib/billing.ts) - inkl. Auflösung der
+		// Gewichte individueller Umlageschlüssel über den geteilten Helfer
+		// des Repositories.
+		const customWeightsByKey = buildCustomAllocationWeightsByKey(
+			[...new Set(detail.costItems.map((costItem) => costItem.customAllocationKeyId).filter((keyId): keyId is string => keyId !== null))]
+		);
 		const result = calculateBillingResult({
 			periodFrom: new Date(detail.billingPeriod.periodFrom),
 			periodTo: new Date(detail.billingPeriod.periodTo),
@@ -908,6 +995,7 @@ registerTool({
 				allocationKey: costItem.allocationKey,
 				directUnitId: costItem.directUnitId,
 				consumptionValues: costItem.consumptionValues,
+				customAllocationWeights: costItem.customAllocationKeyId ? customWeightsByKey.get(costItem.customAllocationKeyId) ?? [] : [],
 			})),
 		});
 
@@ -929,6 +1017,378 @@ registerTool({
 			}))
 		);
 		return { success: true, id, tenantStatements: result.leaseResults.length };
+	},
+});
+
+// ============================================================
+// Frei definierbare Umlageschlüssel (Nebenkostenabrechnung)
+// ============================================================
+
+registerCrudTools<CustomAllocationKeyInput>({
+	entity: "custom_allocation_keys",
+	entityLabel: "Umlageschlüssel (individuell)",
+	fields: {
+		propertyId: { type: "string", description: "ID der Liegenschaft" },
+		label: { type: "string" },
+		notes: { type: "string", nullable: true },
+	},
+	listFilters: { propertyId: { type: "string", description: "ID der Liegenschaft (Pflicht)" } },
+	list: (filter) => {
+		if (!getProperty(filter.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
+		return listCustomAllocationKeysWithWeights(filter.propertyId as string);
+	},
+	get: (id) => getCustomAllocationKey(id),
+	beforeCreate: (input) => (getProperty(input.propertyId) ? null : "Die angegebene Liegenschaft existiert nicht."),
+	beforeUpdate: (id) => {
+		const customKey = getCustomAllocationKey(id);
+		if (!customKey) return `Umlageschlüssel mit ID "${id}" wurde nicht gefunden.`;
+		return null;
+	},
+	create: (input) => createCustomAllocationKey(input),
+	update: (id, input) => updateCustomAllocationKey(id, { label: input.label, notes: input.notes }),
+	delete: (id) => deleteCustomAllocationKey(id),
+});
+
+registerTool({
+	name: "custom_allocation_keys_set_weight",
+	description: "Setzt das Gewicht einer Einheit für einen individuellen Umlageschlüssel (Upsert).",
+	inputSchema: buildInputSchema({
+		customAllocationKeyId: { type: "string" },
+		unitId: { type: "string" },
+		weight: { type: "float", description: "Gewicht (>= 0)" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs(
+			{ customAllocationKeyId: { type: "string" }, unitId: { type: "string" }, weight: { type: "float" } },
+			args
+		);
+		const customKey = getCustomAllocationKey(input.customAllocationKeyId as string);
+		if (!customKey) throw new McpToolError(`Umlageschlüssel mit ID "${input.customAllocationKeyId as string}" wurde nicht gefunden.`);
+		if (!getUnit(input.unitId as string)) throw new McpToolError("Die angegebene Einheit existiert nicht.");
+		upsertCustomAllocationKeyWeight(input.customAllocationKeyId as string, input.unitId as string, input.weight as number);
+		return { success: true };
+	},
+});
+
+// ============================================================
+// Buchhaltung: Konten, Banktransaktionen, Buchungszeilen
+// ============================================================
+
+registerCrudTools<AccountInput>({
+	entity: "accounts",
+	entityLabel: "Konto (Buchhaltung)",
+	fields: {
+		propertyId: { type: "string", description: "ID der Liegenschaft" },
+		label: { type: "string", description: "Kontobezeichnung, z. B. \"Gebäudeversicherung\"" },
+		notes: { type: "string", nullable: true },
+	},
+	listFilters: { propertyId: { type: "string", description: "ID der Liegenschaft (Pflicht)" } },
+	list: (filter) => {
+		if (!getProperty(filter.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
+		return listAccountsWithStats(filter.propertyId as string);
+	},
+	get: (id) => getAccount(id),
+	beforeCreate: (input) => (getProperty(input.propertyId) ? null : "Die angegebene Liegenschaft existiert nicht."),
+	beforeUpdate: (id) => {
+		const account = getAccount(id);
+		if (!account) return `Konto mit ID "${id}" wurde nicht gefunden.`;
+		return null;
+	},
+	beforeDelete: (id) => {
+		const account = getAccount(id);
+		if (!account) return `Konto mit ID "${id}" wurde nicht gefunden.`;
+		if (countAllocationsForAccount(id) > 0) return "Dieses Konto hat bereits Buchungen und kann daher nicht gelöscht werden.";
+		return null;
+	},
+	create: (input) => createAccount(input),
+	update: (id, input) => updateAccount(id, { label: input.label, notes: input.notes }),
+	delete: (id) => deleteAccount(id),
+});
+
+const bankTransactionFields: Record<string, FieldSpec> = {
+	propertyId: { type: "string", description: "ID der Liegenschaft (Bankkonto)" },
+	bookingDate: { type: "date", description: "Buchungsdatum laut Kontoauszug" },
+	amount: { type: "decimal", description: "Betrag signed: positiv = Eingang (Gutschrift), negativ = Ausgang (Belastung)" },
+	description: { type: "string", description: "Beschreibung/Verwendungszweck laut Kontoauszug" },
+	partner: { type: "string", nullable: true, description: "Zahlungspartner" },
+	notes: { type: "string", nullable: true },
+};
+
+registerCrudTools<BankTransactionInput>({
+	entity: "bank_transactions",
+	entityLabel: "Banktransaktion",
+	fields: bankTransactionFields,
+	listFilters: {
+		propertyId: { type: "string", nullable: true },
+		status: {
+			type: "enum",
+			values: BANK_TRANSACTION_STATUS,
+			nullable: true,
+			description: "Abgeleiteter Zuordnungsstatus (OPEN = nichts zugeordnet, PARTIAL = teilweise, RECONCILED = vollständig)",
+		},
+	},
+	list: (filter) =>
+		listBankTransactions({
+			propertyId: (filter.propertyId as string) ?? undefined,
+			status: (filter.status as "OPEN" | "PARTIAL" | "RECONCILED") ?? undefined,
+		}),
+	get: (id) => getBankTransaction(id),
+	beforeCreate: (input) => (getProperty(input.propertyId) ? null : "Die angegebene Liegenschaft existiert nicht."),
+	beforeUpdate: (_id, input) => (getProperty(input.propertyId) ? null : "Die angegebene Liegenschaft existiert nicht."),
+	create: (input) => createBankTransaction(input),
+	update: (id, input) => updateBankTransaction(id, input),
+	delete: (id) => deleteBankTransaction(id),
+});
+
+/**
+ * Validiert die Buchungszeilen einer Banktransaktion (gleiche Fachregeln
+ * wie saveBankTransactionAllocationsAction in
+ * src/app/(app)/buchhaltung/actions.ts): genau ein Ziel je Zeile,
+ * Teilbeträge im Vorzeichen der Banktransaktion, Referenzen derselben
+ * Liegenschaft, keine stornierten Sollstellungen, Summe <= Betrag.
+ */
+function validateAllocationArgs(bankTransactionId: string, allocations: { accountId: string | null; transactionId: string | null; amount: string }[]): string | null {
+	const bankTransaction = getBankTransaction(bankTransactionId);
+	if (!bankTransaction) return `Banktransaktion mit ID "${bankTransactionId}" wurde nicht gefunden.`;
+
+	const bankAmountCents = Math.round(Number(bankTransaction.amount) * 100);
+	let allocatedCents = 0;
+
+	for (const [index, allocation] of allocations.entries()) {
+		if (Boolean(allocation.accountId) === Boolean(allocation.transactionId)) {
+			return `Zeile ${index + 1}: Bitte genau ein Ziel (accountId ODER transactionId) angeben.`;
+		}
+		const amountCents = Math.round(Number(allocation.amount) * 100);
+		if (!Number.isFinite(amountCents) || amountCents === 0) {
+			return `Zeile ${index + 1}: Bitte einen von 0 verschiedenen Teilbetrag angeben.`;
+		}
+		if (amountCents < 0 !== bankAmountCents < 0) {
+			return `Zeile ${index + 1}: Der Teilbetrag muss dasselbe Vorzeichen haben wie die Banktransaktion.`;
+		}
+		if (allocation.accountId) {
+			const account = getAccount(allocation.accountId);
+			if (!account) return `Zeile ${index + 1}: Das angegebene Konto existiert nicht.`;
+			if (account.propertyId !== bankTransaction.propertyId) {
+				return `Zeile ${index + 1}: Das Konto gehört zu einer anderen Liegenschaft als die Banktransaktion.`;
+			}
+		}
+		if (allocation.transactionId) {
+			const transaction = getTransaction(allocation.transactionId);
+			if (!transaction) return `Zeile ${index + 1}: Die angegebene Sollstellung existiert nicht.`;
+			if (transaction.lease.unit.propertyId !== bankTransaction.propertyId) {
+				return `Zeile ${index + 1}: Die Sollstellung gehört zu einer anderen Liegenschaft als die Banktransaktion.`;
+			}
+			if (transaction.status === "CANCELLED") {
+				return `Zeile ${index + 1}: Stornierte Sollstellungen können nicht zugeordnet werden.`;
+			}
+		}
+		allocatedCents += amountCents;
+	}
+
+	if (Math.abs(allocatedCents) > Math.abs(bankAmountCents)) {
+		return "Die Teilbeträge übersteigen den Betrag der Banktransaktion.";
+	}
+	return null;
+}
+
+registerTool({
+	name: "bank_transactions_allocate",
+	description:
+		"Ersetzt SÄMTLICHE Buchungszeilen einer Banktransaktion: ordnet Teilbeträge (Split möglich) Konten " +
+		"(accountId, z. B. Gebäudeversicherung) oder fälligen Sollstellungen (transactionId, Mieten) zu. " +
+		"Vollständig zugeordnete Sollstellungen gelten als bezahlt (Status PAID inkl. Zahldatum). " +
+		"Der Zuordnungsstatus der Banktransaktion (offen/teilweise/zugeordnet) wird daraus abgeleitet.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			id: { type: "string", description: "ID der Banktransaktion" },
+			allocations: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						accountId: { type: ["string", "null"], description: "Ziel-Konto (genau eines von accountId/transactionId je Zeile)" },
+						transactionId: { type: ["string", "null"], description: "Ziel-Sollstellung (Mieteingang)" },
+						amount: { type: ["string", "number"], description: "Teilbetrag, gleiches Vorzeichen wie die Banktransaktion (Dezimal, Komma erlaubt)" },
+					},
+					required: ["amount"],
+				},
+				description: "Buchungszeilen (leeres Array = Zuordnung entfernen)",
+			},
+		},
+		required: ["id"],
+		additionalProperties: false,
+	},
+	handler: (args) => {
+		if (typeof args !== "object" || args === null || Array.isArray(args)) throw new McpToolError("Die Argumente müssen ein JSON-Objekt sein.");
+		const { id, allocations } = args as Record<string, unknown>;
+		if (typeof id !== "string" || !id) throw new McpToolError('Pflichtfeld "id" fehlt.');
+		if (allocations !== undefined && !Array.isArray(allocations)) throw new McpToolError('Feld "allocations" muss ein Array sein.');
+
+		const parsed: BankTransactionAllocationInput[] = ((allocations ?? []) as Record<string, unknown>[]).map((entry) => {
+			const coerced = coerceArgs(
+				{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, amount: { type: "decimal" } },
+				entry ?? {}
+			);
+			return {
+				accountId: (coerced.accountId as string) ?? null,
+				transactionId: (coerced.transactionId as string) ?? null,
+				amount: coerced.amount as string,
+			};
+		});
+
+		const validationError = validateAllocationArgs(id, parsed);
+		if (validationError) throw new McpToolError(validationError);
+
+		setBankTransactionAllocations(id, parsed);
+		return { success: true, id, allocations: parsed.length };
+	},
+});
+
+registerTool({
+	name: "bank_transactions_import",
+	description:
+		"Importiert eine Liste von Banktransaktionen (z. B. aus einem eingelesenen Kontoauszug) inkl. optionaler " +
+		"Buchungszeilen in einem Zug. Es werden ALLE Einträge vorab geprüft (gleiche Fachregeln wie " +
+		"bank_transactions_allocate) - bei einem Fehler wird nichts angelegt. " +
+		"Offene Sollstellungen der Liegenschaft können über transactions_list mit propertyId-Filter ermittelt werden.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			propertyId: { type: "string", description: "ID der Liegenschaft (Bankkonto, auf dem die Bewegungen erfasst werden)" },
+			transactions: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						bookingDate: { type: "string", description: "Buchungsdatum (ISO-8601)" },
+						amount: { type: ["string", "number"], description: "Betrag signed: positiv = Eingang, negativ = Ausgang (Dezimal, Komma erlaubt)" },
+						description: { type: "string", description: "Beschreibung/Verwendungszweck" },
+						partner: { type: ["string", "null"] },
+						notes: { type: ["string", "null"] },
+						allocations: {
+							type: "array",
+							items: {
+								type: "object",
+								properties: {
+									accountId: { type: ["string", "null"] },
+									transactionId: { type: ["string", "null"] },
+									amount: { type: ["string", "number"] },
+								},
+								required: ["amount"],
+							},
+							description: "Optionale Buchungszeilen (wie bei bank_transactions_allocate)",
+						},
+					},
+					required: ["bookingDate", "amount", "description"],
+				},
+			},
+		},
+		required: ["propertyId", "transactions"],
+		additionalProperties: false,
+	},
+	handler: (args) => {
+		if (typeof args !== "object" || args === null || Array.isArray(args)) throw new McpToolError("Die Argumente müssen ein JSON-Objekt sein.");
+		const { propertyId, transactions } = args as Record<string, unknown>;
+		if (typeof propertyId !== "string" || !propertyId) throw new McpToolError('Pflichtfeld "propertyId" fehlt.');
+		if (!getProperty(propertyId)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
+		if (!Array.isArray(transactions)) throw new McpToolError('Pflichtfeld "transactions" muss ein Array sein.');
+		if (transactions.length === 0) throw new McpToolError("Die Liste der Banktransaktionen ist leer.");
+		if (transactions.length > MAX_BANK_TRANSACTION_IMPORT) {
+			throw new McpToolError(`Es können maximal ${MAX_BANK_TRANSACTION_IMPORT} Banktransaktionen pro Aufruf importiert werden.`);
+		}
+
+		// Alle Einträge VOR dem Anlegen normalisieren und prüfen (fail-fast:
+		// bei einem Fehler wird nichts angelegt).
+		const prepared: { input: BankTransactionInput; allocations: BankTransactionAllocationInput[] }[] = [];
+		for (const [index, rawEntry] of (transactions as Record<string, unknown>[]).entries()) {
+			// "allocations" ist kein Stammfeld - coerceArgs prüft gegen die
+			// Feld-Spezifikation und lehnt unbekannte Felder ab, deshalb wird
+			// es vorab abgetrennt.
+			const { allocations: rawAllocations, ...entry } = rawEntry ?? {};
+			const coerced = coerceArgs(
+				{
+					bookingDate: { type: "date" },
+					amount: { type: "decimal", description: "signed" },
+					description: { type: "string" },
+					partner: { type: "string", nullable: true },
+					notes: { type: "string", nullable: true },
+				},
+				entry
+			);
+			const input: BankTransactionInput = {
+				propertyId,
+				bookingDate: coerced.bookingDate as string,
+				amount: coerced.amount as string,
+				description: coerced.description as string,
+				partner: (coerced.partner as string) ?? null,
+				notes: (coerced.notes as string) ?? null,
+			};
+
+			if (rawAllocations !== undefined && rawAllocations !== null && !Array.isArray(rawAllocations)) {
+				throw new McpToolError(`Eintrag ${index + 1}: "allocations" muss ein Array sein.`);
+			}
+			const allocations: BankTransactionAllocationInput[] = ((rawAllocations ?? []) as Record<string, unknown>[]).map((allocationEntry) => {
+				const allocationCoerced = coerceArgs(
+					{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, amount: { type: "decimal" } },
+					allocationEntry ?? {}
+				);
+				return {
+					accountId: (allocationCoerced.accountId as string) ?? null,
+					transactionId: (allocationCoerced.transactionId as string) ?? null,
+					amount: allocationCoerced.amount as string,
+				};
+			});
+
+			prepared.push({ input, allocations });
+		}
+
+		// Vorab-Validierung der Buchungszeilen: Da die Banktransaktionen noch
+		// nicht existieren, wird die Prüfung gegen die geplanten Werte
+		// ausgeführt - die Ziel-Checks (Liegenschaft, Storno, Summe) gelten
+		// identisch.
+		for (const [index, { input, allocations }] of prepared.entries()) {
+			if (allocations.length === 0) continue;
+			const bankAmountCents = Math.round(Number(input.amount) * 100);
+			let allocatedCents = 0;
+			for (const [lineIndex, allocation] of allocations.entries()) {
+				const lineLabel = `Eintrag ${index + 1}, Zeile ${lineIndex + 1}`;
+				if (Boolean(allocation.accountId) === Boolean(allocation.transactionId)) {
+					throw new McpToolError(`${lineLabel}: Bitte genau ein Ziel (accountId ODER transactionId) angeben.`);
+				}
+				const amountCents = Math.round(Number(allocation.amount) * 100);
+				if (!Number.isFinite(amountCents) || amountCents === 0) throw new McpToolError(`${lineLabel}: Ungültiger Teilbetrag.`);
+				if (amountCents < 0 !== bankAmountCents < 0) {
+					throw new McpToolError(`${lineLabel}: Der Teilbetrag muss dasselbe Vorzeichen haben wie die Banktransaktion.`);
+				}
+				if (allocation.accountId) {
+					const account = getAccount(allocation.accountId);
+					if (!account) throw new McpToolError(`${lineLabel}: Das angegebene Konto existiert nicht.`);
+					if (account.propertyId !== propertyId) throw new McpToolError(`${lineLabel}: Das Konto gehört zu einer anderen Liegenschaft.`);
+				}
+				if (allocation.transactionId) {
+					const transaction = getTransaction(allocation.transactionId);
+					if (!transaction) throw new McpToolError(`${lineLabel}: Die angegebene Sollstellung existiert nicht.`);
+					if (transaction.lease.unit.propertyId !== propertyId) {
+						throw new McpToolError(`${lineLabel}: Die Sollstellung gehört zu einer anderen Liegenschaft.`);
+					}
+					if (transaction.status === "CANCELLED") throw new McpToolError(`${lineLabel}: Stornierte Sollstellungen können nicht zugeordnet werden.`);
+				}
+				allocatedCents += amountCents;
+			}
+			if (Math.abs(allocatedCents) > Math.abs(bankAmountCents)) {
+				throw new McpToolError(`Eintrag ${index + 1}: Die Teilbeträge übersteigen den Betrag der Banktransaktion.`);
+			}
+		}
+
+		const createdIds: string[] = [];
+		for (const { input, allocations } of prepared) {
+			const bankTransaction = createBankTransaction(input);
+			createdIds.push(bankTransaction.id);
+			if (allocations.length > 0) setBankTransactionAllocations(bankTransaction.id, allocations);
+		}
+
+		return { success: true, created: createdIds.length, ids: createdIds };
 	},
 });
 

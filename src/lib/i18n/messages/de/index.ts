@@ -5,6 +5,7 @@
  */
 import { admin } from "./admin";
 import { auth } from "./auth";
+import { banking } from "./banking";
 import { billing } from "./billing";
 import { calendar } from "./calendar";
 import { chat } from "./chat";
@@ -32,6 +33,7 @@ import { units } from "./units";
 export const deMessages = {
 	admin,
 	auth,
+	banking,
 	billing,
 	calendar,
 	chat,

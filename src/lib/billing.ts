@@ -1,4 +1,4 @@
-import type { AllocationKey, BillingPeriodStatus, CostCategory } from "@/data/types";
+import type { AllocationKey, BillingPeriodStatus } from "@/data/types";
 import { getRentForDate } from "@/lib/rent-history";
 import { toCents, distributeCents } from "@/lib/money";
 import { atMidnight, daysBetweenInclusive, daysInMonth, overlapRange } from "@/lib/date-range";
@@ -17,8 +17,8 @@ import { atMidnight, daysBetweenInclusive, daysInMonth, overlapRange } from "@/l
  * Grundprinzip der Umlage (zwei Schritte):
  *  1. Die Kostenposition wird - abhängig vom Umlageschlüssel - auf die
  *     Einheiten der Liegenschaft verteilt (Wohnfläche/Anzahl Einheiten/
- *     Verbrauch/Direktzuordnung). Der Umlageschlüssel "Personen" bildet
- *     hiervon eine Ausnahme, siehe unten.
+ *     Verbrauch/Direktzuordnung/individuelle Gewichte). Der Umlageschlüssel
+ *     "Personen" bildet hiervon eine Ausnahme, siehe unten.
  *  2. Der auf eine Einheit entfallende Betrag wird - taggenau - auf die
  *     Mietverhältnisse verteilt, die die Einheit während des
  *     Abrechnungszeitraums bewohnt haben (zeitanteilige Verteilung bei
@@ -41,30 +41,68 @@ type RentAdjustmentLike = {
 };
 
 /**
- * Summiert die vertraglich vereinbarten Nebenkosten-Vorauszahlungen für den
- * Zeitanteil [occupiedFrom, occupiedTo] eines Mietvertrags taggenau.
- * Berücksichtigt spätere Änderungen der Vorauszahlung (RentAdjustment)
- * mittels der zentralen Verlaufslogik aus src/lib/rent-history.ts
- * (getRentForDate) und rechnet den jeweils gültigen monatlichen Betrag über
- * die tatsächliche Anzahl Kalendertage des jeweiligen Monats taggenau um.
+ * Eine im System als bezahlt markierte Monats-Sollstellung (Zahlung des
+ * Mietvertrags, siehe /finanzen bzw. transactions): Grundlage der
+ * TATSÄCHLICH geleisteten Nebenkosten-Vorauszahlungen.
  */
-export function computePrepaymentsCents(
+export type BillingPaidPaymentInput = {
+	/** Fälligkeitsdatum der bezahlten Sollstellung - der zugehörige Monat zählt als geleistet. */
+	dueDate: string;
+};
+
+/**
+ * Summiert die TATSÄCHLICH geleisteten (im System als bezahlt markierten)
+ * Nebenkosten-Vorauszahlungen für den Zeitanteil [occupiedFrom, occupiedTo]
+ * eines Mietvertrags. Grundlage sind die bezahlten Monats-Sollstellungen des
+ * Vertrags: Fällt für einen Monat mindestens eine bezahlte Sollstellung in
+ * den Zeitanteil, gilt der Monat als geleistete Vorauszahlung - in Höhe des
+ * zum Fälligkeitsdatum gültigen vertraglichen Nebenkostenanteils
+ * (getRentForDate inkl. RentAdjustments, src/lib/rent-history.ts), anteilig
+ * taggenau auf die Überlappung des Fälligkeitsmonats mit dem Zeitanteil
+ * umgerechnet (1/Tage des Monats pro Tag, analog § 191 BGB-Tagesbruchteile).
+ *
+ * Nicht bezahlte Monate zählen bewusst NICHT (kein blindes Vertrauen auf
+ * die vertraglich vereinbarte Vorauszahlung - gezählt wird nur, was der
+ * Mieter tatsächlich überwiesen hat). Pro Monat wird höchstens eine
+ * Sollstellung angerechnet, unabhängig davon, ob Miete und Vorauszahlung in
+ * einer oder in getrennten Sollstellungen erfasst wurden.
+ */
+export function computePaidPrepaymentsCents(
 	lease: { startDate: string; coldRent: string; serviceCharges: string },
 	adjustments: RentAdjustmentLike[],
+	paidPayments: BillingPaidPaymentInput[],
 	occupiedFrom: Date,
 	occupiedTo: Date
-): number {
+): { totalCents: number; paidPaymentsCount: number } {
 	let totalEuros = 0;
-	const cursor = atMidnight(occupiedFrom);
-	const end = atMidnight(occupiedTo);
+	let countedMonths = 0;
+	const from = atMidnight(occupiedFrom);
+	const to = atMidnight(occupiedTo);
+	const seenMonths = new Set<string>();
 
-	while (cursor.getTime() <= end.getTime()) {
-		const { serviceCharges } = getRentForDate(lease, adjustments, cursor);
-		totalEuros += serviceCharges / daysInMonth(cursor);
-		cursor.setDate(cursor.getDate() + 1);
+	for (const payment of paidPayments) {
+		const due = atMidnight(new Date(payment.dueDate));
+		if (Number.isNaN(due.getTime())) continue;
+
+		const monthKey = `${due.getFullYear()}-${due.getMonth()}`;
+		if (seenMonths.has(monthKey)) continue;
+
+		// Überlappung des Fälligkeitsmonats mit dem Zeitanteil des Vertrags.
+		const monthStart = atMidnight(new Date(due.getFullYear(), due.getMonth(), 1));
+		const monthEnd = atMidnight(new Date(due.getFullYear(), due.getMonth() + 1, 0));
+		const range = overlapRange(monthStart, monthEnd, from, to);
+		if (!range) continue;
+
+		const days = daysBetweenInclusive(range.from, range.to);
+		if (days <= 0) continue;
+
+		const { serviceCharges } = getRentForDate(lease, adjustments, due);
+		totalEuros += (serviceCharges * days) / daysInMonth(due);
+		seenMonths.add(monthKey);
+		countedMonths += 1;
 	}
 
-	return Math.round(totalEuros * 100);
+	return { totalCents: Math.round(totalEuros * 100), paidPaymentsCount: countedMonths };
 }
 
 // ============================================================
@@ -80,6 +118,8 @@ export type BillingLeaseInput = {
 	serviceCharges: string;
 	numberOfOccupants: number;
 	rentAdjustments: RentAdjustmentLike[];
+	/** Als bezahlt markierte Sollstellungen des Vertrags (Vorauszahlungs-Grundlage). */
+	paidTransactions: BillingPaidPaymentInput[];
 };
 
 export type BillingUnitInput = {
@@ -93,12 +133,22 @@ export type BillingConsumptionValueInput = {
 	value: string;
 };
 
+/** Gewicht einer Einheit für allocationKey = "CUSTOM" (bereits aufgelöst). */
+export type BillingCustomWeightInput = {
+	unitId: string;
+	weight: number;
+};
+
 export type BillingCostItemInput = {
 	id: string;
 	amount: string;
 	allocationKey: AllocationKey;
+	/** Nur relevant bei allocationKey = "DIRECT". */
 	directUnitId: string | null;
+	/** Nur relevant bei allocationKey = "CONSUMPTION". */
 	consumptionValues: BillingConsumptionValueInput[];
+	/** Nur relevant bei allocationKey = "CUSTOM" (Gewichte des referenzierten Schlüssels). */
+	customAllocationWeights: BillingCustomWeightInput[];
 };
 
 export type BillingPeriodInput = {
@@ -125,7 +175,10 @@ export type LeaseBillingResult = {
 	occupiedDays: number;
 	lines: LeaseStatementLine[];
 	totalAllocatedCostsCents: number;
+	/** Tatsächlich geleistete Vorauszahlungen (nur bezahlte Monate). */
 	totalPrepaymentsCents: number;
+	/** Anzahl angerechneter bezahlter Monats-Zahlungen (0 = Warnhinweis in der UI). */
+	paidPrepaymentCount: number;
 	/** umgelegte Kosten - Vorauszahlungen: positiv = Nachzahlung, negativ = Guthaben. */
 	balanceCents: number;
 };
@@ -164,6 +217,10 @@ function unitWeightFor(unit: BillingUnitInput, costItem: BillingCostItemInput): 
 		}
 		case "DIRECT":
 			return unit.id === costItem.directUnitId ? 1 : 0;
+		case "CUSTOM": {
+			const weight = costItem.customAllocationWeights.find((w) => w.unitId === unit.id);
+			return weight?.weight ?? 0;
+		}
 		default:
 			return 0;
 	}
@@ -281,9 +338,10 @@ export function calculateBillingResult(period: BillingPeriodInput): BillingResul
 	const leaseResults: LeaseBillingResult[] = allOverlaps.map((overlap) => {
 		const lines = linesByLease.get(overlap.lease.id) ?? [];
 		const totalAllocatedCostsCents = lines.reduce((s, l) => s + l.amountCents, 0);
-		const totalPrepaymentsCents = computePrepaymentsCents(
+		const { totalCents: totalPrepaymentsCents, paidPaymentsCount: paidPrepaymentCount } = computePaidPrepaymentsCents(
 			overlap.lease,
 			overlap.lease.rentAdjustments,
+			overlap.lease.paidTransactions,
 			overlap.occupiedFrom,
 			overlap.occupiedTo
 		);
@@ -296,6 +354,7 @@ export function calculateBillingResult(period: BillingPeriodInput): BillingResul
 			lines,
 			totalAllocatedCostsCents,
 			totalPrepaymentsCents,
+			paidPrepaymentCount,
 			balanceCents: totalAllocatedCostsCents - totalPrepaymentsCents,
 		};
 	});
@@ -323,25 +382,5 @@ export const allocationKeyLabels: Record<AllocationKey, string> = {
 	UNITS: "Einheiten",
 	CONSUMPTION: "Verbrauch",
 	DIRECT: "Direkte Zuordnung",
-};
-
-/** Kostenarten nach § 2 BetrKV (Nr. 1-16) + Sonstige Betriebskosten (Nr. 17). */
-export const costCategoryLabels: Record<CostCategory, string> = {
-	PUBLIC_CHARGES: "1. Laufende öffentliche Lasten des Grundstücks",
-	WATER_SUPPLY: "2. Wasserversorgung",
-	DRAINAGE: "3. Entwässerung",
-	HEATING: "4. Heizung",
-	HOT_WATER: "5. Warmwasser",
-	HEATING_HOT_WATER_COMBINED: "6. Verbundene Heizungs-/Warmwasseranlagen",
-	ELEVATOR: "7. Aufzug",
-	STREET_CLEANING_WASTE: "8. Straßenreinigung und Müllabfuhr",
-	BUILDING_CLEANING_PEST_CONTROL: "9. Gebäudereinigung und Ungezieferbekämpfung",
-	GARDEN_MAINTENANCE: "10. Gartenpflege",
-	LIGHTING: "11. Beleuchtung",
-	CHIMNEY_CLEANING: "12. Schornsteinreinigung",
-	INSURANCE: "13. Sach- und Haftpflichtversicherung",
-	CARETAKER: "14. Hauswart",
-	CABLE_ANTENNA: "15. Gemeinschafts-Antennenanlage / Kabelanschluss",
-	LAUNDRY_FACILITIES: "16. Betrieb der Einrichtungen für die Wäschepflege",
-	OTHER: "17. Sonstige Betriebskosten",
+	CUSTOM: "Individuell",
 };
