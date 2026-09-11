@@ -4,7 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createTicket, deleteTicket, getTicket, listTickets, updateTicket, updateTicketStatus } from "@/data/tickets";
-import { createTicketMessage, getTicketMessage, linkMessageToTicket, unlinkMessageFromTicket } from "@/data/ticket-messages";
+import {
+	createTicketMessage,
+	deleteTicketNote,
+	getTicketMessage,
+	linkMessageToTicket,
+	unlinkMessageFromTicket,
+	updateTicketNote,
+} from "@/data/ticket-messages";
 import type { TicketStatus } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
@@ -157,6 +164,61 @@ export async function addTicketNoteAction(_prevState: ActionState, formData: For
 	}
 
 	revalidatePath(`/tickets/${ticketId}`);
+	revalidatePath("/tickets");
+	return { success: true };
+}
+
+/** Bearbeitet eine interne Notiz im Ticket-Verlauf (nur Notizen, keine E-Mails). */
+export async function updateTicketNoteAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const messageId = getString(formData, "messageId");
+	const body = getString(formData, "body");
+
+	if (!messageId || !body) {
+		return { error: t("tickets.errors.noteRequired") };
+	}
+	const message = getTicketMessage(messageId);
+	if (!message || message.direction !== "NOTE" || !message.ticketId) {
+		return { error: t("tickets.errors.noteNotFound") };
+	}
+	const ticket = getTicket(message.ticketId);
+	if (!ticket) {
+		return { error: t("tickets.errors.ticketNotFound") };
+	}
+
+	try {
+		updateTicketNote(messageId, body);
+		logActivity(user, "UPDATE", "tickets", `Interne Notiz zum Ticket „${ticket.title}“ bearbeitet`, ticket.id);
+	} catch (error) {
+		console.error("updateTicketNoteAction failed", error);
+		return { error: t("tickets.errors.noteFailed") };
+	}
+
+	revalidatePath(`/tickets/${message.ticketId}`);
+	revalidatePath("/tickets");
+	return { success: true };
+}
+
+/** Löscht eine interne Notiz aus dem Ticket-Verlauf (nur Notizen, keine E-Mails). */
+export async function deleteTicketNoteAction(messageId: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const message = getTicketMessage(messageId);
+	if (!message || message.direction !== "NOTE" || !message.ticketId) {
+		return { error: t("tickets.errors.noteNotFound") };
+	}
+	const ticket = getTicket(message.ticketId);
+
+	try {
+		deleteTicketNote(messageId);
+		logActivity(user, "DELETE", "tickets", `Interne Notiz zum Ticket „${ticket ? ticket.title : message.ticketId}“ gelöscht`, message.ticketId);
+	} catch (error) {
+		console.error("deleteTicketNoteAction failed", error);
+		return { error: t("tickets.errors.noteDeleteFailed") };
+	}
+
+	revalidatePath(`/tickets/${message.ticketId}`);
 	revalidatePath("/tickets");
 	return { success: true };
 }

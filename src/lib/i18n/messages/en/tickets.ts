@@ -33,6 +33,7 @@ export const tickets: typeof deTickets = {
 	"note.label": "Internal note",
 	"note.placeholder": "Only visible internally - will not be sent…",
 	"note.submit": "Add note",
+	"note.editTitle": "Edit internal note",
 	// Email reply form
 	"reply.toLabel": "Email reply to",
 	"reply.toPlaceholder": "recipient@example.com",
@@ -63,6 +64,7 @@ export const tickets: typeof deTickets = {
 	"actions.unlinkTitle": "Unlink (back to mailbox)",
 	"actions.reassign": "Assign to another ticket",
 	"actions.assign": "Assign",
+	"actions.editNote": "Edit note",
 	// Dialogs
 	"dialog.editTitle": "Edit ticket",
 	"dialog.formDescription": "Record damage or maintenance tasks - optionally assigned to a property or unit.",
@@ -71,6 +73,7 @@ export const tickets: typeof deTickets = {
 	// Confirmation dialogs
 	"confirm.delete": 'Really delete ticket "{title}"?',
 	"confirm.unlink": 'Remove the assignment of the email "{subject}" to this ticket? It will reappear in the mailbox.',
+	"confirm.deleteNote": "Really delete this internal note?",
 	// Success messages
 	"success.replySent": "The email has been sent.",
 	// Error messages from the server actions
@@ -80,7 +83,9 @@ export const tickets: typeof deTickets = {
 	"errors.deleteFailed": "The ticket could not be deleted.",
 	"errors.noteRequired": "Please enter a note text.",
 	"errors.ticketNotFound": "The ticket was not found.",
+	"errors.noteNotFound": "The note was not found.",
 	"errors.noteFailed": "The note could not be saved.",
+	"errors.noteDeleteFailed": "The note could not be deleted.",
 	"errors.replyRequired": "Please fill in recipient, subject and message.",
 	"errors.smtpNotConfigured": "Email sending is not configured (SMTP, see settings).",
 	"errors.replyFailed": "The email could not be sent ({detail}).",

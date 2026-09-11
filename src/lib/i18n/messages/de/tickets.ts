@@ -38,6 +38,7 @@ export const tickets = {
 	"note.label": "Interne Notiz",
 	"note.placeholder": "Nur intern sichtbar - wird nicht versendet…",
 	"note.submit": "Notiz hinzufügen",
+	"note.editTitle": "Interne Notiz bearbeiten",
 	// E-Mail-Antwort-Formular
 	"reply.toLabel": "E-Mail-Antwort an",
 	"reply.toPlaceholder": "empfaenger@example.com",
@@ -68,6 +69,7 @@ export const tickets = {
 	"actions.unlinkTitle": "Zuordnung aufheben (zurück ins Postfach)",
 	"actions.reassign": "Anderem Ticket zuordnen",
 	"actions.assign": "Zuordnen",
+	"actions.editNote": "Notiz bearbeiten",
 	// Dialoge
 	"dialog.editTitle": "Ticket bearbeiten",
 	"dialog.formDescription": "Schäden oder Instandhaltungsaufgaben erfassen - optional einer Liegenschaft bzw. Einheit zugeordnet.",
@@ -77,6 +79,7 @@ export const tickets = {
 	// Bestätigungsdialoge
 	"confirm.delete": 'Ticket "{title}" wirklich löschen?',
 	"confirm.unlink": 'Zuordnung der E-Mail "{subject}" zu diesem Ticket aufheben? Sie erscheint wieder im Postfach.',
+	"confirm.deleteNote": "Interne Notiz wirklich löschen?",
 	// Erfolgsmeldungen
 	"success.replySent": "Die E-Mail wurde versendet.",
 	// Fehlermeldungen aus den Server Actions
@@ -86,7 +89,9 @@ export const tickets = {
 	"errors.deleteFailed": "Das Ticket konnte nicht gelöscht werden.",
 	"errors.noteRequired": "Bitte geben Sie einen Notiztext ein.",
 	"errors.ticketNotFound": "Das Ticket wurde nicht gefunden.",
+	"errors.noteNotFound": "Die Notiz wurde nicht gefunden.",
 	"errors.noteFailed": "Die Notiz konnte nicht gespeichert werden.",
+	"errors.noteDeleteFailed": "Die Notiz konnte nicht gelöscht werden.",
 	"errors.replyRequired": "Bitte füllen Sie Empfänger, Betreff und Nachricht aus.",
 	"errors.smtpNotConfigured": "Der E-Mail-Versand ist nicht konfiguriert (SMTP, siehe Einstellungen).",
 	"errors.replyFailed": "Die E-Mail konnte nicht versendet werden ({detail}).",

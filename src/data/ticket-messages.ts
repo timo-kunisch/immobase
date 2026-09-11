@@ -179,6 +179,23 @@ export function deleteMailboxMessage(id: string): void {
 }
 
 /**
+ * Bearbeitet den Text einer internen Notiz. Nur Notizen sind editierbar -
+ * E-Mail-Einträge sind authentische Protokolle des Mailverkehrs.
+ */
+export function updateTicketNote(id: string, bodyText: string): void {
+	getDb().prepare("UPDATE ticket_messages SET body_text = ? WHERE id = ? AND direction = 'NOTE'").run(bodyText, id);
+}
+
+/**
+ * Löscht eine interne Notiz aus dem Ticket-Verlauf. Nur Notizen sind so
+ * löschbar - E-Mail-Einträge bleiben erhalten (sie verschwinden nur mit
+ * dem Ticket bzw. landen beim Entknüpfen zurück im Postfach).
+ */
+export function deleteTicketNote(id: string): void {
+	getDb().prepare("DELETE FROM ticket_messages WHERE id = ? AND direction = 'NOTE'").run(id);
+}
+
+/**
  * Threading: Sucht zu RFC-822-Verweisen (In-Reply-To/References) ein
  * bereits verknüpftes Ticket - eingehende Antworten auf Ticket-E-Mails
  * landen so automatisch im richtigen Verlauf.

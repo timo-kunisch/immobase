@@ -114,9 +114,12 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   `unref`'d, parallele Läufe abgelehnt) ruft automatisch ab; zusätzlich manueller „Jetzt abrufen"-
   Button. Der komplette Verlauf (E-Mails eingehend/ausgehend + interne Notizen, eine Tabelle
   `ticket_messages` mit Diskriminator `direction`) ist auf der Ticket-Detailseite `/tickets/[id]`
-  sichtbar. **Eingehende E-Mails lassen sich im Verlauf wieder entknüpfen** (zurück ins
-  Postfach) **oder einem anderen Ticket neu zuordnen** (`unlinkMessageFromTicket()`/
-  `linkMessageToTicket()` + Actions auf der Ticket-Detailseite). **E-Mail-Antworten aus dem
+sichtbar. **Eingehende E-Mails lassen sich im Verlauf wieder entknüpfen** (zurück ins
+   Postfach) **oder einem anderen Ticket neu zuordnen** (`unlinkMessageFromTicket()`/
+   `linkMessageToTicket()` + Actions auf der Ticket-Detailseite). **Interne Notizen lassen
+   sich im Verlauf bearbeiten und löschen** (`updateTicketNote()`/`deleteTicketNote()`,
+   nur Richtung NOTE - E-Mail-Einträge bleiben authentisch; Actions mit Audit-Log auf der
+   Ticket-Detailseite). **E-Mail-Antworten aus dem
   Ticket** (`src/lib/ticket-mailer.ts`, geteilt von Action +
   MCP) setzen eigene Message-ID + Threading-Header, **hängen die Ticket-Kennung an den Betreff**
   (`ensureTicketSubjectTag()`, idempotent) und legen den OUTBOUND-Eintrag ab - nur wenn
@@ -840,7 +843,7 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Buchungskreise inkl. Hausgeld-Buchungen und Kreis-Trennung, Löschen finalisierter
   Perioden/Jahresabrechnungen mit Artefakt-Cleanup;
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
-  Threading + IMAP-Sync-Stand,
+  Threading + Notiz-Bearbeitung/-Löschung (nur Richtung NOTE) + IMAP-Sync-Stand,
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
   Fehler-Rolle/Anhang-Metadaten, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
   Kaskade),  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,

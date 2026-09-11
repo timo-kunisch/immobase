@@ -11,6 +11,7 @@ import {
 	convertMessageToTicket,
 	createTicketMessage,
 	deleteMailboxMessage,
+	deleteTicketNote,
 	findLinkedTicketIdByMessageIds,
 	getTicketMessage,
 	importInboundMessage,
@@ -19,6 +20,7 @@ import {
 	listTicketMessageCounts,
 	listTicketMessages,
 	unlinkMessageFromTicket,
+	updateTicketNote,
 } from "@/data/ticket-messages";
 import { createTicket, deleteTicket, findTicketIdByRef, getTicket } from "@/data/tickets";
 import { buildTicketSubjectTag } from "@/lib/ticket-ref";
@@ -210,6 +212,33 @@ describe("ticket_messages: Postfach und Verknüpfung", () => {
 		createTicketMessage({ ticketId, direction: "NOTE", bodyText: "Intern" });
 		deleteTicket(ticketId);
 		expect(listTicketMessages(ticketId)).toHaveLength(0);
+	});
+
+	it("bearbeitet nur interne Notizen, keine E-Mail-Einträge", () => {
+		const ticketId = createTestTicket(createTestProperty());
+		const note = createTicketMessage({ ticketId, direction: "NOTE", bodyText: "Ursprünglich" });
+		const outbound = createTicketMessage({ ticketId, direction: "OUTBOUND", subject: "Antwort", bodyText: "Gesendet" });
+
+		updateTicketNote(note.id, "Überarbeitet");
+		expect(getTicketMessage(note.id)?.bodyText).toBe("Überarbeitet");
+
+		// Ausgehende E-Mails bleiben vom Notiz-Update unberührt.
+		updateTicketNote(outbound.id, "Manipulation");
+		expect(getTicketMessage(outbound.id)?.bodyText).toBe("Gesendet");
+	});
+
+	it("löscht nur interne Notizen, keine E-Mail-Einträge", () => {
+		const ticketId = createTestTicket(createTestProperty());
+		const note = createTicketMessage({ ticketId, direction: "NOTE", bodyText: "Weg damit" });
+		const outbound = createTicketMessage({ ticketId, direction: "OUTBOUND", subject: "Antwort" });
+
+		deleteTicketNote(note.id);
+		expect(getTicketMessage(note.id)).toBeNull();
+		expect(listTicketMessages(ticketId)).toHaveLength(1);
+
+		// Ausgehende E-Mails bleiben vom Notiz-Löschen unberührt.
+		deleteTicketNote(outbound.id);
+		expect(getTicketMessage(outbound.id)).not.toBeNull();
 	});
 });
 

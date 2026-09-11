@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import type { EmailContact } from "@/components/tickets/email-recipient-input";
 import { MessageUnlinkButton } from "@/components/tickets/message-unlink-button";
+import { NoteEditDialog } from "@/components/tickets/note-edit-dialog";
 import { ReassignMessageDialog, type ReassignableTicket } from "@/components/tickets/reassign-message-dialog";
 import { TicketFormDialog } from "@/components/tickets/ticket-form-dialog";
 import { TicketNoteForm } from "@/components/tickets/ticket-note-form";
@@ -25,7 +26,7 @@ import type { TranslateFn } from "@/lib/i18n/translator";
 import { buildTicketSubjectTag } from "@/lib/ticket-ref";
 import { formatDate, formatDateTime } from "@/lib/format";
 
-import { deleteTicketAction } from "../actions";
+import { deleteTicketAction, deleteTicketNoteAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,16 @@ function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage
 							<>
 								<ReassignMessageDialog message={message} tickets={reassignTickets} />
 								<MessageUnlinkButton message={message} />
+							</>
+						) : null}
+						{/* Interne Notizen sind bearbeitbar und löschbar. */}
+						{isNote ? (
+							<>
+								<NoteEditDialog message={message} />
+								<ConfirmDeleteButton
+									action={deleteTicketNoteAction.bind(null, message.id)}
+									confirmMessage={t("tickets.confirm.deleteNote")}
+								/>
 							</>
 						) : null}
 						<span className="text-xs text-muted-foreground">{formatDateTime(message.createdAt)}</span>
