@@ -23,7 +23,7 @@ import type { Deposit, DepositStatus, DepositType, Lease, RentAdjustment, Tenant
 
 const LEASE_COLUMNS = `
 	id, unit_id AS unitId, tenant_id AS tenantId, start_date AS startDate, end_date AS endDate,
-	cold_rent AS coldRent, service_charges AS serviceCharges, number_of_occupants AS numberOfOccupants,
+	cold_rent AS coldRent, service_charges AS serviceCharges,
 	deposit, notes, created_at AS createdAt, updated_at AS updatedAt
 `;
 
@@ -38,7 +38,7 @@ const RENT_ADJUSTMENT_COLUMNS = `
  */
 const LEASE_JOIN_COLUMNS = `
 	l.id, l.unit_id AS unitId, l.tenant_id AS tenantId, l.start_date AS startDate, l.end_date AS endDate,
-	l.cold_rent AS coldRent, l.service_charges AS serviceCharges, l.number_of_occupants AS numberOfOccupants,
+	l.cold_rent AS coldRent, l.service_charges AS serviceCharges,
 	l.deposit, l.notes, l.created_at AS createdAt, l.updated_at AS updatedAt,
 	${UNIT_PROPERTY_COLUMNS},
 	${TENANT_COLUMNS},
@@ -92,7 +92,6 @@ function mapLeaseRow(row: LeaseJoinRow, rentAdjustments: RentAdjustment[]): Leas
 		endDate: row.endDate,
 		coldRent: row.coldRent,
 		serviceCharges: row.serviceCharges,
-		numberOfOccupants: row.numberOfOccupants,
 		deposit: row.deposit,
 		notes: row.notes,
 		createdAt: row.createdAt,
@@ -137,7 +136,6 @@ export interface LeaseInput {
 	endDate: string | null;
 	coldRent: string;
 	serviceCharges: string;
-	numberOfOccupants: number;
 	deposit: string | null;
 	notes: string | null;
 }
@@ -221,8 +219,8 @@ export function createLease(input: LeaseInput): Lease {
 	const timestamp = now();
 	getDb()
 		.prepare(
-			`INSERT INTO leases (id, unit_id, tenant_id, start_date, end_date, cold_rent, service_charges, number_of_occupants, deposit, notes, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO leases (id, unit_id, tenant_id, start_date, end_date, cold_rent, service_charges, deposit, notes, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			id,
@@ -232,7 +230,6 @@ export function createLease(input: LeaseInput): Lease {
 			input.endDate,
 			input.coldRent,
 			input.serviceCharges,
-			input.numberOfOccupants,
 			input.deposit,
 			input.notes,
 			timestamp,
@@ -246,7 +243,7 @@ export function updateLease(id: string, input: LeaseInput): void {
 		.prepare(
 			`UPDATE leases
 			 SET unit_id = ?, tenant_id = ?, start_date = ?, end_date = ?, cold_rent = ?, service_charges = ?,
-				 number_of_occupants = ?, deposit = ?, notes = ?, updated_at = ?
+				 deposit = ?, notes = ?, updated_at = ?
 			 WHERE id = ?`
 		)
 		.run(
@@ -256,7 +253,6 @@ export function updateLease(id: string, input: LeaseInput): void {
 			input.endDate,
 			input.coldRent,
 			input.serviceCharges,
-			input.numberOfOccupants,
 			input.deposit,
 			input.notes,
 			now(),

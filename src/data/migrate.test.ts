@@ -110,24 +110,19 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0013:
-		// housing_charge_id-Spalte der Buchungszeilen + Wegfall der
-		// Kostenart-Spalte der WEG-Kostenpositionen).
-		const hasHousingChargeColumn = () => tableColumns(db, "bank_transaction_allocations").includes("housing_charge_id");
-		const hasCategoryColumn = () => tableColumns(db, "hoa_cost_items").includes("category");
-		expect(hasHousingChargeColumn()).toBe(true);
-		expect(hasCategoryColumn()).toBe(false);
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0014:
+		// Wegfall der Personenzahl-Spalte der Mietverträge).
+		const hasOccupantsColumn = () => tableColumns(db, "leases").includes("number_of_occupants");
+		expect(hasOccupantsColumn()).toBe(false);
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(hasHousingChargeColumn()).toBe(false);
-		expect(hasCategoryColumn()).toBe(true);
+		expect(hasOccupantsColumn()).toBe(true);
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(hasHousingChargeColumn()).toBe(true);
-		expect(hasCategoryColumn()).toBe(false);
+		expect(hasOccupantsColumn()).toBe(false);
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

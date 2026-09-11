@@ -16,7 +16,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { importCostItemsFromBankingAction } from "@/app/(app)/abrechnung/actions";
 
 /** Uniforme Umlageschlüssel für den Sammel-Import (DIRECT/CUSTOM erfordern Einzelentscheidungen je Position). */
-const IMPORT_KEYS = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION"] as const;
+const IMPORT_KEYS = ["LIVING_SPACE", "UNITS", "CONSUMPTION"] as const;
 
 /**
  * Nettosumme der Buchungszeilen eines Kontos im Abrechnungszeitraum

@@ -64,7 +64,6 @@ export interface Lease {
 	endDate: string | null;
 	coldRent: string;
 	serviceCharges: string;
-	numberOfOccupants: number;
 	deposit: string | null;
 	notes: string | null;
 	createdAt: string;
@@ -310,7 +309,7 @@ export type BankTransactionStatus = "OPEN" | "PARTIAL" | "RECONCILED";
 // ============================================================
 
 export type BillingPeriodStatus = "DRAFT" | "FINALIZED";
-export type AllocationKey = "LIVING_SPACE" | "OCCUPANTS" | "UNITS" | "CONSUMPTION" | "DIRECT" | "CUSTOM";
+export type AllocationKey = "LIVING_SPACE" | "UNITS" | "CONSUMPTION" | "DIRECT" | "CUSTOM";
 
 /**
  * Frei definierbarer Umlageschlüssel einer Liegenschaft (allocationKey

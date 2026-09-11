@@ -116,16 +116,10 @@ export function LeaseFormDialog({ lease, units, tenants }: { lease?: Lease; unit
 							</div>
 						</div>
 
-						<div className="grid gap-2">
-							<Label htmlFor="numberOfOccupants">{t("leases.fields.numberOfOccupants")} *</Label>
-							<Input id="numberOfOccupants" name="numberOfOccupants" type="number" step="1" min="1" defaultValue={lease?.numberOfOccupants ?? 1} required />
-							<p className="text-xs text-muted-foreground">{t("leases.fields.numberOfOccupantsHint")}</p>
-						</div>
-
-						<div className="grid gap-2">
-							<Label htmlFor="notes">{t("common.notes")}</Label>
-							<Textarea id="notes" name="notes" defaultValue={lease?.notes ?? ""} />
-						</div>
+					<div className="grid gap-2">
+						<Label htmlFor="notes">{t("common.notes")}</Label>
+						<Textarea id="notes" name="notes" defaultValue={lease?.notes ?? ""} />
+					</div>
 
 						<ActionErrorToast state={state} />
 					</div>

@@ -95,7 +95,6 @@ function seedPropertyUnitTenantLease() {
 		endDate: null,
 		coldRent: "800.00",
 		serviceCharges: "150.00",
-		numberOfOccupants: 2,
 		deposit: null,
 		notes: null,
 	});

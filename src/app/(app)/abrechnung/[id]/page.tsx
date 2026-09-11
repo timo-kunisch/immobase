@@ -187,8 +187,8 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 									<div key={`${warning.costItemId}-${index}`} className="flex items-center gap-3">
 										<AlertTriangle className="size-5 shrink-0 text-amber-600" />
 										<p className="text-sm">
-											<span className="font-semibold">{costItem?.label ?? t("billing.warning.fallbackItem")}</span> {t("billing.warning.notAllocated")}{" "}
-											{warning.reason === "NO_OCCUPANTS" ? t("billing.warning.noOccupants") : t("billing.warning.noAllocationBasis")}
+										<span className="font-semibold">{costItem?.label ?? t("billing.warning.fallbackItem")}</span> {t("billing.warning.notAllocated")}{" "}
+										{t("billing.warning.noAllocationBasis")}
 										</p>
 									</div>
 								);

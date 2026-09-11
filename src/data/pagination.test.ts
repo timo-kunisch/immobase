@@ -51,7 +51,6 @@ function seedLease() {
 		endDate: null,
 		coldRent: "800.00",
 		serviceCharges: "150.00",
-		numberOfOccupants: 1,
 		deposit: null,
 		notes: null,
 	});

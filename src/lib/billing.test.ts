@@ -91,7 +91,6 @@ describe("calculateBillingResult mit individuellem Umlageschlüssel (CUSTOM)", (
 					endDate: null,
 					coldRent: "800.00",
 					serviceCharges: "150.00",
-					numberOfOccupants: 1,
 					rentAdjustments: NO_ADJUSTMENTS,
 					paidTransactions: [],
 				},

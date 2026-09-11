@@ -79,7 +79,6 @@ function makeLease(overrides: { id?: string; startDate?: string; endDate?: strin
 		endDate: overrides.endDate !== undefined ? overrides.endDate : "2026-12-31",
 		coldRent: "800.00",
 		serviceCharges: "100.00",
-		numberOfOccupants: 1,
 		deposit: null,
 		notes: null,
 		createdAt: TIMESTAMP,

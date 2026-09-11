@@ -69,7 +69,6 @@ function seedBaseData() {
 		endDate: null,
 		coldRent: "700.00",
 		serviceCharges: "120.00",
-		numberOfOccupants: 1,
 		deposit: null,
 		notes: null,
 	});

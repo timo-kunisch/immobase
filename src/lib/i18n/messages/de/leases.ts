@@ -37,8 +37,6 @@ export const leases = {
 	"fields.coldRent": "Kaltmiete (€)",
 	"fields.serviceCharges": "Nebenkosten (€)",
 	"fields.deposit": "Kaution (€)",
-	"fields.numberOfOccupants": "Anzahl Personen im Haushalt",
-	"fields.numberOfOccupantsHint": "Grundlage für den Umlageschlüssel \"Personen\" in der Nebenkostenabrechnung.",
 	// Miet-/Nebenkosten-Änderung (RentAdjustmentFormDialog)
 	"adjustment.add": "Änderung hinterlegen",
 	"adjustment.createTitle": "Miet-/Nebenkostenänderung",

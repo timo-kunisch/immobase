@@ -46,7 +46,6 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 	const startDateRaw = getString(formData, "startDate");
 	const endDateRaw = getString(formData, "endDate");
 	const notes = getString(formData, "notes");
-	const numberOfOccupantsRaw = getString(formData, "numberOfOccupants");
 
 	const coldRent = getDecimalString(formData, "coldRent");
 	const serviceCharges = getDecimalString(formData, "serviceCharges");
@@ -58,8 +57,6 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 		};
 	}
 
-	const numberOfOccupants = Number(numberOfOccupantsRaw);
-
 	const data = {
 		unitId,
 		tenantId,
@@ -67,9 +64,6 @@ export async function saveLeaseAction(_prevState: ActionState, formData: FormDat
 		endDate: endDateRaw ? new Date(endDateRaw).toISOString() : null,
 		coldRent,
 		serviceCharges,
-		// Grundlage für den Umlageschlüssel "Personen" in der
-		// Nebenkostenabrechnung (siehe src/lib/billing.ts), min. 1.
-		numberOfOccupants: Number.isInteger(numberOfOccupants) && numberOfOccupants > 0 ? numberOfOccupants : 1,
 		deposit,
 		notes: notes || null,
 	};

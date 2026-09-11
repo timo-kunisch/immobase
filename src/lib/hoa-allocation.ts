@@ -17,8 +17,6 @@ import { toCents, distributeCents } from "@/lib/money";
  *    Nebenkostenabrechnung bekannten Schlüsseln "Einheiten"/"Verbrauch"/
  *    "Direkte Zuordnung" sowie einem frei definierbaren Schlüssel
  *    ("CUSTOM", je Einheit frei vergebbare Gewichte).
- *  - Es gibt keinen "Personen"-Schlüssel (WEG-Kosten werden nicht nach
- *    Personenzahl der Bewohner umgelegt).
  *  - Die zweite Verteilungsstufe (Einheit -> Zeitanteil) verteilt nicht auf
  *    Mietverhältnisse, sondern auf Eigentumsverhältnisse (unitOwnerships) -
  *    bei einem unterjährigen Eigentümerwechsel wird der auf eine Einheit

@@ -33,8 +33,6 @@ export const leases: typeof deLeases = {
 	"fields.coldRent": "Base rent (€)",
 	"fields.serviceCharges": "Service charges (€)",
 	"fields.deposit": "Security deposit (€)",
-	"fields.numberOfOccupants": "Number of persons in household",
-	"fields.numberOfOccupantsHint": "Basis for the \"persons\" allocation key in the service charge statement.",
 	// Rent/service charge adjustment (RentAdjustmentFormDialog)
 	"adjustment.add": "Record adjustment",
 	"adjustment.createTitle": "Rent/service charge adjustment",

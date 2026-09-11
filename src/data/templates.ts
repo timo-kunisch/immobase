@@ -236,7 +236,7 @@ export function deleteGeneratedDocument(id: string): void {
 
 const LEASE_COLUMNS = `
 	id, unit_id AS unitId, tenant_id AS tenantId, start_date AS startDate, end_date AS endDate,
-	cold_rent AS coldRent, service_charges AS serviceCharges, number_of_occupants AS numberOfOccupants,
+	cold_rent AS coldRent, service_charges AS serviceCharges,
 	deposit, notes, created_at AS createdAt, updated_at AS updatedAt
 `;
 

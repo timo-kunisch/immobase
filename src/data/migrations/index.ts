@@ -11,6 +11,7 @@ import { migration0010 } from "./0010_rental_custom_allocation_keys.ts";
 import { migration0011 } from "./0011_bank_accounts.ts";
 import { migration0012 } from "./0012_calendar_event_times.ts";
 import { migration0013 } from "./0013_hoa_statement_banking.ts";
+import { migration0014 } from "./0014_remove_lease_occupants.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -33,4 +34,5 @@ export const migrations: Migration[] = [
 	migration0011,
 	migration0012,
 	migration0013,
+	migration0014,
 ];

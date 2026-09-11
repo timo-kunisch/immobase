@@ -36,7 +36,7 @@ import { formatDate } from "@/lib/format";
 import { getOptionalFloat } from "@/lib/form-data";
 import { sendPdfByPostForSource, type PostalShipmentActionState } from "@/lib/postal-shipments";
 
-const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
+const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
 
 function getString(formData: FormData, key: string): string {
 	const value = formData.get(key);
@@ -306,7 +306,7 @@ export async function deleteCostItemAction(id: string): Promise<ActionState> {
  * Einzelentscheidungen und bleiben dem Anlegen/Bearbeiten einzelner
  * Kostenpositionen vorbehalten.
  */
-const BANKING_IMPORT_ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION"];
+const BANKING_IMPORT_ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "UNITS", "CONSUMPTION"];
 
 /**
  * Übernimmt die Buchungszeilen der Buchhaltung (siehe /buchhaltung) als

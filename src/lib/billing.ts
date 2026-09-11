@@ -17,19 +17,12 @@ import { atMidnight, daysBetweenInclusive, daysInMonth, overlapRange } from "@/l
  * Grundprinzip der Umlage (zwei Schritte):
  *  1. Die Kostenposition wird - abhängig vom Umlageschlüssel - auf die
  *     Einheiten der Liegenschaft verteilt (Wohnfläche/Anzahl Einheiten/
- *     Verbrauch/Direktzuordnung/individuelle Gewichte). Der Umlageschlüssel
- *     "Personen" bildet hiervon eine Ausnahme, siehe unten.
+ *     Verbrauch/Direktzuordnung/individuelle Gewichte).
  *  2. Der auf eine Einheit entfallende Betrag wird - taggenau - auf die
  *     Mietverhältnisse verteilt, die die Einheit während des
  *     Abrechnungszeitraums bewohnt haben (zeitanteilige Verteilung bei
  *     Mieterwechsel). War die Einheit zeitweise unvermietet, verbleibt der
  *     entsprechende Anteil beim Vermieter (wird keinem Mieter berechnet).
- *
- * Für den Umlageschlüssel "Personen" entfällt der Zwischenschritt auf
- * Einheiten-Ebene: Es wird direkt mit "Personentagen" (Personenzahl ×
- * bewohnte Tage) je Mietverhältnis über die gesamte Liegenschaft gerechnet -
- * das bildet sowohl die Gewichtung nach Einheit als auch die zeitanteilige
- * Verteilung bei Mieterwechsel in einem Schritt ab.
  */
 
 type RentAdjustmentLike = {
@@ -173,7 +166,6 @@ export type BillingLeaseInput = {
 	endDate: string | null;
 	coldRent: string;
 	serviceCharges: string;
-	numberOfOccupants: number;
 	rentAdjustments: RentAdjustmentLike[];
 	/** Als bezahlt markierte Sollstellungen des Vertrags (Vorauszahlungs-Grundlage). */
 	paidTransactions: BillingPaidPaymentInput[];
@@ -242,7 +234,7 @@ export type LeaseBillingResult = {
 
 export type CostItemAllocationWarning = {
 	costItemId: string;
-	reason: "NO_ALLOCATION_BASIS" | "NO_OCCUPANTS";
+	reason: "NO_ALLOCATION_BASIS";
 };
 
 export type BillingResult = {
@@ -330,27 +322,6 @@ export function calculateBillingResult(period: BillingPeriodInput): BillingResul
 	for (const costItem of period.costItems) {
 		const amountCents = toCents(costItem.amount);
 
-		if (costItem.allocationKey === "OCCUPANTS") {
-			// Direkte Verteilung über "Personentage" (Personenzahl × bewohnte
-			// Tage) - bildet Einheiten-Gewichtung und Zeitanteil bei
-			// Mieterwechsel in einem Schritt ab, siehe Dateikopf.
-			const weights = allOverlaps.map((o) => o.lease.numberOfOccupants * o.occupiedDays);
-			const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-			if (totalWeight <= 0) {
-				warnings.push({ costItemId: costItem.id, reason: "NO_OCCUPANTS" });
-				continue;
-			}
-			const shares = distributeCents(amountCents, weights);
-			allOverlaps.forEach((overlap, index) => {
-				if (shares[index] === 0) return;
-				ensureLeaseLines(overlap.lease.id).push({
-					costItemId: costItem.id,
-					amountCents: shares[index],
-				});
-			});
-			continue;
-		}
-
 		// Schritt 1: Kostenposition auf die Einheiten der Liegenschaft verteilen.
 		const unitWeights = period.units.map((unit) => unitWeightFor(unit, costItem));
 		const totalUnitWeight = unitWeights.reduce((sum, w) => sum + w, 0);
@@ -435,7 +406,6 @@ export const billingPeriodStatusStyles: Record<BillingPeriodStatus, string> = {
 
 export const allocationKeyLabels: Record<AllocationKey, string> = {
 	LIVING_SPACE: "Wohnfläche",
-	OCCUPANTS: "Personen",
 	UNITS: "Einheiten",
 	CONSUMPTION: "Verbrauch",
 	DIRECT: "Direkte Zuordnung",

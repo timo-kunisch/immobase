@@ -119,7 +119,7 @@ const DEPOSIT_TYPES = ["CASH", "BANK_GUARANTEE", "BLOCKED_ACCOUNT"] as const;
 const DEPOSIT_STATUS = ["PENDING", "RECEIVED", "PARTIALLY_REFUNDED", "REFUNDED"] as const;
 const DOCUMENT_TYPES = ["CONTRACT", "INVOICE", "FLOORPLAN", "OTHER"] as const;
 const TEMPLATE_CATEGORIES = ["WARNING", "BILLING", "GENERAL", "TERMINATION", "OTHER"] as const;
-const ALLOCATION_KEYS = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"] as const;
+const ALLOCATION_KEYS = ["LIVING_SPACE", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"] as const;
 
 const MONTH_NAMES = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
 
@@ -212,7 +212,6 @@ const leaseFields: Record<string, FieldSpec> = {
 	endDate: { type: "date", nullable: true, description: "Mietende (null = unbefristet)" },
 	coldRent: { type: "decimal", description: "Kaltmiete" },
 	serviceCharges: { type: "decimal", description: "Nebenkosten-Vorauszahlung" },
-	numberOfOccupants: { type: "int" },
 	deposit: { type: "decimal", nullable: true, description: "Vereinbarte Kaution" },
 	notes: { type: "string", nullable: true },
 };

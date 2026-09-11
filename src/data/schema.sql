@@ -381,7 +381,6 @@ CREATE TABLE leases (
 	end_date text,
 	cold_rent text NOT NULL,
 	service_charges text NOT NULL,
-	number_of_occupants integer DEFAULT 1 NOT NULL,
 	deposit text,
 	notes text,
 	created_at text NOT NULL,

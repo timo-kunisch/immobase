@@ -23,7 +23,7 @@ const TRANSACTION_JOIN_COLUMNS = `
 	tr.id, tr.lease_id AS leaseId, tr.amount, tr.due_date AS dueDate, tr.paid_date AS paidDate,
 	tr.purpose, tr.status, tr.created_at AS createdAt, tr.updated_at AS updatedAt,
 	l.unit_id AS leaseUnitId, l.tenant_id AS leaseTenantId, l.start_date AS leaseStartDate, l.end_date AS leaseEndDate,
-	l.cold_rent AS leaseColdRent, l.service_charges AS leaseServiceCharges, l.number_of_occupants AS leaseNumberOfOccupants,
+	l.cold_rent AS leaseColdRent, l.service_charges AS leaseServiceCharges,
 	l.deposit AS leaseDeposit, l.notes AS leaseNotes, l.created_at AS leaseCreatedAt, l.updated_at AS leaseUpdatedAt,
 	${UNIT_PROPERTY_COLUMNS},
 	${TENANT_COLUMNS}
@@ -57,7 +57,6 @@ interface TransactionJoinRow extends Transaction, UnitPropertyJoinRow, TenantJoi
 	leaseEndDate: string | null;
 	leaseColdRent: string;
 	leaseServiceCharges: string;
-	leaseNumberOfOccupants: number;
 	leaseDeposit: string | null;
 	leaseNotes: string | null;
 	leaseCreatedAt: string;
@@ -83,7 +82,6 @@ function mapTransactionRow(row: TransactionJoinRow): TransactionWithLease {
 			endDate: row.leaseEndDate,
 			coldRent: row.leaseColdRent,
 			serviceCharges: row.leaseServiceCharges,
-			numberOfOccupants: row.leaseNumberOfOccupants,
 			deposit: row.leaseDeposit,
 			notes: row.leaseNotes,
 			createdAt: row.leaseCreatedAt,

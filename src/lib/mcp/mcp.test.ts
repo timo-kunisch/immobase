@@ -438,7 +438,6 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 			endDate: null,
 			coldRent: "800.00",
 			serviceCharges: "150.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});
@@ -494,7 +493,6 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 			endDate: null,
 			coldRent: "800.00",
 			serviceCharges: "150.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});
@@ -621,7 +619,6 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 			endDate: null,
 			coldRent: "800.00",
 			serviceCharges: "150.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});
@@ -684,7 +681,6 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 			endDate: null,
 			coldRent: "800.00",
 			serviceCharges: "150.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});
@@ -716,7 +712,6 @@ describe("MCP-Werkzeuge: CRUD-Durchstich und Validierung", () => {
 			endDate: null,
 			coldRent: "700.00",
 			serviceCharges: "120.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});
@@ -1024,7 +1019,6 @@ describe("MCP-Werkzeuge: Kalender und Wissensdatenbank", () => {
 			endDate: "2026-12-31",
 			coldRent: "800.00",
 			serviceCharges: "150.00",
-			numberOfOccupants: 1,
 			deposit: null,
 			notes: null,
 		});

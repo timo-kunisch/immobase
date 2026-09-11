@@ -16,7 +16,7 @@ import { useI18n } from "@/lib/i18n/provider";
 import { saveCostItemAction } from "@/app/(app)/abrechnung/actions";
 import type { AllocationKey, CostItem, CustomAllocationKey, Unit } from "@/data/types";
 
-const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "OCCUPANTS", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
+const ALLOCATION_KEYS: AllocationKey[] = ["LIVING_SPACE", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
 
 export function CostItemFormDialog({
 	billingPeriodId,

@@ -52,7 +52,6 @@ export const billing = {
 	// Umlage-Warnungen (Live-Vorschau im Entwurf)
 	"warning.fallbackItem": "Kostenposition",
 	"warning.notAllocated": "konnte nicht umgelegt werden:",
-	"warning.noOccupants": "Für den Zeitraum sind keine bewohnten Personentage vorhanden.",
 	"warning.noAllocationBasis": "Es liegt keine gültige Verteilungsgrundlage vor (z. B. fehlende Wohnfläche, Verbrauchswerte oder Gewichte).",
 	// Filter
 	"filter.allProperties": "Alle Liegenschaften",
@@ -132,7 +131,6 @@ export const billing = {
 	"fields.customAllocationKeyPlaceholder": "Umlageschlüssel auswählen",
 	// Umlageschlüssel (Enum AllocationKey)
 	"allocationKey.LIVING_SPACE": "Wohnfläche",
-	"allocationKey.OCCUPANTS": "Personen",
 	"allocationKey.UNITS": "Einheiten",
 	"allocationKey.CONSUMPTION": "Verbrauch",
 	"allocationKey.DIRECT": "Direkte Zuordnung",
