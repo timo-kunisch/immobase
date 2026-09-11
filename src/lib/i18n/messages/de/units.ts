@@ -1,7 +1,7 @@
 /**
  * Namespace "units" (Deutsch): Modul "Einheiten" (Mieteinheiten) -
- * Listen-Seite inkl. Liegenschafts-Filter, Formular-Dialog
- * (Anlegen/Bearbeiten) und Meldungen der Server Actions.
+ * Listen-Seite, Formular-Dialog (Anlegen/Bearbeiten) und Meldungen
+ * der Server Actions.
  */
 export const units = {
 	title: "Mieteinheiten",
@@ -22,8 +22,6 @@ export const units = {
 	"badge.leases": "Verträge",
 	"badge.tickets": "Tickets",
 	"badge.documents": "Dokumente",
-	// Liegenschafts-Filter über der Liste
-	"filter.allProperties": "Alle Liegenschaften",
 	// Lösch-Bestätigung (ConfirmDeleteButton)
 	"confirm.delete": "Einheit \"{name}\" wirklich löschen?",
 	// Formular-Dialog

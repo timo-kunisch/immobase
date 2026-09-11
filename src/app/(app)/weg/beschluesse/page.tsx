@@ -3,7 +3,6 @@ import { Gavel } from "lucide-react";
 import { listHoas, listOwnerResolutions } from "@/data/meetings";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { HoaFilter } from "@/components/weg/hoa-filter";
 import { ResolutionsTable } from "@/components/weg/resolutions-table";
 import { getT } from "@/lib/i18n/server";
 
@@ -16,8 +15,8 @@ export const dynamic = "force-dynamic";
  * (/weg/versammlungen/[meetingId]) ist dies eine reine Lesansicht ohne
  * Bearbeiten/Löschen (Bearbeitung erfolgt ausschließlich über die
  * jeweilige Versammlung, siehe Verlinkung je Zeile). Flache Top-Level-
- * Seite mit optionalem hoaId-Filter (siehe HoaFilter), analog zu den
- * übrigen WEG-Funktionen.
+ * Seite mit optionalem hoaId-Vorfilter (Cross-Modul-Links); das Filtern
+ * nach WEG übernimmt die WEG-Spalte der Client-Datentabelle.
  */
 export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const t = await getT();
@@ -47,8 +46,6 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 			<SiteHeader title={t("hoaMeetings.collection.title")} description={t("hoaMeetings.collection.description")} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/beschluesse" />
-
 				<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">{t("hoaMeetings.collection.info")}</div>
 
 				<Card>

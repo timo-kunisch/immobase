@@ -20,8 +20,6 @@ export const units: typeof deUnits = {
 	"badge.leases": "Leases",
 	"badge.tickets": "Tickets",
 	"badge.documents": "Documents",
-	// Property filter above the list
-	"filter.allProperties": "All properties",
 	// Delete confirmation (ConfirmDeleteButton)
 	"confirm.delete": "Really delete unit \"{name}\"?",
 	// Form dialog

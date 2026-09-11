@@ -9,11 +9,11 @@ import { useI18n } from "@/lib/i18n/provider";
 const ALL_VALUE = "all";
 
 /**
- * Liegenschafts-Filter (analog UnitPropertyFilter/BillingPropertyFilter),
+ * Liegenschafts-Filter (analog BillingPropertyFilter),
  * aber für WEGs - ermöglicht die Auswahl einer WEG auf den nun flachen
  * Top-Level-Seiten unter /weg/* (Wirtschaftsplan, Jahresabrechnung,
- * Hausgeld, Rücklage, Versammlungen, Beschluss-Sammlung,
- * Eigentumsverhältnisse, Verteilerschlüssel) - konsistent zum Muster der
+ * Hausgeld, Rücklage, Versammlungen, Eigentumsverhaeltnisse,
+ * Verteilerschluessel, Buchhaltung) - konsistent zum Muster der
  * Mietverwaltung (z. B. /einheiten?propertyId=).
  */
 export function HoaFilter({ hoas, value, basePath }: { hoas: Hoa[]; value?: string; basePath: string }) {

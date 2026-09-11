@@ -5,7 +5,6 @@ import { getUnitStats, listActiveLeasesWithTenants, listUnits } from "@/data/uni
 import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { UnitFormDialog } from "@/components/einheiten/unit-form-dialog";
-import { UnitPropertyFilter } from "@/components/einheiten/unit-property-filter";
 import { UnitsTable } from "@/components/einheiten/units-table";
 import { getT } from "@/lib/i18n/server";
 
@@ -15,7 +14,7 @@ export default async function EinheitenPage({ searchParams }: { searchParams: Pr
 	const t = await getT();
 	const { propertyId } = await searchParams;
 
-	// Liegenschaften für den Filter/das Formular alphabetisch (bisher per
+	// Liegenschaften für das Formular alphabetisch (bisher per
 	// SQL ORDER BY name, jetzt im Anschluss an listProperties() sortiert -
 	// Code-Unit-Vergleich entspricht der SQLite-BINARY-Kollation).
 	const propertyList = [...listProperties()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -44,9 +43,7 @@ export default async function EinheitenPage({ searchParams }: { searchParams: Pr
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 			{propertyList.length === 0 ? (
 				<p className="text-sm text-muted-foreground">{t("units.noProperties")}</p>
-			) : (
-				<UnitPropertyFilter properties={propertyList} value={propertyId} />
-			)}
+			) : null}
 				<Card>
 					<CardContent className="p-0">
 						{rows.length === 0 ? (
