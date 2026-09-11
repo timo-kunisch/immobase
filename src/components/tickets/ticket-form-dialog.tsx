@@ -125,10 +125,12 @@ export function TicketFormDialog({
 							</Select>
 						</div>
 
-						<div className="grid gap-2">
-							<Label htmlFor="contractorNotes">{t("tickets.fields.contractorNotes")}</Label>
-							<Textarea id="contractorNotes" name="contractorNotes" placeholder={t("tickets.fields.contractorNotesPlaceholder")} defaultValue={ticket?.contractorNotes ?? ""} />
-						</div>
+						{isEdit ? (
+							<div className="grid gap-2">
+								<Label htmlFor="contractorNotes">{t("tickets.fields.contractorNotes")}</Label>
+								<Textarea id="contractorNotes" name="contractorNotes" placeholder={t("tickets.fields.contractorNotesPlaceholder")} defaultValue={ticket?.contractorNotes ?? ""} />
+							</div>
+						) : null}
 
 						<ActionErrorToast state={state} />
 					</div>
