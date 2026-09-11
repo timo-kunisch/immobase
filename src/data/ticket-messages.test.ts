@@ -14,11 +14,14 @@ import {
 	deleteTicketNote,
 	findLinkedTicketIdByMessageIds,
 	getTicketMessage,
+	hideMailboxMessage,
 	importInboundMessage,
 	linkMessageToTicket,
+	listHiddenMailboxMessages,
 	listMailboxMessages,
 	listTicketMessageCounts,
 	listTicketMessages,
+	unhideMailboxMessage,
 	unlinkMessageFromTicket,
 	updateTicketNote,
 } from "@/data/ticket-messages";
@@ -239,6 +242,79 @@ describe("ticket_messages: Postfach und Verknüpfung", () => {
 		// Ausgehende E-Mails bleiben vom Notiz-Löschen unberührt.
 		deleteTicketNote(outbound.id);
 		expect(getTicketMessage(outbound.id)).not.toBeNull();
+	});
+});
+
+describe("ticket_messages: E-Mails ausblenden", () => {
+	it("blendet Postfach-E-Mails aus und wieder ein", () => {
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 41, subject: "Später ansehen" });
+
+		hideMailboxMessage(message.id);
+
+		expect(getTicketMessage(message.id)?.hidden).toBe(true);
+		expect(listMailboxMessages()).toHaveLength(0);
+		expect(listHiddenMailboxMessages().map((m) => m.id)).toEqual([message.id]);
+
+		unhideMailboxMessage(message.id);
+
+		expect(getTicketMessage(message.id)?.hidden).toBe(false);
+		expect(listMailboxMessages().map((m) => m.id)).toEqual([message.id]);
+		expect(listHiddenMailboxMessages()).toHaveLength(0);
+	});
+
+	it("verhindert erneuten Import ausgeblendeter E-Mails (Dedup bleibt)", () => {
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 42, subject: "Nicht nochmal" });
+		hideMailboxMessage(message.id);
+
+		const retry = importInboundMessage({ imapFolder: "INBOX", imapUid: 42, subject: "Nicht nochmal" });
+
+		expect(retry.inserted).toBe(false);
+		expect(listHiddenMailboxMessages().map((m) => m.id)).toEqual([message.id]);
+	});
+
+	it("setzt das Ausblend-Flag beim Zuordnen zu einem Ticket zurück", () => {
+		const propertyId = createTestProperty();
+		const ticketId = createTestTicket(propertyId);
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 43, subject: "Doch ein Ticket" });
+		hideMailboxMessage(message.id);
+
+		linkMessageToTicket(message.id, ticketId);
+
+		// Im Ticket-Verlauf ist hidden fachlich bedeutungslos - beim Lösen
+		// der Zuordnung landet die E-Mail wieder SICHTBAR im Postfach.
+		expect(getTicketMessage(message.id)?.hidden).toBe(false);
+
+		unlinkMessageFromTicket(message.id);
+
+		expect(listMailboxMessages().map((m) => m.id)).toEqual([message.id]);
+		expect(listHiddenMailboxMessages()).toHaveLength(0);
+	});
+
+	it("blendet nur unverknüpfte eingehende E-Mails aus (sonst No-Op)", () => {
+		const propertyId = createTestProperty();
+		const ticketId = createTestTicket(propertyId);
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 44, subject: "Bereits zugeordnet" });
+		linkMessageToTicket(message.id, ticketId);
+		const outbound = createTicketMessage({ ticketId, direction: "OUTBOUND", subject: "Antwort" });
+		const note = createTicketMessage({ ticketId, direction: "NOTE", bodyText: "Intern" });
+
+		hideMailboxMessage(message.id);
+		hideMailboxMessage(outbound.id);
+		hideMailboxMessage(note.id);
+
+		expect(getTicketMessage(message.id)?.hidden).toBe(false);
+		expect(getTicketMessage(outbound.id)?.hidden).toBe(false);
+		expect(getTicketMessage(note.id)?.hidden).toBe(false);
+	});
+
+	it("löscht auch ausgeblendete Postfach-E-Mails", () => {
+		const { message } = importInboundMessage({ imapFolder: "INBOX", imapUid: 45, subject: "Doch weg damit" });
+		hideMailboxMessage(message.id);
+
+		deleteMailboxMessage(message.id);
+
+		expect(getTicketMessage(message.id)).toBeNull();
+		expect(listHiddenMailboxMessages()).toHaveLength(0);
 	});
 });
 

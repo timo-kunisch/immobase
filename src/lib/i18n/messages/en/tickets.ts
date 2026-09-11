@@ -124,6 +124,8 @@ export const tickets: typeof deTickets = {
 	"mailbox.confirm.delete": 'Delete email "{subject}" from the mailbox? (The message on the server is kept.)',
 	"mailbox.actions.convert": "Convert to ticket",
 	"mailbox.actions.attach": "Attach to ticket",
+	"mailbox.actions.hide": "Hide",
+	"mailbox.actions.unhide": "Unhide",
 	"mailbox.dialog.convertTitle": "Convert email to ticket",
 	"mailbox.dialog.convertDescription": "The email will be assigned to the new ticket as the first history entry.",
 	"mailbox.dialog.convertSubmit": "Create ticket",
@@ -134,6 +136,14 @@ export const tickets: typeof deTickets = {
 	"mailbox.errors.convertFailed": "The email could not be converted into a ticket.",
 	"mailbox.errors.linkFailed": "The email could not be assigned.",
 	"mailbox.errors.deleteFailed": "The email could not be deleted.",
+	"mailbox.errors.hideFailed": "The email could not be hidden.",
+	"mailbox.errors.unhideFailed": "The email could not be unhidden.",
+	// Hidden emails (mailbox)
+	"mailbox.hidden.title": "Hidden emails",
+	"mailbox.hidden.show": "Show hidden emails ({count})",
+	"mailbox.hidden.showLess": "Show less",
+	"mailbox.hidden.hint": "These emails are hidden from the mailbox but remain stored - they can be unhidden or deleted.",
+	"mailbox.hidden.empty": "No hidden emails.",
 	"mailbox.success.synced": "{imported} new email(s) fetched{linked}.",
 	"mailbox.success.syncedLinked": " ({count} automatically assigned to a ticket)",
 };

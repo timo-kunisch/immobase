@@ -80,9 +80,12 @@ import {
 	createTicketMessage,
 	deleteMailboxMessage,
 	getTicketMessage,
+	hideMailboxMessage,
 	linkMessageToTicket,
+	listHiddenMailboxMessages,
 	listMailboxMessages,
 	listTicketMessages,
+	unhideMailboxMessage,
 } from "@/data/ticket-messages";
 import {
 	createTransaction,
@@ -459,9 +462,16 @@ registerTool({
 
 registerTool({
 	name: "postfach_list",
-	description: "Listet die eingehenden, noch keinem Ticket zugeordneten E-Mails im Postfach (neueste zuerst).",
-	inputSchema: buildInputSchema({}),
-	handler: () => listMailboxMessages(),
+	description:
+		"Listet die eingehenden, noch keinem Ticket zugeordneten E-Mails im Postfach (neueste zuerst). Ausgeblendete E-Mails werden nur mit includeHidden=true mit aufgelistet.",
+	inputSchema: buildInputSchema({
+		includeHidden: { type: "boolean", nullable: true, description: "true = zusätzlich die ausgeblendeten E-Mails auflisten (Feld hidden = true)" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ includeHidden: { type: "boolean", nullable: true } }, args);
+		const visible = listMailboxMessages();
+		return input.includeHidden ? [...visible, ...listHiddenMailboxMessages()] : visible;
+	},
 });
 
 registerTool({
@@ -549,6 +559,39 @@ registerTool({
 		const id = input.id as string;
 		if (!getTicketMessage(id)) throw new McpToolError("Die E-Mail wurde nicht gefunden.");
 		deleteMailboxMessage(id);
+		return { success: true, id };
+	},
+});
+
+registerTool({
+	name: "postfach_hide",
+	description:
+		"Blendet eine E-Mail aus dem Postfach aus, ohne sie zu löschen: Die lokale Kopie bleibt erhalten und erscheint in der App im Bereich „Ausgeblendete E-Mails“ (postfach_list mit includeHidden=true). Nur für unzugeordnete eingehende E-Mails.",
+	inputSchema: buildInputSchema({
+		id: { type: "string", description: "ID der E-Mail im Postfach" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ id: { type: "string" } }, args);
+		const id = input.id as string;
+		const message = getTicketMessage(id);
+		if (!message || message.direction !== "INBOUND" || message.ticketId) throw new McpToolError("Die E-Mail wurde nicht gefunden.");
+		hideMailboxMessage(id);
+		return { success: true, id };
+	},
+});
+
+registerTool({
+	name: "postfach_unhide",
+	description: "Blendet eine ausgeblendete Postfach-E-Mail wieder in die normale Postfach-Ansicht ein.",
+	inputSchema: buildInputSchema({
+		id: { type: "string", description: "ID der ausgeblendeten E-Mail" },
+	}),
+	handler: (args) => {
+		const input = coerceArgs({ id: { type: "string" } }, args);
+		const id = input.id as string;
+		const message = getTicketMessage(id);
+		if (!message || message.direction !== "INBOUND" || message.ticketId) throw new McpToolError("Die E-Mail wurde nicht gefunden.");
+		unhideMailboxMessage(id);
 		return { success: true, id };
 	},
 });

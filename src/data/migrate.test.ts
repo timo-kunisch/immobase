@@ -45,6 +45,11 @@ function tableNames(db: BetterSqlite3.Database): string[] {
 	return rows.map((r) => r.name);
 }
 
+function columnNames(db: BetterSqlite3.Database, table: string): string[] {
+	const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+	return rows.map((r) => r.name);
+}
+
 describe("migrateDatabase", () => {
 	it("migriert eine frische Datenbank auf die neueste Version", () => {
 		const db = getDb();
@@ -139,10 +144,10 @@ describe("migrateDatabase", () => {
 		db.prepare("INSERT INTO tickets (id, title, status, created_at, updated_at) VALUES ('t2', 'Organisatorisch', 'OPEN', '2026-01-04', '2026-01-04')").run();
 
 		// ... das Down schlägt dafür bewusst mit Constraint-Fehler fehl und
-		// lässt die Datenbank auf Version 15 stehen (0017 und 0016 wurden
+		// lässt die Datenbank auf Version 15 stehen (0018, 0017 und 0016 wurden
 		// zuvor erfolgreich zurückgenommen, 0015 bleibt unverändert erhalten).
-		expect(() => migrateDatabaseDown(db, 3)).toThrow();
-		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 2);
+		expect(() => migrateDatabaseDown(db, 4)).toThrow();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 3);
 		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
 	});
 });
@@ -150,18 +155,18 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0017:
-		// Ticket-Aktivitätsverlauf - Tabelle ticket_activity_log fällt weg).
-		expect(tableNames(db)).toContain("ticket_activity_log");
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0018:
+		// ausgeblendete E-Mails - Spalte ticket_messages.hidden fällt weg).
+		expect(columnNames(db, "ticket_messages")).toContain("hidden");
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(tableNames(db)).not.toContain("ticket_activity_log");
+		expect(columnNames(db, "ticket_messages")).not.toContain("hidden");
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(tableNames(db)).toContain("ticket_activity_log");
+		expect(columnNames(db, "ticket_messages")).toContain("hidden");
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

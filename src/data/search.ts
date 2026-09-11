@@ -746,11 +746,13 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 	}
 
 	// --- Postfach: noch keinem Ticket zugeordnete eingehende E-Mails ----------------
+	// (Ausgeblendete bleiben bewusst außen vor - sie sind aus der Ansicht
+	// ausgeblendet, bis sie wieder eingeblendet werden.)
 	const mailboxRows = getDb()
 		.prepare(
 			`SELECT id, subject, from_address AS fromAddress, body_text AS bodyText
 			 FROM ticket_messages
-			 WHERE ticket_id IS NULL AND direction = 'INBOUND'
+			 WHERE ticket_id IS NULL AND direction = 'INBOUND' AND hidden = 0
 			 ORDER BY created_at DESC
 			 LIMIT ${SCAN_LIMIT}`
 		)

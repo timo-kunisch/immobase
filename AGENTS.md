@@ -109,7 +109,11 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Ticket-Kennung im Betreff (`[#a3f8b2c1]`, erste 8 UUID-Hex-Zeichen; `src/lib/ticket-ref.ts`
   + `findTicketIdByRef()` im Tickets-Repository, nur eindeutige Treffer); alles andere bleibt
   im Postfach und kann dort gelesen (Öffnen-Dialog), **in ein Ticket
-  umgewandelt** oder **an ein Ticket angeheftet** (oder gelöscht = nur lokale Kopie) werden. Ein
+  umgewandelt**, **an ein Ticket angeheftet** oder **ausgeblendet** werden (Migration 0018,
+  `ticket_messages.hidden`; ausgeblendete E-Mails bleiben samt Dedup-Merkmal erhalten und sind
+  auf `/postfach` über den Bereich „Ausgeblendete E-Mails" (`?hidden=1`) wieder einblendbar/
+  löschbar; beim Zuordnen zu einem Ticket wird das Flag zurückgesetzt; löschbar = nur lokale
+  Kopie). Ein
   Scheduler (Start in `src/app/(app)/layout.tsx` wie der Dropbox-Scheduler; 5-Minuten-Intervall,
   `unref`'d, parallele Läufe abgelehnt) ruft automatisch ab; zusätzlich manueller „Jetzt abrufen"-
   Button. Der komplette Verlauf (E-Mails eingehend/ausgehend + interne Notizen, eine Tabelle
@@ -852,7 +856,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Buchungskreise inkl. Hausgeld-Buchungen und Kreis-Trennung, Löschen finalisierter
   Perioden/Jahresabrechnungen mit Artefakt-Cleanup;
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
-  Threading + Notiz-Bearbeitung/-Löschung (nur Richtung NOTE) + IMAP-Sync-Stand,
+  Threading + Notiz-Bearbeitung/-Löschung (nur Richtung NOTE) + Ausblenden/Einblenden (hidden-Flag,
+  Dedup bleibt, Flag-Reset bei Ticket-Zuordnung) + IMAP-Sync-Stand,
   `ticket-activity.test.ts` = Ticket-Aktivitätsverlauf: Protokollierung/Reihenfolge/
   Ticket-Trennung/Fremdschlüssel/Kaskade/Akteur-Referenz (ON DELETE SET NULL),
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/

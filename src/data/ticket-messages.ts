@@ -1,5 +1,5 @@
 import { getDb } from "./db";
-import { newId, now } from "./helpers";
+import { intToBool, newId, now } from "./helpers";
 import { createTicket, type TicketInput } from "./tickets";
 import type { Ticket, TicketMessage, TicketMessageDirection } from "./types";
 
@@ -8,7 +8,8 @@ import type { Ticket, TicketMessage, TicketMessageDirection } from "./types";
  * eine Tabelle für den kompletten Konversationsverlauf eines Tickets
  * (eingehende/ausgehende E-Mails + interne Notizen) UND gleichzeitig für
  * das Eingangs-Postfach (eingehende Nachrichten mit `ticket_id IS NULL`).
- * Siehe Migration 0006.
+ * Siehe Migration 0006; `hidden` (Migration 0018) blendet Postfach-Nachrichten
+ * aus der normalen Ansicht aus, ohne sie zu löschen.
  */
 
 const TICKET_MESSAGE_COLUMNS = `
@@ -17,8 +18,15 @@ const TICKET_MESSAGE_COLUMNS = `
 	from_address AS fromAddress, to_addresses AS toAddresses,
 	subject, body_text AS bodyText,
 	author_user_id AS authorUserId, author_email AS authorEmail,
-	created_at AS createdAt
+	created_at AS createdAt, hidden
 `;
+
+/** Zeilenform, wie better-sqlite3 sie liefert (hidden noch als 0/1). */
+type TicketMessageRow = Omit<TicketMessage, "hidden"> & { hidden: number };
+
+function mapTicketMessageRow(row: TicketMessageRow): TicketMessage {
+	return { ...row, hidden: intToBool(row.hidden) };
+}
 
 export interface TicketMessageInput {
 	ticketId: string | null;
@@ -51,12 +59,13 @@ export function createTicketMessage(input: TicketMessageInput): TicketMessage {
 		authorUserId: input.authorUserId ?? null,
 		authorEmail: input.authorEmail ?? null,
 		createdAt: input.createdAt ?? now(),
+		hidden: false,
 	};
 	getDb()
 		.prepare(
 			`INSERT INTO ticket_messages (id, ticket_id, direction, message_id, imap_folder, imap_uid,
-				from_address, to_addresses, subject, body_text, author_user_id, author_email, created_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+				from_address, to_addresses, subject, body_text, author_user_id, author_email, created_at, hidden)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`
 		)
 		.run(
 			message.id,
@@ -99,12 +108,13 @@ export function importInboundMessage(input: Omit<TicketMessageInput, "ticketId" 
 		authorUserId: null,
 		authorEmail: null,
 		createdAt: input.createdAt ?? now(),
+		hidden: false,
 	};
 	const result = getDb()
 		.prepare(
 			`INSERT OR IGNORE INTO ticket_messages (id, ticket_id, direction, message_id, imap_folder, imap_uid,
-				from_address, to_addresses, subject, body_text, author_user_id, author_email, created_at)
-			 VALUES (?, ?, 'INBOUND', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)`
+				from_address, to_addresses, subject, body_text, author_user_id, author_email, created_at, hidden)
+			 VALUES (?, ?, 'INBOUND', ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?, 0)`
 		)
 		.run(
 			message.id,
@@ -124,26 +134,40 @@ export function importInboundMessage(input: Omit<TicketMessageInput, "ticketId" 
 export function getTicketMessage(id: string): TicketMessage | null {
 	const row = getDb()
 		.prepare(`SELECT ${TICKET_MESSAGE_COLUMNS} FROM ticket_messages WHERE id = ?`)
-		.get(id) as TicketMessage | undefined;
-	return row ?? null;
+		.get(id) as TicketMessageRow | undefined;
+	return row ? mapTicketMessageRow(row) : null;
 }
 
 /** Verlauf eines Tickets chronologisch (rowid als Tie-Breaker bei gleichem Mail-Datum). */
 export function listTicketMessages(ticketId: string): TicketMessage[] {
-	return getDb()
+	const rows = getDb()
 		.prepare(`SELECT ${TICKET_MESSAGE_COLUMNS} FROM ticket_messages WHERE ticket_id = ? ORDER BY created_at ASC, rowid ASC`)
-		.all(ticketId) as TicketMessage[];
+		.all(ticketId) as TicketMessageRow[];
+	return rows.map(mapTicketMessageRow);
 }
 
-/** Postfach: eingehende, noch keinem Ticket zugeordnete Nachrichten (neueste zuerst). */
+/** Postfach: sichtbare eingehende Nachrichten (noch keinem Ticket zugeordnet, neueste zuerst). */
 export function listMailboxMessages(): TicketMessage[] {
-	return getDb()
+	const rows = getDb()
 		.prepare(
 			`SELECT ${TICKET_MESSAGE_COLUMNS} FROM ticket_messages
-			 WHERE direction = 'INBOUND' AND ticket_id IS NULL
+			 WHERE direction = 'INBOUND' AND ticket_id IS NULL AND hidden = 0
 			 ORDER BY created_at DESC, rowid DESC`
 		)
-		.all() as TicketMessage[];
+		.all() as TicketMessageRow[];
+	return rows.map(mapTicketMessageRow);
+}
+
+/** Postfach: die ausgeblendeten, noch keinem Ticket zugeordneten Nachrichten (neueste zuerst). */
+export function listHiddenMailboxMessages(): TicketMessage[] {
+	const rows = getDb()
+		.prepare(
+			`SELECT ${TICKET_MESSAGE_COLUMNS} FROM ticket_messages
+			 WHERE direction = 'INBOUND' AND ticket_id IS NULL AND hidden = 1
+			 ORDER BY created_at DESC, rowid DESC`
+		)
+		.all() as TicketMessageRow[];
+	return rows.map(mapTicketMessageRow);
 }
 
 /** Anzahl der Nachrichten je Ticket (für Zähler-Badges in der Kanban-Ansicht). */
@@ -154,9 +178,13 @@ export function listTicketMessageCounts(): Record<string, number> {
 	return Object.fromEntries(rows.map((row) => [row.ticketId, row.count]));
 }
 
-/** Ordnet eine Nachricht (aus dem Postfach) einem Ticket zu. */
+/**
+ * Ordnet eine Nachricht (aus dem Postfach) einem Ticket zu. Ein evtl.
+ * vorhandenes Ausblend-Flag wird zurückgesetzt, damit die E-Mail nach
+ * dem Lösen der Zuordnung wieder sichtbar im Postfach landet.
+ */
 export function linkMessageToTicket(id: string, ticketId: string): void {
-	getDb().prepare("UPDATE ticket_messages SET ticket_id = ? WHERE id = ?").run(ticketId, id);
+	getDb().prepare("UPDATE ticket_messages SET ticket_id = ?, hidden = 0 WHERE id = ?").run(ticketId, id);
 }
 
 /**
@@ -170,12 +198,27 @@ export function unlinkMessageFromTicket(id: string): void {
 }
 
 /**
- * Löscht eine Nachricht aus dem Postfach. Nur unverknüpfte eingehende
- * Nachrichten sind so löschbar - Ticket-Verläufe werden nicht entfernt
- * (sie verschwinden mit dem Ticket per ON DELETE CASCADE).
+ * Löscht eine Nachricht aus dem Postfach (auch ausgeblendete). Nur
+ * unverknüpfte eingehende Nachrichten sind so löschbar - Ticket-Verläufe
+ * werden nicht entfernt (sie verschwinden mit dem Ticket per ON DELETE
+ * CASCADE).
  */
 export function deleteMailboxMessage(id: string): void {
 	getDb().prepare("DELETE FROM ticket_messages WHERE id = ? AND direction = 'INBOUND' AND ticket_id IS NULL").run(id);
+}
+
+/**
+ * Blendet eine Nachricht aus dem Postfach aus (Alternative zum Löschen:
+ * die lokale Kopie bleibt samt Dedup-Merkmal erhalten und kann jederzeit
+ * wieder eingeblendet werden). Nur unverknüpfte eingehende Nachrichten.
+ */
+export function hideMailboxMessage(id: string): void {
+	getDb().prepare("UPDATE ticket_messages SET hidden = 1 WHERE id = ? AND direction = 'INBOUND' AND ticket_id IS NULL").run(id);
+}
+
+/** Blendet eine ausgeblendete Postfach-Nachricht wieder ein. */
+export function unhideMailboxMessage(id: string): void {
+	getDb().prepare("UPDATE ticket_messages SET hidden = 0 WHERE id = ? AND direction = 'INBOUND' AND ticket_id IS NULL").run(id);
 }
 
 /**

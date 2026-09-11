@@ -3,7 +3,14 @@
 import { revalidatePath } from "next/cache";
 
 import { logTicketActivity } from "@/data/ticket-activity";
-import { getTicketMessage, convertMessageToTicket, deleteMailboxMessage, linkMessageToTicket } from "@/data/ticket-messages";
+import {
+	getTicketMessage,
+	convertMessageToTicket,
+	deleteMailboxMessage,
+	hideMailboxMessage,
+	linkMessageToTicket,
+	unhideMailboxMessage,
+} from "@/data/ticket-messages";
 import { getTicket } from "@/data/tickets";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
@@ -159,6 +166,55 @@ export async function deleteMailboxMessageAction(id: string): Promise<ActionStat
 	if (message) {
 		logActivity(user, "DELETE", "postfach", `E-Mail „${message.subject ?? "(ohne Betreff)"}“ aus dem Postfach gelöscht`, id);
 	}
+
+	revalidateMailbox();
+	return { success: true };
+}
+
+/**
+ * Blendet eine E-Mail aus dem Postfach aus, ohne sie zu löschen: Die
+ * lokale Kopie bleibt erhalten (inkl. Dedup-Merkmal, d. h. sie wird auch
+ * beim nächsten IMAP-Abruf nicht erneut importiert) und erscheint im
+ * Bereich „Ausgeblendete E-Mails" wieder zum Einblenden.
+ */
+export async function hideMailboxMessageAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const message = getTicketMessage(id);
+	if (!message || message.direction !== "INBOUND" || message.ticketId) {
+		return { error: t("tickets.errors.emailNotFound") };
+	}
+
+	try {
+		hideMailboxMessage(id);
+	} catch (error) {
+		console.error("hideMailboxMessageAction failed", error);
+		return { error: t("tickets.mailbox.errors.hideFailed") };
+	}
+
+	logActivity(user, "UPDATE", "postfach", `E-Mail „${message.subject ?? "(ohne Betreff)"}“ im Postfach ausgeblendet`, id);
+
+	revalidateMailbox();
+	return { success: true };
+}
+
+/** Blendet eine ausgeblendete Postfach-E-Mail wieder ein. */
+export async function unhideMailboxMessageAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const message = getTicketMessage(id);
+	if (!message || message.direction !== "INBOUND" || message.ticketId) {
+		return { error: t("tickets.errors.emailNotFound") };
+	}
+
+	try {
+		unhideMailboxMessage(id);
+	} catch (error) {
+		console.error("unhideMailboxMessageAction failed", error);
+		return { error: t("tickets.mailbox.errors.unhideFailed") };
+	}
+
+	logActivity(user, "UPDATE", "postfach", `E-Mail „${message.subject ?? "(ohne Betreff)"}“ im Postfach wieder eingeblendet`, id);
 
 	revalidateMailbox();
 	return { success: true };

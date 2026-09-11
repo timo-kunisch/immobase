@@ -194,6 +194,12 @@ export interface TicketMessage {
 	authorEmail: string | null;
 	/** Bei E-Mails das Datum aus dem Mail-Header, sonst der Erfassungszeitpunkt. */
 	createdAt: string;
+	/**
+	 * Postfach: Nachricht wurde aus der Postfach-Ansicht ausgeblendet
+	 * (bleibt gespeichert, einblendbar). Beim Zuordnen zu einem Ticket
+	 * wird das Flag zurückgesetzt.
+	 */
+	hidden: boolean;
 }
 
 // ------------------------------------------------------------

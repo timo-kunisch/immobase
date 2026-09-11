@@ -640,7 +640,7 @@ CREATE TABLE "ticket_messages" (
 	body_text text,
 	author_user_id text,
 	author_email text,
-	created_at text NOT NULL,
+	created_at text NOT NULL, hidden integer DEFAULT 0 NOT NULL,
 	FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (author_user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
 );

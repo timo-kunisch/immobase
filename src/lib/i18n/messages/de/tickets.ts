@@ -131,6 +131,8 @@ export const tickets = {
 	"mailbox.confirm.delete": 'E-Mail "{subject}" aus dem Postfach löschen? (Die Nachricht auf dem Server bleibt erhalten.)',
 	"mailbox.actions.convert": "In Ticket umwandeln",
 	"mailbox.actions.attach": "An Ticket anheften",
+	"mailbox.actions.hide": "Ausblenden",
+	"mailbox.actions.unhide": "Wieder einblenden",
 	"mailbox.dialog.convertTitle": "E-Mail in Ticket umwandeln",
 	"mailbox.dialog.convertDescription": "Die E-Mail wird dem neuen Ticket als erster Verlauf-Eintrag zugeordnet.",
 	"mailbox.dialog.convertSubmit": "Ticket anlegen",
@@ -141,6 +143,15 @@ export const tickets = {
 	"mailbox.errors.convertFailed": "Die E-Mail konnte nicht in ein Ticket umgewandelt werden.",
 	"mailbox.errors.linkFailed": "Die E-Mail konnte nicht zugeordnet werden.",
 	"mailbox.errors.deleteFailed": "Die E-Mail konnte nicht gelöscht werden.",
+	"mailbox.errors.hideFailed": "Die E-Mail konnte nicht ausgeblendet werden.",
+	"mailbox.errors.unhideFailed": "Die E-Mail konnte nicht wieder eingeblendet werden.",
+	// Ausgeblendete E-Mails (Postfach)
+	"mailbox.hidden.title": "Ausgeblendete E-Mails",
+	"mailbox.hidden.show": "Ausgeblendete E-Mails anzeigen ({count})",
+	"mailbox.hidden.showLess": "Weniger anzeigen",
+	"mailbox.hidden.hint":
+		"Diese E-Mails sind aus dem Postfach ausgeblendet, bleiben aber gespeichert - sie können wieder eingeblendet oder gelöscht werden.",
+	"mailbox.hidden.empty": "Keine ausgeblendeten E-Mails.",
 	"mailbox.success.synced": "{imported} neue E-Mail(s) abgerufen{linked}.",
 	"mailbox.success.syncedLinked": " ({count} automatisch einem Ticket zugeordnet)",
 };
