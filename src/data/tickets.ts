@@ -24,20 +24,21 @@ const UNIT_COLUMNS = `
 
 /** Ticket inklusive verknüpfter Liegenschaft und (optionaler) Einheit. */
 export interface TicketWithRelations extends Ticket {
-	// property_id ist NOT NULL mit FK restrict - die Liegenschaft existiert
-	// daher garantiert (kein null-Fall nötig).
-	property: { id: string; name: string };
+	// Liegenschaft ist optional (Ticket ohne Objektbezug) - property ist
+	// daher null, wenn kein property_id gesetzt ist.
+	property: { id: string; name: string } | null;
 	unit: { id: string; label: string } | null;
 }
 
 /** Flache Join-Zeile aus listTickets (vor dem Mapping zu TicketWithRelations). */
 interface TicketJoinRow extends Ticket {
-	propertyName: string;
+	propertyName: string | null;
 	unitLabel: string | null;
 }
 
 export interface TicketInput {
-	propertyId: string;
+	/** null = Ticket ohne Objektbezug. */
+	propertyId: string | null;
 	unitId: string | null;
 	title: string;
 	description: string | null;
@@ -76,7 +77,7 @@ export function listTickets(filters: { propertyId?: string; unitId?: string } = 
 		const { propertyName, unitLabel, ...ticket } = row;
 		return {
 			...ticket,
-			property: { id: row.propertyId, name: propertyName },
+			property: row.propertyId && propertyName ? { id: row.propertyId, name: propertyName } : null,
 			unit: row.unitId && unitLabel ? { id: row.unitId, label: unitLabel } : null,
 		};
 	});
@@ -98,7 +99,7 @@ export function getTicket(id: string): TicketWithRelations | null {
 	const { propertyName, unitLabel, ...ticket } = row;
 	return {
 		...ticket,
-		property: { id: row.propertyId, name: propertyName },
+		property: row.propertyId && propertyName ? { id: row.propertyId, name: propertyName } : null,
 		unit: row.unitId && unitLabel ? { id: row.unitId, label: unitLabel } : null,
 	};
 }

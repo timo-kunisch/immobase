@@ -52,15 +52,15 @@ export interface DashboardActiveLease {
 
 /** Offenes Ticket inkl. verknüpfter Liegenschaft und (optionaler) Einheit. */
 export interface DashboardTicket extends Ticket {
-	// property_id ist NOT NULL mit FK restrict - die Liegenschaft existiert
-	// daher garantiert (kein null-Fall nötig).
-	property: { id: string; name: string };
+	// Liegenschaft ist optional (Ticket ohne Objektbezug) - property ist
+	// daher null, wenn kein property_id gesetzt ist.
+	property: { id: string; name: string } | null;
 	unit: { id: string; label: string } | null;
 }
 
 /** Flache Join-Zeile aus listLatestOpenTickets (vor dem Mapping). */
 interface DashboardTicketJoinRow extends Ticket {
-	propertyName: string;
+	propertyName: string | null;
 	unitLabel: string | null;
 }
 
@@ -186,7 +186,7 @@ export function listLatestOpenTickets(limit = 5): DashboardTicket[] {
 		const { propertyName, unitLabel, ...ticket } = row;
 		return {
 			...ticket,
-			property: { id: row.propertyId, name: propertyName },
+			property: row.propertyId && propertyName ? { id: row.propertyId, name: propertyName } : null,
 			unit: row.unitId && unitLabel ? { id: row.unitId, label: unitLabel } : null,
 		};
 	});

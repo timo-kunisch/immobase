@@ -39,20 +39,21 @@ export async function syncMailboxAction(): Promise<ActionState> {
 
 /**
  * Wandelt eine Postfach-Nachricht in ein neues Ticket um (Titel/Beschreibung
- * sind aus Betreff/Inhalt vorbefüllt, Liegenschaft ist Pflicht).
+ * sind aus Betreff/Inhalt vorbefüllt, die Liegenschaft ist optional).
  */
 export async function convertMessageToTicketAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
 	const messageId = getString(formData, "messageId");
-	const propertyId = getString(formData, "propertyId");
+	const propertyIdRaw = getString(formData, "propertyId");
+	const propertyId = propertyIdRaw === "none" ? null : propertyIdRaw || null;
 	const unitIdRaw = getString(formData, "unitId");
 	const unitId = unitIdRaw === "none" ? "" : unitIdRaw;
 	const title = getString(formData, "title");
 	const description = getString(formData, "description");
 
-	if (!messageId || !propertyId || !title) {
-		return { error: t("tickets.errors.missingPropertyOrTitle") };
+	if (!messageId || !title) {
+		return { error: t("tickets.errors.missingTitle") };
 	}
 
 	const message = getTicketMessage(messageId);
@@ -66,7 +67,8 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 	try {
 		const ticket = convertMessageToTicket(messageId, {
 			propertyId,
-			unitId: unitId || null,
+			// Eine Einheit ist nur sinnvoll mit Liegenschaft wählbar.
+			unitId: propertyId ? unitId || null : null,
 			title,
 			description: description || null,
 			status: "OPEN",

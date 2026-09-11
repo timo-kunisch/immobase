@@ -152,7 +152,8 @@ export type TicketStatus = "OPEN" | "IN_PROGRESS" | "DONE";
 
 export interface Ticket {
 	id: string;
-	propertyId: string;
+	/** null = Ticket ohne Objektbezug (allgemeine Aufgabe). */
+	propertyId: string | null;
 	unitId: string | null;
 	title: string;
 	description: string | null;

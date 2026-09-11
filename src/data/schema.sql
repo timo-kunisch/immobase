@@ -613,7 +613,7 @@ CREATE TABLE tenants (
 	updated_at text NOT NULL
 );
 
-CREATE TABLE ticket_messages (
+CREATE TABLE "ticket_messages" (
 	id text PRIMARY KEY NOT NULL,
 	ticket_id text,
 	direction text NOT NULL,
@@ -631,9 +631,9 @@ CREATE TABLE ticket_messages (
 	FOREIGN KEY (author_user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
 );
 
-CREATE TABLE tickets (
+CREATE TABLE "tickets" (
 	id text PRIMARY KEY NOT NULL,
-	property_id text NOT NULL,
+	property_id text,
 	unit_id text,
 	title text NOT NULL,
 	description text,

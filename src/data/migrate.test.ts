@@ -45,11 +45,6 @@ function tableNames(db: BetterSqlite3.Database): string[] {
 	return rows.map((r) => r.name);
 }
 
-function tableColumns(db: BetterSqlite3.Database, table: string): string[] {
-	const rows = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
-	return rows.map((r) => r.name);
-}
-
 describe("migrateDatabase", () => {
 	it("migriert eine frische Datenbank auf die neueste Version", () => {
 		const db = getDb();
@@ -105,24 +100,71 @@ describe("migrateDatabase", () => {
 		expect(() => migrateDatabase(db, path.join(testDir, "data.db"))).toThrow(DatabaseTooNewError);
 		db.close();
 	});
+
+	it("0015: erhält Ticket-Verlauf beim Neubau und erlaubt Tickets ohne Liegenschaft", () => {
+		// DB auf den Stand VOR 0015 bringen (Migrationen 1..14) und echte
+		// Tickets samt Kommunikationsverlauf befüllen.
+		const raw = openRaw();
+		for (const migration of migrations) {
+			if (migration.version >= 15) continue;
+			raw.exec(migration.up);
+		}
+		raw.pragma("user_version = 14");
+		raw.pragma("foreign_keys = ON");
+		raw
+			.prepare(
+				"INSERT INTO properties (id, name, street, zip_code, city, country, created_at, updated_at) VALUES ('p1', 'Haus 1', 'Str. 1', '12345', 'Stadt', 'Deutschland', '2026-01-01', '2026-01-01')"
+			)
+			.run();
+		raw
+			.prepare(
+				"INSERT INTO tickets (id, property_id, title, status, created_at, updated_at) VALUES ('t1', 'p1', 'Heizung defekt', 'OPEN', '2026-01-02', '2026-01-02')"
+			)
+			.run();
+		raw
+			.prepare(
+				"INSERT INTO ticket_messages (id, ticket_id, direction, body_text, created_at) VALUES ('m1', 't1', 'NOTE', 'Erste Rückmeldung', '2026-01-03')"
+			)
+			.run();
+		raw.close();
+
+		// Migration 0015: Der Tabellen-Neubau darf den Verlauf NICHT kaskadieren
+		// (ticket_messages zeigt mit ON DELETE CASCADE auf tickets).
+		const db = getDb();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
+		expect(db.prepare("SELECT COUNT(*) c FROM tickets").get().c).toBe(1);
+		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
+
+		// Tickets ohne Liegenschaft sind nach 0015 erlaubt ...
+		db.prepare("INSERT INTO tickets (id, title, status, created_at, updated_at) VALUES ('t2', 'Organisatorisch', 'OPEN', '2026-01-04', '2026-01-04')").run();
+
+		// ... das Down schlägt dafür bewusst mit Constraint-Fehler fehl und
+		// lässt die Datenbank unverändert auf Version 15.
+		expect(() => migrateDatabaseDown(db, 1)).toThrow();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
+		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
+	});
 });
 
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0014:
-		// Wegfall der Personenzahl-Spalte der Mietverträge).
-		const hasOccupantsColumn = () => tableColumns(db, "leases").includes("number_of_occupants");
-		expect(hasOccupantsColumn()).toBe(false);
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0015:
+		// Liegenschafts-Pflicht der Tickets entfällt - property_id wird optional).
+		const isPropertyIdRequired = () => {
+			const columns = db.prepare("PRAGMA table_info(tickets)").all() as { name: string; notnull: number }[];
+			return (columns.find((c) => c.name === "property_id")?.notnull ?? 0) === 1;
+		};
+		expect(isPropertyIdRequired()).toBe(false);
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(hasOccupantsColumn()).toBe(true);
+		expect(isPropertyIdRequired()).toBe(true);
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(hasOccupantsColumn()).toBe(false);
+		expect(isPropertyIdRequired()).toBe(false);
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

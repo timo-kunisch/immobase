@@ -18,7 +18,7 @@ import type { TicketMessage } from "@/data/types";
 export interface ReassignableTicket {
 	id: string;
 	title: string;
-	propertyName: string;
+	propertyName: string | null;
 }
 
 /** Ordnet eine bereits verknüpfte eingehende E-Mail einem anderen Ticket zu. */
@@ -68,7 +68,8 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 								<SelectContent>
 									{tickets.map((ticket) => (
 										<SelectItem key={ticket.id} value={ticket.id}>
-											{ticket.title} ({ticket.propertyName})
+											{ticket.title}
+											{ticket.propertyName ? ` (${ticket.propertyName})` : ""}
 										</SelectItem>
 									))}
 								</SelectContent>

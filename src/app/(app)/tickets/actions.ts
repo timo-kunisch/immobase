@@ -36,7 +36,8 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 	const user = await requireUser();
 	const t = await getT();
 	const id = getString(formData, "id");
-	const propertyId = getString(formData, "propertyId");
+	const propertyIdRaw = getString(formData, "propertyId");
+	const propertyId = propertyIdRaw === "none" ? null : propertyIdRaw || null;
 	const unitIdRaw = getString(formData, "unitId");
 	const unitId = unitIdRaw === "none" ? "" : unitIdRaw;
 	const title = getString(formData, "title");
@@ -44,9 +45,9 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 	const statusRaw = getString(formData, "status") as TicketStatus;
 	const contractorNotes = getString(formData, "contractorNotes");
 
-	if (!propertyId || !title) {
+	if (!title) {
 		return {
-			error: t("tickets.errors.missingPropertyOrTitle"),
+			error: t("tickets.errors.missingTitle"),
 		};
 	}
 
@@ -54,7 +55,8 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 
 	const data = {
 		propertyId,
-		unitId: unitId || null,
+		// Eine Einheit ist nur sinnvoll mit Liegenschaft wählbar.
+		unitId: propertyId ? unitId || null : null,
 		title,
 		description: description || null,
 		status,

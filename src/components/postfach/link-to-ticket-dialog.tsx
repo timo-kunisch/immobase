@@ -18,7 +18,7 @@ import type { TicketMessage } from "@/data/types";
 export interface LinkableTicket {
 	id: string;
 	title: string;
-	propertyName: string;
+	propertyName: string | null;
 }
 
 /** Heftet eine Postfach-E-Mail an ein bestehendes (nicht erledigtes) Ticket. */
@@ -60,7 +60,8 @@ export function LinkToTicketDialog({ message, tickets }: { message: TicketMessag
 								<SelectContent>
 									{tickets.map((ticket) => (
 										<SelectItem key={ticket.id} value={ticket.id}>
-											{ticket.title} ({ticket.propertyName})
+											{ticket.title}
+											{ticket.propertyName ? ` (${ticket.propertyName})` : ""}
 										</SelectItem>
 									))}
 								</SelectContent>

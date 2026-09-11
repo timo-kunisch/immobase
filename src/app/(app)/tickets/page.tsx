@@ -40,8 +40,6 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 			<SiteHeader title={t("tickets.title")} description={t("tickets.description")} actions={<TicketFormDialog properties={propertyList} units={unitList} />} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				{propertyList.length === 0 ? <p className="text-sm text-muted-foreground">{t("tickets.emptyProperties")}</p> : null}
-
 				{filterLabel ? (
 					<p className="text-sm text-muted-foreground">
 						{t("tickets.filteredBy")} <span className="font-medium text-foreground">{filterLabel}</span> ·{" "}
@@ -86,12 +84,16 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 															<ConfirmDeleteButton action={deleteTicketAction.bind(null, ticket.id)} confirmMessage={t("tickets.confirm.delete", { title: ticket.title })} />
 														</div>
 													</CardHeader>
-													<CardContent className="flex flex-col gap-3">
-														<p className="text-xs text-muted-foreground">
-															<Link href={`/liegenschaften#property-${ticket.propertyId}`} className="hover:text-foreground hover:underline">
+												<CardContent className="flex flex-col gap-3">
+													<p className="text-xs text-muted-foreground">
+														{ticket.property ? (
+															<Link href={`/liegenschaften#property-${ticket.property.id}`} className="hover:text-foreground hover:underline">
 																{ticket.property.name}
 															</Link>
-															{ticket.unit ? (
+														) : (
+															t("tickets.fields.noProperty")
+														)}
+														{ticket.unit ? (
 																<>
 																	{" · "}
 																	<Link href={`/einheiten#unit-${ticket.unit.id}`} className="hover:text-foreground hover:underline">

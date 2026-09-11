@@ -4,9 +4,8 @@ import { tickets as deTickets } from "../de/tickets";
 export const tickets: typeof deTickets = {
 	// Page header of the Kanban overview
 	title: "Tickets",
-	description: "Damage & maintenance per property/unit.",
+	description: "Damage & maintenance - optionally assigned to a property/unit.",
 	// Kanban overview
-	emptyProperties: "Create a property first in order to record tickets.",
 	filteredBy: "Filtered by:",
 	empty: "No tickets recorded yet.",
 	emptyColumn: "No tickets",
@@ -53,6 +52,7 @@ export const tickets: typeof deTickets = {
 	"fields.contractorNotes": "Contractor notes",
 	"fields.contractorNotesPlaceholder": "Feedback, appointments, spare parts…",
 	"fields.propertyPlaceholder": "Select property",
+	"fields.noProperty": "No specific property",
 	"fields.noUnit": "No specific unit",
 	"fields.ticket": "Ticket",
 	"fields.ticketPlaceholder": "Select ticket",
@@ -65,7 +65,7 @@ export const tickets: typeof deTickets = {
 	"actions.assign": "Assign",
 	// Dialogs
 	"dialog.editTitle": "Edit ticket",
-	"dialog.formDescription": "Record damage or maintenance tasks for a property or unit.",
+	"dialog.formDescription": "Record damage or maintenance tasks - optionally assigned to a property or unit.",
 	"dialog.reassignTitle": "Assign email to another ticket",
 	"dialog.reassignDescription": "The email \"{subject}\" will be removed from the current history and assigned to the selected ticket.",
 	// Confirmation dialogs
@@ -74,7 +74,7 @@ export const tickets: typeof deTickets = {
 	// Success messages
 	"success.replySent": "The email has been sent.",
 	// Error messages from the server actions
-	"errors.missingPropertyOrTitle": "Please select a property and enter a title.",
+	"errors.missingTitle": "Please enter a title.",
 	"errors.saveFailed": "The ticket could not be saved.",
 	"errors.statusFailed": "The status could not be changed.",
 	"errors.deleteFailed": "The ticket could not be deleted.",

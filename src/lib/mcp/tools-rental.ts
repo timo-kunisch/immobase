@@ -315,8 +315,8 @@ registerCrudTools<TicketInput>({
 	entity: "tickets",
 	entityLabel: "Ticket",
 	fields: {
-		propertyId: { type: "string", description: "ID der Liegenschaft" },
-		unitId: { type: "string", nullable: true, description: "ID der Einheit (optional)" },
+		propertyId: { type: "string", nullable: true, description: "ID der Liegenschaft (optional, null = Ticket ohne Objektbezug)" },
+		unitId: { type: "string", nullable: true, description: "ID der Einheit (optional, nur mit Liegenschaft sinnvoll)" },
 		title: { type: "string" },
 		description: { type: "string", nullable: true },
 		status: { type: "enum", values: TICKET_STATUS },
@@ -334,18 +334,20 @@ registerCrudTools<TicketInput>({
 		}),
 	get: (id) => findTicket(id),
 	beforeCreate: (input) => {
-		if (!getProperty(input.propertyId)) return "Die angegebene Liegenschaft existiert nicht.";
+		if (input.propertyId && !getProperty(input.propertyId)) return "Die angegebene Liegenschaft existiert nicht.";
 		if (input.unitId && !getUnit(input.unitId)) return "Die angegebene Einheit existiert nicht.";
 		return null;
 	},
 	beforeUpdate: (_id, input) => {
-		if (!getProperty(input.propertyId)) return "Die angegebene Liegenschaft existiert nicht.";
+		if (input.propertyId && !getProperty(input.propertyId)) return "Die angegebene Liegenschaft existiert nicht.";
 		if (input.unitId && !getUnit(input.unitId)) return "Die angegebene Einheit existiert nicht.";
 		return null;
 	},
 	create: (input) =>
 		createTicket({
 			...input,
+			// Eine Einheit ist nur mit Liegenschaft sinnvoll.
+			unitId: input.propertyId ? input.unitId : null,
 			resolvedAt: input.status === "DONE" ? new Date().toISOString() : null,
 		}),
 	update: (id, input) => {
@@ -466,7 +468,7 @@ registerTool({
 	description: "Wandelt eine Postfach-E-Mail in ein neues Ticket um (Status OPEN) und ordnet die E-Mail dem Ticket als ersten Verlauf-Eintrag zu.",
 	inputSchema: buildInputSchema({
 		messageId: { type: "string", description: "ID der E-Mail im Postfach" },
-		propertyId: { type: "string", description: "ID der Liegenschaft" },
+		propertyId: { type: "string", nullable: true, description: "ID der Liegenschaft (optional, null = Ticket ohne Objektbezug)" },
 		unitId: { type: "string", nullable: true, description: "ID der Einheit (optional)" },
 		title: { type: "string", description: "Titel des Tickets (z. B. Betreff der E-Mail)" },
 		description: { type: "string", nullable: true },
@@ -475,7 +477,7 @@ registerTool({
 		const input = coerceArgs(
 			{
 				messageId: { type: "string" },
-				propertyId: { type: "string" },
+				propertyId: { type: "string", nullable: true },
 				unitId: { type: "string", nullable: true },
 				title: { type: "string" },
 				description: { type: "string", nullable: true },
@@ -485,11 +487,13 @@ registerTool({
 		const message = getTicketMessage(input.messageId as string);
 		if (!message || message.direction !== "INBOUND") throw new McpToolError("Die E-Mail wurde nicht gefunden.");
 		if (message.ticketId) throw new McpToolError("Diese E-Mail ist bereits einem Ticket zugeordnet.");
-		if (!getProperty(input.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
+		if (input.propertyId && !getProperty(input.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
 		if (input.unitId && !getUnit(input.unitId as string)) throw new McpToolError("Die angegebene Einheit existiert nicht.");
+		const propertyId = (input.propertyId as string) ?? null;
 		return convertMessageToTicket(message.id, {
-			propertyId: input.propertyId as string,
-			unitId: (input.unitId as string) ?? null,
+			propertyId,
+			// Eine Einheit ist nur mit Liegenschaft sinnvoll.
+			unitId: propertyId ? ((input.unitId as string) ?? null) : null,
 			title: input.title as string,
 			description: (input.description as string) ?? null,
 			status: "OPEN",

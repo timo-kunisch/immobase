@@ -121,11 +121,15 @@ export default async function DashboardPage() {
 									<li key={ticket.id} className="flex items-center justify-between gap-4 px-6 py-3">
 										<div>
 											<p className="text-sm font-medium">{ticket.title}</p>
-											<p className="text-xs text-muted-foreground">
-												<Link href={`/liegenschaften#property-${ticket.propertyId}`} className="hover:text-foreground hover:underline">
+										<p className="text-xs text-muted-foreground">
+											{ticket.property ? (
+												<Link href={`/liegenschaften#property-${ticket.property.id}`} className="hover:text-foreground hover:underline">
 													{ticket.property.name}
 												</Link>
-												{ticket.unit ? (
+											) : (
+												t("tickets.fields.noProperty")
+											)}
+											{ticket.unit ? (
 													<>
 														{" · "}
 														<Link href={`/einheiten#unit-${ticket.unit.id}`} className="hover:text-foreground hover:underline">

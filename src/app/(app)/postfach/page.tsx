@@ -33,7 +33,7 @@ export default async function PostfachPage() {
 	const linkableTickets = configured
 		? listTickets()
 				.filter((ticket) => ticket.status !== "DONE")
-				.map((ticket) => ({ id: ticket.id, title: ticket.title, propertyName: ticket.property.name }))
+				.map((ticket) => ({ id: ticket.id, title: ticket.title, propertyName: ticket.property?.name ?? null }))
 		: [];
 
 	return (

@@ -32,7 +32,7 @@ export function TicketFormDialog({
 	const { t } = useI18n();
 	const isEdit = Boolean(ticket);
 	const [open, setOpen] = useState(false);
-	const [propertyId, setPropertyId] = useState(ticket?.propertyId ?? defaultPropertyId ?? properties[0]?.id ?? "");
+	const [propertyId, setPropertyId] = useState(ticket ? (ticket.propertyId ?? "none") : (defaultPropertyId ?? properties[0]?.id ?? "none"));
 	const [state, formAction, isPending] = useActionState(saveTicketAction, initialActionState);
 
 	useEffect(() => {
@@ -51,7 +51,7 @@ export function TicketFormDialog({
 						<Pencil className="size-4" />
 					</Button>
 				) : (
-					<Button type="button" disabled={properties.length === 0}>
+					<Button type="button">
 						<Plus />
 						{t("tickets.actions.new")}
 					</Button>
@@ -69,12 +69,13 @@ export function TicketFormDialog({
 					<div className="grid gap-4 py-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="propertyId">{t("common.property")} *</Label>
-								<Select name="propertyId" value={propertyId} onValueChange={setPropertyId} required>
+								<Label htmlFor="propertyId">{t("common.property")} ({t("common.optional")})</Label>
+								<Select name="propertyId" value={propertyId} onValueChange={setPropertyId}>
 									<SelectTrigger id="propertyId" className="w-full">
 										<SelectValue placeholder={t("tickets.fields.propertyPlaceholder")} />
 									</SelectTrigger>
 									<SelectContent>
+										<SelectItem value="none">{t("tickets.fields.noProperty")}</SelectItem>
 										{properties.map((property) => (
 											<SelectItem key={property.id} value={property.id}>
 												{property.name}

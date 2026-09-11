@@ -90,7 +90,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	// Andere offene Tickets als Ziel für „Anderem Ticket zuordnen".
 	const reassignTickets = listTickets()
 		.filter((other) => other.id !== ticket.id && other.status !== "DONE")
-		.map((other) => ({ id: other.id, title: other.title, propertyName: other.property.name }));
+		.map((other) => ({ id: other.id, title: other.title, propertyName: other.property?.name ?? null }));
 
 	// Vorbefüllung der Antwort aus der letzten eingehenden E-Mail.
 	const lastInbound = [...messages].reverse().find((message) => message.direction === "INBOUND");
@@ -128,12 +128,16 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 							<TicketStatusSelect ticketId={ticket.id} status={ticket.status} />
 						</div>
 					</CardHeader>
-					<CardContent className="flex flex-col gap-2">
-						<p className="text-sm text-muted-foreground">
-							<Link href={`/liegenschaften#property-${ticket.propertyId}`} className="hover:text-foreground hover:underline">
+				<CardContent className="flex flex-col gap-2">
+					<p className="text-sm text-muted-foreground">
+						{ticket.property ? (
+							<Link href={`/liegenschaften#property-${ticket.property.id}`} className="hover:text-foreground hover:underline">
 								{ticket.property.name}
 							</Link>
-							{ticket.unit ? (
+						) : (
+							t("tickets.fields.noProperty")
+						)}
+						{ticket.unit ? (
 								<>
 									{" · "}
 									<Link href={`/einheiten#unit-${ticket.unit.id}`} className="hover:text-foreground hover:underline">

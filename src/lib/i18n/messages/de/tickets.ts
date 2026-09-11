@@ -8,9 +8,8 @@
 export const tickets = {
 	// Seitenkopf der Kanban-Übersicht
 	title: "Tickets",
-	description: "Schäden & Instandhaltung je Liegenschaft/Einheit.",
+	description: "Schäden & Instandhaltung - optional einer Liegenschaft/Einheit zugeordnet.",
 	// Kanban-Übersicht
-	emptyProperties: "Legen Sie zuerst eine Liegenschaft an, um Tickets erfassen zu können.",
 	filteredBy: "Gefiltert nach:",
 	empty: "Noch keine Tickets erfasst.",
 	emptyColumn: "Keine Tickets",
@@ -58,6 +57,7 @@ export const tickets = {
 	"fields.contractorNotes": "Handwerker-Notizen",
 	"fields.contractorNotesPlaceholder": "Rückmeldung, Termine, Ersatzteile…",
 	"fields.propertyPlaceholder": "Liegenschaft auswählen",
+	"fields.noProperty": "Keine bestimmte Liegenschaft",
 	"fields.noUnit": "Keine bestimmte Einheit",
 	"fields.ticket": "Ticket",
 	"fields.ticketPlaceholder": "Ticket auswählen",
@@ -70,7 +70,7 @@ export const tickets = {
 	"actions.assign": "Zuordnen",
 	// Dialoge
 	"dialog.editTitle": "Ticket bearbeiten",
-	"dialog.formDescription": "Schäden oder Instandhaltungsaufgaben einer Liegenschaft bzw. Einheit erfassen.",
+	"dialog.formDescription": "Schäden oder Instandhaltungsaufgaben erfassen - optional einer Liegenschaft bzw. Einheit zugeordnet.",
 	"dialog.reassignTitle": "E-Mail anderem Ticket zuordnen",
 	"dialog.reassignDescription":
 		"Die E-Mail „{subject}“ wird aus dem aktuellen Verlauf entfernt und dem ausgewählten Ticket zugeordnet.",
@@ -80,7 +80,7 @@ export const tickets = {
 	// Erfolgsmeldungen
 	"success.replySent": "Die E-Mail wurde versendet.",
 	// Fehlermeldungen aus den Server Actions
-	"errors.missingPropertyOrTitle": "Bitte wählen Sie eine Liegenschaft und vergeben Sie einen Titel.",
+	"errors.missingTitle": "Bitte vergeben Sie einen Titel.",
 	"errors.saveFailed": "Das Ticket konnte nicht gespeichert werden.",
 	"errors.statusFailed": "Status konnte nicht geändert werden.",
 	"errors.deleteFailed": "Das Ticket konnte nicht gelöscht werden.",

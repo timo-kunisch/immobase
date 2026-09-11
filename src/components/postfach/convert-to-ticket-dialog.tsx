@@ -23,7 +23,7 @@ import type { Property, TicketMessage, Unit } from "@/data/types";
 export function ConvertToTicketDialog({ message, properties, units }: { message: TicketMessage; properties: Property[]; units: Unit[] }) {
 	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
-	const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "");
+	const [propertyId, setPropertyId] = useState(properties[0]?.id ?? "none");
 	const [state, formAction, isPending] = useActionState(convertMessageToTicketAction, initialActionState);
 
 	useEffect(() => {
@@ -37,7 +37,7 @@ export function ConvertToTicketDialog({ message, properties, units }: { message:
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
 			<DialogTrigger asChild>
-				<Button type="button" variant="outline" size="sm" disabled={properties.length === 0}>
+				<Button type="button" variant="outline" size="sm">
 					<Wrench className="size-4" />
 					{t("tickets.mailbox.actions.convert")}
 				</Button>
@@ -54,12 +54,13 @@ export function ConvertToTicketDialog({ message, properties, units }: { message:
 					<div className="grid gap-4 py-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="propertyId">{t("common.property")} *</Label>
-								<Select name="propertyId" value={propertyId} onValueChange={setPropertyId} required>
+								<Label htmlFor="propertyId">{t("common.property")} ({t("common.optional")})</Label>
+								<Select name="propertyId" value={propertyId} onValueChange={setPropertyId}>
 									<SelectTrigger id="propertyId" className="w-full">
 										<SelectValue placeholder={t("tickets.fields.propertyPlaceholder")} />
 									</SelectTrigger>
 									<SelectContent>
+										<SelectItem value="none">{t("tickets.fields.noProperty")}</SelectItem>
 										{properties.map((property) => (
 											<SelectItem key={property.id} value={property.id}>
 												{property.name}

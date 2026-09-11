@@ -192,7 +192,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 			`SELECT t.id, t.title, t.status, t.contractor_notes AS contractorNotes, t.created_at AS createdAt,
 			        p.name AS propertyName, u.label AS unitLabel
 			 FROM tickets t
-			 JOIN properties p ON p.id = t.property_id
+			 LEFT JOIN properties p ON p.id = t.property_id
 			 LEFT JOIN units u ON u.id = t.unit_id
 			 ORDER BY t.created_at DESC
 			 LIMIT ${SCAN_LIMIT}`
@@ -203,7 +203,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 		status: string;
 		contractorNotes: string | null;
 		createdAt: string;
-		propertyName: string;
+		propertyName: string | null;
 		unitLabel: string | null;
 	}>;
 	add(
