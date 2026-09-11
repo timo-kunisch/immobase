@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createDocument, deleteDocument, getDocument } from "@/data/documents";
+import { createDocument, deleteDocument, getDocument, updateDocument } from "@/data/documents";
 import type { DocumentType } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
@@ -68,6 +68,42 @@ export async function uploadDocumentAction(_prevState: ActionState, formData: Fo
 	} catch (error) {
 		console.error("uploadDocumentAction failed", error);
 		return { error: t("documents.errors.uploadFailed") };
+	}
+
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/**
+ * Hochgeladene DMS-Dokumente bearbeiten: Dokumententyp und die Zuordnungen
+ * zu Liegenschaft/Einheit/Mieter anpassen (die Datei selbst bleibt
+ * unverändert). Nur für Quelle "DOCUMENT" - generierte Schreiben und
+ * Abrechnungs-PDFs leiten ihre Zuordnungen aus den Fachdaten ab.
+ */
+export async function updateDocumentAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	const id = getString(formData, "id");
+	const typeRaw = getString(formData, "type") as DocumentType;
+	const propertyId = getOptionalId(formData, "propertyId");
+	const unitId = getOptionalId(formData, "unitId");
+	const tenantId = getOptionalId(formData, "tenantId");
+
+	const document = getDocument(id);
+	if (!document) {
+		return { error: t("documents.errors.notFound") };
+	}
+
+	// Ungültige Typ-Fallbacks werden wie beim Upload verworfen ("OTHER");
+	// ungültige Zuordnungs-IDs scheitern am Foreign-Key-Constraint -> saveFailed.
+	const type: DocumentType = DOCUMENT_TYPES.includes(typeRaw) ? typeRaw : "OTHER";
+
+	try {
+		updateDocument(id, { propertyId, unitId, tenantId, type });
+		logActivity(user, "UPDATE", "dokumente", `Dokument „${document.fileName}“ bearbeitet`, id);
+	} catch (error) {
+		console.error("updateDocumentAction failed", error);
+		return { error: t("documents.errors.saveFailed") };
 	}
 
 	revalidatePath("/dokumente");

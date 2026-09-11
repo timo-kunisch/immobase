@@ -75,6 +75,28 @@ export function createDocument(input: DocumentInput): DocumentRecord {
 	return { id, ...input, ocrText: null, createdAt: timestamp, updatedAt: timestamp };
 }
 
+/** Änderbare Felder eines hochgeladenen DMS-Dokuments (Typ + Zuordnungen). */
+export interface DocumentUpdateInput {
+	propertyId: string | null;
+	unitId: string | null;
+	tenantId: string | null;
+	type: DocumentType;
+}
+
+/**
+ * Aktualisiert Dokumententyp und Zuordnungen eines hochgeladenen Dokuments -
+ * die Datei-Attribute (Name, Ablagepfad, Größe, OCR-Text) bleiben unberührt.
+ */
+export function updateDocument(id: string, input: DocumentUpdateInput): void {
+	getDb()
+		.prepare(
+			`UPDATE documents
+			 SET property_id = ?, unit_id = ?, tenant_id = ?, type = ?, updated_at = ?
+			 WHERE id = ?`
+		)
+		.run(input.propertyId, input.unitId, input.tenantId, input.type, now(), id);
+}
+
 export function deleteDocument(id: string): void {
 	getDb().prepare("DELETE FROM documents WHERE id = ?").run(id);
 }

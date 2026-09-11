@@ -75,7 +75,13 @@ export default async function DokumentePage({
 								<p>{query ? t("documents.emptySearch", { query }) : t("documents.empty")}</p>
 							</div>
 						) : (
-							<DocumentsTable rows={documentRows} postalConfigured={postalConfigured} />
+							<DocumentsTable
+								rows={documentRows}
+								postalConfigured={postalConfigured}
+								properties={propertyList}
+								units={unitList}
+								tenants={tenantList}
+							/>
 						)}
 					</CardContent>
 				</Card>

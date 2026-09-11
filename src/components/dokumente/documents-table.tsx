@@ -5,9 +5,11 @@ import { FileText } from "lucide-react";
 
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
+import { DocumentEditDialog } from "@/components/dokumente/document-edit-dialog";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import type { DocumentSourceType, UnifiedDocument } from "@/lib/documents-overview";
+import type { Property, Tenant, Unit } from "@/data/types";
 import { formatDate, formatFileSize } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n/translator";
@@ -52,7 +54,20 @@ const sourceTypes: DocumentSourceType[] = ["DOCUMENT", "GENERATED_DOCUMENT", "TE
  * Server-Seite lädt die per ?q=/?propertyId=/?unitId=/?tenantId=
  * vorgefilterte Vollliste.
  */
-export function DocumentsTable({ rows, postalConfigured }: { rows: DocumentRow[]; postalConfigured: boolean }) {
+export function DocumentsTable({
+	rows,
+	postalConfigured,
+	properties,
+	units,
+	tenants,
+}: {
+	rows: DocumentRow[];
+	postalConfigured: boolean;
+	/** Picker-Listen für den Bearbeiten-Dialog (nur Quelle "DOCUMENT"). */
+	properties: Property[];
+	units: Unit[];
+	tenants: Tenant[];
+}) {
 	const { t } = useI18n();
 
 	const columns: DataTableColumn<DocumentRow>[] = [
@@ -128,7 +143,7 @@ export function DocumentsTable({ rows, postalConfigured }: { rows: DocumentRow[]
 		{
 			key: "actions",
 			header: t("common.actions"),
-			headClassName: "w-[100px] text-right",
+			headClassName: "w-[132px] text-right",
 			cellClassName: "text-right",
 			cell: (row) => (
 				<div className="flex items-center justify-end gap-1">
@@ -137,6 +152,9 @@ export function DocumentsTable({ rows, postalConfigured }: { rows: DocumentRow[]
 						disabled={!postalConfigured || row.mimeType !== "application/pdf"}
 						disabledReason={!postalConfigured ? t("postal.notConfiguredShort") : t("documents.errors.onlyPdf")}
 					/>
+					{row.sourceType === "DOCUMENT" ? (
+						<DocumentEditDialog row={row} properties={properties} units={units} tenants={tenants} />
+					) : null}
 					{row.sourceType !== "TENANT_STATEMENT" && row.sourceType !== "HOA_ANNUAL_STATEMENT" ? (
 						<ConfirmDeleteButton
 							action={deleteAnyDocumentAction.bind(null, row.sourceType, row.id)}
