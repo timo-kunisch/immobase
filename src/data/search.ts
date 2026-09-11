@@ -134,13 +134,25 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 	// --- Mieter ---------------------------------------------------------------
 	const tenantRows = getDb()
 		.prepare(
-			`SELECT id, first_name AS firstName, last_name AS lastName, email, phone, notes
+			`SELECT id, first_name AS firstName, last_name AS lastName,
+			        street, zip_code AS zipCode, city, country, email, phone, notes
 			 FROM tenants ORDER BY last_name, first_name`
 		)
-		.all() as Array<{ id: string; firstName: string; lastName: string; email: string | null; phone: string | null; notes: string | null }>;
+		.all() as Array<{
+		id: string;
+		firstName: string;
+		lastName: string;
+		street: string | null;
+		zipCode: string | null;
+		city: string | null;
+		country: string | null;
+		email: string | null;
+		phone: string | null;
+		notes: string | null;
+	}>;
 	add(
 		collectMatches(trimmed, tenantRows, limit, (row) => ({
-			haystack: hay(row.firstName, row.lastName, row.email, row.phone, row.notes),
+			haystack: hay(row.firstName, row.lastName, row.street, row.zipCode, row.city, row.country, row.email, row.phone, row.notes),
 			result: {
 				type: "tenant",
 				id: row.id,

@@ -34,7 +34,7 @@ import { createPostalShipment } from "@/data/postal-shipments";
 import { createLease, createRentAdjustment, listLeasesWithDetails } from "@/data/leases";
 import { createProperty, deleteProperty, getProperty, getPropertyStats, listProperties, updateProperty } from "@/data/properties";
 import { insertSession, deleteAllSessionsForUser, getSessionByToken } from "@/data/sessions";
-import { createTenant } from "@/data/tenants";
+import { createTenant, getTenant, listTenants, updateTenant } from "@/data/tenants";
 import { listRentArrearAmounts } from "@/data/dashboard";
 import { createTransaction, generateDueTransactions, listOpenTransactionArrearAmounts, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
 import { createUnit } from "@/data/units";
@@ -143,6 +143,56 @@ describe("properties", () => {
 		getDb().prepare("DELETE FROM units WHERE id = ?").run(unit.id);
 		deleteProperty(property.id);
 		expect(listProperties()).toHaveLength(0);
+	});
+});
+
+describe("tenants", () => {
+	it("CRUD-Roundtrip inkl. optionaler Postanschrift", () => {
+		// Anlegen mit vollständiger Postanschrift ...
+		const tenant = createTenant({
+			firstName: "Erika",
+			lastName: "Muster",
+			street: "Wohnweg 5",
+			zipCode: "54321",
+			city: "Hamburg",
+			country: "Deutschland",
+			email: "erika@example.org",
+			phone: null,
+			notes: null,
+		});
+		expect(getTenant(tenant.id)).toMatchObject({
+			street: "Wohnweg 5",
+			zipCode: "54321",
+			city: "Hamburg",
+			country: "Deutschland",
+		});
+		expect(listTenants()[0].city).toBe("Hamburg");
+
+		// ... Bearbeiten leert die Postanschrift (Zustellung wieder an die Einheit) ...
+		updateTenant(tenant.id, {
+			firstName: "Erika",
+			lastName: "Muster",
+			street: null,
+			zipCode: null,
+			city: null,
+			country: null,
+			email: null,
+			phone: null,
+			notes: null,
+		});
+		expect(getTenant(tenant.id)?.street).toBeNull();
+		expect(getTenant(tenant.id)?.city).toBeNull();
+
+		// ... und Ausbleiben einzelner Adressfelder wird zu NULL normalisiert.
+		const partial = createTenant({
+			firstName: "Paul",
+			lastName: "Teil",
+			zipCode: "12345",
+			email: null,
+			phone: null,
+			notes: null,
+		});
+		expect(getTenant(partial.id)).toMatchObject({ street: null, zipCode: "12345", city: null, country: null });
 	});
 });
 

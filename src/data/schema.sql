@@ -611,7 +611,7 @@ CREATE TABLE tenants (
 	notes text,
 	created_at text NOT NULL,
 	updated_at text NOT NULL
-);
+, street text, zip_code text, city text, country text);
 
 CREATE TABLE ticket_activity_log (
 	id text PRIMARY KEY NOT NULL,

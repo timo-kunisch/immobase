@@ -203,6 +203,10 @@ registerCrudTools<TenantInput>({
 	fields: {
 		firstName: { type: "string" },
 		lastName: { type: "string" },
+		street: { type: "string", nullable: true, description: "Postanschrift: Straße & Hausnummer (null = Zustellung an die gemietete Einheit)" },
+		zipCode: { type: "string", nullable: true, description: "Postanschrift: PLZ" },
+		city: { type: "string", nullable: true, description: "Postanschrift: Stadt" },
+		country: { type: "string", nullable: true, description: "Postanschrift: Land" },
 		email: { type: "string", nullable: true },
 		phone: { type: "string", nullable: true },
 		notes: { type: "string", nullable: true },

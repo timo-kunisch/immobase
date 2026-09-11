@@ -62,12 +62,32 @@ export function TenantFormDialog({ tenant }: { tenant?: Tenant }) {
 							</div>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="email">{t("common.email")}</Label>
-							<Input id="email" name="email" type="email" defaultValue={tenant?.email ?? ""} />
+							<Label htmlFor="street">{t("tenants.fields.street")}</Label>
+							<Input id="street" name="street" defaultValue={tenant?.street ?? ""} />
+						</div>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="grid gap-2">
+								<Label htmlFor="zipCode">{t("tenants.fields.zipCode")}</Label>
+								<Input id="zipCode" name="zipCode" defaultValue={tenant?.zipCode ?? ""} />
+							</div>
+							<div className="grid gap-2">
+								<Label htmlFor="city">{t("tenants.fields.city")}</Label>
+								<Input id="city" name="city" defaultValue={tenant?.city ?? ""} />
+							</div>
 						</div>
 						<div className="grid gap-2">
-							<Label htmlFor="phone">{t("common.phone")}</Label>
-							<Input id="phone" name="phone" defaultValue={tenant?.phone ?? ""} />
+							<Label htmlFor="country">{t("tenants.fields.country")}</Label>
+							<Input id="country" name="country" defaultValue={tenant?.country ?? t("tenants.fields.countryDefault")} />
+						</div>
+						<div className="grid grid-cols-2 gap-4">
+							<div className="grid gap-2">
+								<Label htmlFor="email">{t("common.email")}</Label>
+								<Input id="email" name="email" type="email" defaultValue={tenant?.email ?? ""} />
+							</div>
+							<div className="grid gap-2">
+								<Label htmlFor="phone">{t("common.phone")}</Label>
+								<Input id="phone" name="phone" defaultValue={tenant?.phone ?? ""} />
+							</div>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="notes">{t("common.notes")}</Label>

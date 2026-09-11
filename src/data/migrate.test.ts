@@ -144,11 +144,11 @@ describe("migrateDatabase", () => {
 		db.prepare("INSERT INTO tickets (id, title, status, created_at, updated_at) VALUES ('t2', 'Organisatorisch', 'OPEN', '2026-01-04', '2026-01-04')").run();
 
 		// ... das Down schlägt dafür bewusst mit Constraint-Fehler fehl und
-		// lässt die Datenbank auf Version 15 stehen (0019, 0018, 0017 und
-		// 0016 wurden zuvor erfolgreich zurückgenommen, 0015 bleibt
+		// lässt die Datenbank auf Version 15 stehen (0020, 0019, 0018, 0017
+		// und 0016 wurden zuvor erfolgreich zurückgenommen, 0015 bleibt
 		// unverändert erhalten).
-		expect(() => migrateDatabaseDown(db, 5)).toThrow();
-		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 4);
+		expect(() => migrateDatabaseDown(db, 6)).toThrow();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 5);
 		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
 	});
 });
@@ -156,18 +156,18 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0019:
-		// Dokumenten-Papierkorb - Spalte documents.deleted_at fällt weg).
-		expect(columnNames(db, "documents")).toContain("deleted_at");
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0020:
+		// Postanschrift der Mieter - Spalte tenants.street fällt weg).
+		expect(columnNames(db, "tenants")).toContain("street");
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(columnNames(db, "documents")).not.toContain("deleted_at");
+		expect(columnNames(db, "tenants")).not.toContain("street");
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(columnNames(db, "documents")).toContain("deleted_at");
+		expect(columnNames(db, "tenants")).toContain("street");
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

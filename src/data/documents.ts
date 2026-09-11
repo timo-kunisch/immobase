@@ -29,7 +29,9 @@ const UNIT_COLUMNS = `
 `;
 
 const TENANT_COLUMNS = `
-	id, first_name AS firstName, last_name AS lastName, email, phone, notes,
+	id, first_name AS firstName, last_name AS lastName,
+	street, zip_code AS zipCode, city, country,
+	email, phone, notes,
 	created_at AS createdAt, updated_at AS updatedAt
 `;
 

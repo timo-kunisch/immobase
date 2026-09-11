@@ -38,6 +38,17 @@ export function TenantsTable({ rows }: { rows: TenantRow[] }) {
 			cell: (row) => <span className="text-muted-foreground">{[row.email, row.phone].filter(Boolean).join(" · ") || "–"}</span>,
 		},
 		{
+			key: "address",
+			header: t("tenants.table.address"),
+			sortValue: (row) => `${row.street ?? ""} ${row.zipCode ?? ""} ${row.city ?? ""}`.trim(),
+			filter: { type: "text", value: (row) => [row.street, [row.zipCode, row.city].filter(Boolean).join(" "), row.country].filter(Boolean).join(", ") },
+			cell: (row) => {
+				const cityLine = [row.zipCode, row.city].filter(Boolean).join(" ");
+				const parts = [row.street, cityLine].filter(Boolean).join(", ");
+				return <span className="text-muted-foreground">{parts || "–"}</span>;
+			},
+		},
+		{
 			key: "linked",
 			header: t("tenants.table.linked"),
 			cell: (row) => (

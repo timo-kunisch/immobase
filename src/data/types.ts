@@ -49,6 +49,11 @@ export interface Tenant {
 	id: string;
 	firstName: string;
 	lastName: string;
+	/** Postanschrift (optional; NULL = Zustellung an die Adresse der gemieteten Einheit). */
+	street: string | null;
+	zipCode: string | null;
+	city: string | null;
+	country: string | null;
 	email: string | null;
 	phone: string | null;
 	notes: string | null;

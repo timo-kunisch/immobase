@@ -537,14 +537,17 @@ async function buildAndSaveStatementPdf(data: TenantStatementPdfData): Promise<A
 	const settings = getCompanySettings();
 	const senderLines = companySettingsToAddressLines(settings);
 
+	// Empfänger: die Postanschrift des Mieters, wenn vollständig hinterlegt
+	// (z. B. nach einem Auszug), sonst die Adresse der gemieteten Einheit.
+	const postalAddress =
+		data.tenant.street && data.tenant.zipCode && data.tenant.city
+			? [data.tenant.street, `${data.tenant.zipCode} ${data.tenant.city}`]
+			: [data.unitProperty.street, `${data.unitProperty.zipCode} ${data.unitProperty.city}`];
+
 	const pdfBuffer = await generateBillingStatementPdf({
 		senderLines,
 		senderAdditional: settings.additional,
-		recipientLines: [
-			`${data.tenant.firstName} ${data.tenant.lastName}`,
-			data.unitProperty.street,
-			`${data.unitProperty.zipCode} ${data.unitProperty.city}`,
-		],
+		recipientLines: [`${data.tenant.firstName} ${data.tenant.lastName}`, ...postalAddress],
 		dateLine: formatDate(new Date()),
 		propertyName: data.property.name,
 		periodFrom: new Date(data.billingPeriod.periodFrom),

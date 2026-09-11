@@ -25,6 +25,9 @@ type TemplateLease = {
 type TemplateTenant = {
 	firstName: string;
 	lastName: string;
+	street?: string | null;
+	zipCode?: string | null;
+	city?: string | null;
 	email: string | null;
 	phone: string | null;
 };
@@ -66,6 +69,10 @@ export const AVAILABLE_PLACEHOLDERS: PlaceholderGroup[] = [
 			{ key: "mieter.vorname", labelKey: "templates.placeholders.mieter.vorname" },
 			{ key: "mieter.nachname", labelKey: "templates.placeholders.mieter.nachname" },
 			{ key: "mieter.name", labelKey: "templates.placeholders.mieter.name" },
+			{ key: "mieter.strasse", labelKey: "templates.placeholders.mieter.strasse" },
+			{ key: "mieter.plz", labelKey: "templates.placeholders.mieter.plz" },
+			{ key: "mieter.ort", labelKey: "templates.placeholders.mieter.ort" },
+			{ key: "mieter.adresse", labelKey: "templates.placeholders.mieter.adresse" },
 			{ key: "mieter.email", labelKey: "templates.placeholders.mieter.email" },
 			{ key: "mieter.telefon", labelKey: "templates.placeholders.mieter.telefon" },
 		],
@@ -117,6 +124,11 @@ function buildPlaceholderValues(context: TemplateContext): Record<string, string
 		"mieter.vorname": tenant?.firstName ?? "",
 		"mieter.nachname": tenant?.lastName ?? "",
 		"mieter.name": tenant != null ? `${tenant.firstName} ${tenant.lastName}` : "",
+		"mieter.strasse": tenant?.street ?? "",
+		"mieter.plz": tenant?.zipCode ?? "",
+		"mieter.ort": tenant?.city ?? "",
+		"mieter.adresse":
+			tenant?.street != null ? [tenant.street, [tenant.zipCode, tenant.city].filter(Boolean).join(" ")].filter(Boolean).join(", ") : "",
 		"mieter.email": tenant?.email ?? "",
 		"mieter.telefon": tenant?.phone ?? "",
 

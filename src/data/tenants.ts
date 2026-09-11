@@ -9,13 +9,20 @@ import type { Tenant } from "./types";
  */
 
 const TENANT_COLUMNS = `
-	id, first_name AS firstName, last_name AS lastName, email, phone, notes,
+	id, first_name AS firstName, last_name AS lastName,
+	street, zip_code AS zipCode, city, country,
+	email, phone, notes,
 	created_at AS createdAt, updated_at AS updatedAt
 `;
 
 export interface TenantInput {
 	firstName: string;
 	lastName: string;
+	/** Postanschrift (optional; null = keine hinterlegt, s. Tenant). */
+	street?: string | null;
+	zipCode?: string | null;
+	city?: string | null;
+	country?: string | null;
 	email: string | null;
 	phone: string | null;
 	notes: string | null;
@@ -35,23 +42,40 @@ export function getTenant(id: string): Tenant | null {
 export function createTenant(input: TenantInput): Tenant {
 	const id = newId();
 	const timestamp = now();
+	const street = input.street ?? null;
+	const zipCode = input.zipCode ?? null;
+	const city = input.city ?? null;
+	const country = input.country ?? null;
 	getDb()
 		.prepare(
-			`INSERT INTO tenants (id, first_name, last_name, email, phone, notes, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO tenants (id, first_name, last_name, street, zip_code, city, country, email, phone, notes, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
-		.run(id, input.firstName, input.lastName, input.email, input.phone, input.notes, timestamp, timestamp);
-	return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
+		.run(id, input.firstName, input.lastName, street, zipCode, city, country, input.email, input.phone, input.notes, timestamp, timestamp);
+	return { id, ...input, street, zipCode, city, country, createdAt: timestamp, updatedAt: timestamp };
 }
 
 export function updateTenant(id: string, input: TenantInput): void {
 	getDb()
 		.prepare(
 			`UPDATE tenants
-			 SET first_name = ?, last_name = ?, email = ?, phone = ?, notes = ?, updated_at = ?
+			 SET first_name = ?, last_name = ?, street = ?, zip_code = ?, city = ?, country = ?,
+				 email = ?, phone = ?, notes = ?, updated_at = ?
 			 WHERE id = ?`
 		)
-		.run(input.firstName, input.lastName, input.email, input.phone, input.notes, now(), id);
+		.run(
+			input.firstName,
+			input.lastName,
+			input.street ?? null,
+			input.zipCode ?? null,
+			input.city ?? null,
+			input.country ?? null,
+			input.email,
+			input.phone,
+			input.notes,
+			now(),
+			id
+		);
 }
 
 export function deleteTenant(id: string): void {

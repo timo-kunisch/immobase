@@ -19,6 +19,10 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 	const id = getString(formData, "id");
 	const firstName = getString(formData, "firstName");
 	const lastName = getString(formData, "lastName");
+	const street = getString(formData, "street");
+	const zipCode = getString(formData, "zipCode");
+	const city = getString(formData, "city");
+	const country = getString(formData, "country");
 	const email = getString(formData, "email");
 	const phone = getString(formData, "phone");
 	const notes = getString(formData, "notes");
@@ -30,6 +34,10 @@ export async function saveTenantAction(_prevState: ActionState, formData: FormDa
 	const data = {
 		firstName,
 		lastName,
+		street: street || null,
+		zipCode: zipCode || null,
+		city: city || null,
+		country: country || null,
 		email: email || null,
 		phone: phone || null,
 		notes: notes || null,

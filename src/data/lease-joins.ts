@@ -33,6 +33,7 @@ export const UNIT_PROPERTY_COLUMNS = `
 /** SELECT-Fragment: Mieter (Tabellen-Alias t). */
 export const TENANT_COLUMNS = `
 	t.first_name AS tenantFirstName, t.last_name AS tenantLastName,
+	t.street AS tenantStreet, t.zip_code AS tenantZipCode, t.city AS tenantCity, t.country AS tenantCountry,
 	t.email AS tenantEmail, t.phone AS tenantPhone, t.notes AS tenantNotes,
 	t.created_at AS tenantCreatedAt, t.updated_at AS tenantUpdatedAt
 `;
@@ -61,6 +62,10 @@ export interface UnitPropertyJoinRow {
 export interface TenantJoinRow {
 	tenantFirstName: string;
 	tenantLastName: string;
+	tenantStreet: string | null;
+	tenantZipCode: string | null;
+	tenantCity: string | null;
+	tenantCountry: string | null;
 	tenantEmail: string | null;
 	tenantPhone: string | null;
 	tenantNotes: string | null;
@@ -100,6 +105,10 @@ export function mapTenant(tenantId: string, row: TenantJoinRow): Tenant {
 		id: tenantId,
 		firstName: row.tenantFirstName,
 		lastName: row.tenantLastName,
+		street: row.tenantStreet,
+		zipCode: row.tenantZipCode,
+		city: row.tenantCity,
+		country: row.tenantCountry,
 		email: row.tenantEmail,
 		phone: row.tenantPhone,
 		notes: row.tenantNotes,

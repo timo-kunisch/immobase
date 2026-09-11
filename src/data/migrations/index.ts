@@ -17,6 +17,7 @@ import { migration0016 } from "./0016_remove_ticket_contractor_notes.ts";
 import { migration0017 } from "./0017_ticket_activity_log.ts";
 import { migration0018 } from "./0018_mailbox_hidden.ts";
 import { migration0019 } from "./0019_documents_trash.ts";
+import { migration0020 } from "./0020_tenant_postal_address.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -45,4 +46,5 @@ export const migrations: Migration[] = [
 	migration0017,
 	migration0018,
 	migration0019,
+	migration0020,
 ];
