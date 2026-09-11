@@ -1,24 +1,17 @@
-import Link from "next/link";
-import { Calculator, ChevronRight, Scale } from "lucide-react";
+import { Calculator, Scale } from "lucide-react";
 
 import { getCostItemCountsByPeriod, listBillingPeriods, listPropertiesSortedByName } from "@/data/billing";
 import { listCustomAllocationKeysWithWeights } from "@/data/custom-allocation-keys";
 import { listUnits } from "@/data/units";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { BillingPeriodsTable, type BillingPeriodRow } from "@/components/abrechnung/billing-periods-table";
 import { BillingPeriodFormDialog } from "@/components/abrechnung/billing-period-form-dialog";
 import { BillingPropertyFilter } from "@/components/abrechnung/billing-property-filter";
+import { CustomAllocationKeysTable } from "@/components/abrechnung/custom-allocation-keys-table";
 import { CustomAllocationKeyFormDialog } from "@/components/abrechnung/custom-allocation-key-form-dialog";
-import { CustomAllocationWeightsDialog } from "@/components/abrechnung/custom-allocation-weights-dialog";
-import { formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { billingPeriodStatusStyles } from "@/lib/billing";
-
-import { deleteBillingPeriodAction, deleteCustomAllocationKeyAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +21,14 @@ export default async function AbrechnungPage({ searchParams }: { searchParams: P
 
 	const billingPeriodList = listBillingPeriods(propertyId ? { propertyId } : undefined);
 	const propertyList = listPropertiesSortedByName();
+
+	// Anzahl der Kostenpositionen je Periode wird serverseitig aufgelöst und
+	// in die Zeilen eingebettet (Maps sind als Client-Props nicht serialisierbar).
 	const costItemCountMap = getCostItemCountsByPeriod();
+	const rows: BillingPeriodRow[] = billingPeriodList.map((billingPeriod) => ({
+		...billingPeriod,
+		costItemCount: costItemCountMap.get(billingPeriod.id) ?? 0,
+	}));
 
 	// Umlageschlüssel + Einheiten werden nur für die ausgewählte Liegenschaft
 	// benötigt (ohne Auswahl wird keine Verwaltungs-Tabelle gerendert).
@@ -64,54 +64,7 @@ export default async function AbrechnungPage({ searchParams }: { searchParams: P
 										<p>{propertyId ? t("billing.empty.periodsFiltered") : t("billing.empty.periods")}</p>
 									</div>
 								) : (
-									<Table>
-										<TableHeader>
-											<TableRow>
-												<TableHead>{t("common.property")}</TableHead>
-												<TableHead>{t("billing.table.period")}</TableHead>
-												<TableHead>{t("billing.table.costItems")}</TableHead>
-												<TableHead>{t("common.status")}</TableHead>
-												<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
-											</TableRow>
-										</TableHeader>
-										<TableBody>
-											{billingPeriodList.map((billingPeriod) => (
-												<TableRow key={billingPeriod.id} id={`billing-period-${billingPeriod.id}`}>
-													<TableCell className="font-medium">
-														<Link href={`/liegenschaften#property-${billingPeriod.propertyId}`} className="hover:underline">
-															{billingPeriod.propertyName}
-														</Link>
-													</TableCell>
-													<TableCell className="text-muted-foreground">
-														{formatDate(billingPeriod.periodFrom)} – {formatDate(billingPeriod.periodTo)}
-													</TableCell>
-													<TableCell className="text-muted-foreground">{costItemCountMap.get(billingPeriod.id) ?? 0}</TableCell>
-													<TableCell>
-														<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${billingPeriodStatusStyles[billingPeriod.status]}`}>
-															{t(`billing.status.${billingPeriod.status}`)}
-														</span>
-													</TableCell>
-													<TableCell>
-														<div className="flex items-center justify-end gap-1">
-															<Button variant="ghost" size="icon-sm" aria-label={t("common.details")} title={t("common.details")} asChild>
-																<Link href={`/abrechnung/${billingPeriod.id}`}>
-																	<ChevronRight className="size-4" />
-																</Link>
-															</Button>
-															{/* Finalisierte Perioden sind nicht mehr bearbeitbar, ihre Löschung
-															    bleibt aber möglich (inkl. aller erzeugten PDFs). */}
-															<ConfirmDeleteButton
-																action={deleteBillingPeriodAction.bind(null, billingPeriod.id)}
-																confirmMessage={t(
-																	billingPeriod.status === "DRAFT" ? "billing.confirm.deletePeriod" : "billing.confirm.deleteFinalizedPeriod"
-																)}
-															/>
-														</div>
-													</TableCell>
-												</TableRow>
-											))}
-										</TableBody>
-									</Table>
+									<BillingPeriodsTable rows={rows} />
 								)}
 							</CardContent>
 						</Card>
@@ -134,39 +87,7 @@ export default async function AbrechnungPage({ searchParams }: { searchParams: P
 											<p>{t("billing.allocationKeys.empty")}</p>
 										</div>
 									) : (
-										<Table>
-											<TableHeader>
-												<TableRow>
-													<TableHead>{t("billing.table.label")}</TableHead>
-													<TableHead>{t("common.notes")}</TableHead>
-													<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
-												</TableRow>
-											</TableHeader>
-											<TableBody>
-												{customAllocationKeys.map((key) => (
-													<TableRow key={key.id}>
-														<TableCell className="font-medium">{key.label}</TableCell>
-														<TableCell className="text-muted-foreground">{key.notes ?? "–"}</TableCell>
-														<TableCell>
-															<div className="flex items-center justify-end gap-1">
-																<CustomAllocationWeightsDialog
-																	propertyId={propertyId}
-																	customAllocationKeyId={key.id}
-																	customAllocationKeyLabel={key.label}
-																	units={unitList}
-																	weights={key.weights}
-																/>
-																<CustomAllocationKeyFormDialog propertyId={propertyId} customAllocationKey={key} />
-																<ConfirmDeleteButton
-																	action={deleteCustomAllocationKeyAction.bind(null, key.id)}
-																	confirmMessage={t("billing.allocationKeys.confirm.delete", { name: key.label })}
-																/>
-															</div>
-														</TableCell>
-													</TableRow>
-												))}
-											</TableBody>
-										</Table>
+										<CustomAllocationKeysTable propertyId={propertyId} rows={customAllocationKeys} units={unitList} />
 									)}
 								</CardContent>
 							</Card>

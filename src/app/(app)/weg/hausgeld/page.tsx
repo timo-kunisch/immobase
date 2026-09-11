@@ -1,46 +1,25 @@
 import { AlertTriangle, Wallet } from "lucide-react";
 
 import {
-	countHousingChargesForUnits,
-	listHousingChargesForUnitsPage,
+	listHousingChargesForUnits,
 	listHoasSortedByName,
 	listOpenHousingChargeArrearAmounts,
 	listOwnersSortedByLastName,
 	listUnitsForProperties,
 } from "@/data/housing-charges";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { PaginationBar } from "@/components/ui/pagination-bar";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { HousingChargeFormDialog } from "@/components/weg/housing-charge-form-dialog";
-import { MarkHousingChargePaidButton } from "@/components/weg/mark-housing-charge-paid-button";
+import { HousingChargesTable } from "@/components/weg/housing-charges-table";
 import { HoaFilter } from "@/components/weg/hoa-filter";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatCurrency } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { resolvePagination } from "@/lib/pagination";
-
-import { deleteHousingChargeAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
-const statusStyles: Record<string, string> = {
-	OPEN: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
-	PAID: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-	OVERDUE: "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400",
-	CANCELLED: "bg-muted text-muted-foreground",
-};
-
-export default async function HausgeldPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+export default async function HausgeldPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const t = await getT();
-	const { hoaId, page: pageParam } = await searchParams;
-
-	const statusLabels: Record<string, string> = {
-		OPEN: t("hoaFinance.charges.status.OPEN"),
-		PAID: t("hoaFinance.charges.status.PAID"),
-		OVERDUE: t("hoaFinance.charges.status.OVERDUE"),
-		CANCELLED: t("hoaFinance.charges.status.CANCELLED"),
-	};
+	const { hoaId } = await searchParams;
 
 	const hoaList = listHoasSortedByName();
 
@@ -62,11 +41,11 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 	const ownerList = listOwnersSortedByLastName();
 	const unitIds = units.map((u) => u.id);
 
-	// Paginierte Sollstellungs-Liste (wächst unbegrenzt, eine Seite = 50 Einträge).
-	const chargePagination = resolvePagination(pageParam, countHousingChargesForUnits(unitIds));
-	const chargeList = listHousingChargesForUnitsPage(unitIds, chargePagination);
+	// Vollständige Sollstellungs-Liste (Sortierung/Filterung/Pagination übernimmt
+	// die Client-Datentabelle inkl. Status-Select-Filter je Spalte).
+	const chargeList = listHousingChargesForUnits(unitIds);
 
-	// Rückstände über ALLE Sollstellungen (unabhängig von der angezeigten Seite).
+	// Rückstände über ALLE Sollstellungen (unabhängig vom Filter-Status).
 	const now = new Date();
 	const arrears = listOpenHousingChargeArrearAmounts(unitIds, now).reduce((sum, amount) => sum + Number(amount), 0);
 
@@ -96,51 +75,10 @@ export default async function HausgeldPage({ searchParams }: { searchParams: Pro
 								<p>{t("hoaFinance.charges.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										{!selectedHoa ? <TableHead>{t("hoaFinance.charges.table.hoa")}</TableHead> : null}
-										<TableHead>{t("hoaFinance.charges.table.ownerUnit")}</TableHead>
-										<TableHead>{t("hoaFinance.charges.table.purpose")}</TableHead>
-										<TableHead>{t("hoaFinance.charges.table.dueDate")}</TableHead>
-										<TableHead className="text-right">{t("common.amount")}</TableHead>
-										<TableHead>{t("common.status")}</TableHead>
-										<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{chargeList.map((charge) => {
-										const chargeHoa = charge.hoa;
-										return (
-											<TableRow key={charge.id}>
-												{!selectedHoa ? <TableCell className="text-muted-foreground">{chargeHoa?.name ?? "–"}</TableCell> : null}
-												<TableCell className="font-medium">
-													{charge.owner.firstName} {charge.owner.lastName}
-													<span className="block text-xs text-muted-foreground">{charge.unit.label}</span>
-												</TableCell>
-												<TableCell className="text-muted-foreground">{charge.purpose ?? "–"}</TableCell>
-												<TableCell className="text-muted-foreground">{formatDate(charge.dueDate)}</TableCell>
-												<TableCell className="text-right">{formatCurrency(charge.amount)}</TableCell>
-												<TableCell>
-													<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${statusStyles[charge.status]}`}>{statusLabels[charge.status]}</span>
-												</TableCell>
-												<TableCell>
-													<div className="flex items-center justify-end gap-1">
-														{charge.status !== "PAID" && chargeHoa ? <MarkHousingChargePaidButton housingChargeId={charge.id} hoaId={chargeHoa.id} /> : null}
-														{chargeHoa ? <HousingChargeFormDialog hoaId={chargeHoa.id} units={units} owners={ownerList} housingCharge={charge} /> : null}
-														{chargeHoa ? <ConfirmDeleteButton action={deleteHousingChargeAction.bind(null, charge.id, chargeHoa.id)} confirmMessage={t("hoaFinance.charges.confirm.delete")} /> : null}
-													</div>
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
+							<HousingChargesTable rows={chargeList} units={units} owners={ownerList} showHoaColumn={!selectedHoa} />
 						)}
 					</CardContent>
 				</Card>
-
-				<PaginationBar basePath="/weg/hausgeld" pagination={chargePagination} params={{ hoaId }} />
 			</div>
 		</div>
 	);

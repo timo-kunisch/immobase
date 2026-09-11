@@ -7,17 +7,11 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { GeneratedDocumentsTable } from "@/components/vorlagen/generated-documents-table";
 import { GenerateDocumentForm } from "@/components/vorlagen/generate-document-form";
-import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
-import { formatDate } from "@/lib/format";
-import { formatFileSize } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
 import { documentTemplateCategoryLabelKeys } from "@/lib/templates";
-
-import { deleteGeneratedDocumentAction, sendGeneratedDocumentByPostAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -70,50 +64,12 @@ export default async function VorlageDetailPage({ params }: { params: Promise<{ 
 								<p>{t("templates.generated.emptyForTemplate")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("templates.generated.table.subject")}</TableHead>
-										<TableHead>{t("common.tenant")}</TableHead>
-										<TableHead>{t("templates.generated.table.createdAt")}</TableHead>
-										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-									<TableBody>
-										{generatedDocumentList.map((document) => (
-											<TableRow key={document.id}>
-												<TableCell className="font-medium">
-													<a href={`/api/uploads/${document.filePath}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:underline">
-														<FileText className="size-4 text-muted-foreground" />
-														{document.subject || document.templateTitle}
-													</a>
-													<span className="block pl-6 text-xs text-muted-foreground">{formatFileSize(document.fileSize)}</span>
-												</TableCell>
-												<TableCell className="text-muted-foreground">
-													{document.tenant ? (
-														<Link href={`/mieter#tenant-${document.tenant.id}`} className="hover:underline">
-															{document.tenant.firstName} {document.tenant.lastName}
-														</Link>
-													) : (
-														"–"
-													)}
-												</TableCell>
-												<TableCell className="text-muted-foreground">{formatDate(document.createdAt)}</TableCell>
-												<TableCell>
-													<div className="flex items-center justify-end gap-1">
-													<SendByPostButton sendAction={sendGeneratedDocumentByPostAction.bind(null, document.id)} disabled={!postalConfigured} disabledReason={t("postal.notConfiguredShort")} />
-													<ConfirmDeleteButton action={deleteGeneratedDocumentAction.bind(null, document.id)} confirmMessage={t("templates.generated.confirmDelete")} />
-													</div>
-												</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
-							)}
-						</CardContent>
-					</Card>
-				</div>
+							<GeneratedDocumentsTable rows={generatedDocumentList} showTenantColumn showSendByPost postalConfigured={postalConfigured} />
+						)}
+					</CardContent>
+				</Card>
 			</div>
+		</div>
 		</div>
 	);
 }

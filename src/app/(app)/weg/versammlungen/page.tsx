@@ -1,38 +1,18 @@
-import Link from "next/link";
-import { CalendarDays, ChevronRight } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 import { listHoas, listOwnerMeetings } from "@/data/meetings";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { OwnerMeetingFormDialog } from "@/components/weg/owner-meeting-form-dialog";
+import { OwnerMeetingsTable } from "@/components/weg/owner-meetings-table";
 import { HoaFilter } from "@/components/weg/hoa-filter";
-import { formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { ownerMeetingStatusStyles } from "@/lib/hoa-meetings";
-
-import { deleteOwnerMeetingAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function VersammlungenListPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const t = await getT();
 	const { hoaId } = await searchParams;
-
-	const meetingTypeLabels: Record<string, string> = {
-		ORDINARY: t("hoaMeetings.meetingType.ORDINARY"),
-		EXTRAORDINARY: t("hoaMeetings.meetingType.EXTRAORDINARY"),
-		CIRCULATION: t("hoaMeetings.meetingType.CIRCULATION"),
-	};
-	const meetingStatusLabels: Record<string, string> = {
-		PLANNED: t("hoaMeetings.meetingStatus.PLANNED"),
-		INVITED: t("hoaMeetings.meetingStatus.INVITED"),
-		HELD: t("hoaMeetings.meetingStatus.HELD"),
-		MINUTES_FINALIZED: t("hoaMeetings.meetingStatus.MINUTES_FINALIZED"),
-		CANCELLED: t("hoaMeetings.meetingStatus.CANCELLED"),
-	};
 
 	const hoaList = listHoas();
 
@@ -49,6 +29,8 @@ export default async function VersammlungenListPage({ searchParams }: { searchPa
 
 	const selectedHoa = hoaId ? hoaList.find((h) => h.id === hoaId) : undefined;
 
+	// WEG-Filter (?hoaId=) bleibt serverseitig als Vorfilter wirksam;
+	// Sortierung/Filterung/Pagination übernimmt die Client-Datentabelle.
 	const meetingList = listOwnerMeetings(selectedHoa ? { hoaId: selectedHoa.id } : undefined);
 
 	return (
@@ -66,43 +48,7 @@ export default async function VersammlungenListPage({ searchParams }: { searchPa
 								<p>{t("hoaMeetings.meetings.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										{!selectedHoa ? <TableHead>{t("hoaMeetings.meetings.table.hoa")}</TableHead> : null}
-										<TableHead>{t("hoaMeetings.meetings.table.title")}</TableHead>
-										<TableHead>{t("hoaMeetings.meetings.table.type")}</TableHead>
-										<TableHead>{t("hoaMeetings.meetings.table.date")}</TableHead>
-										<TableHead>{t("common.status")}</TableHead>
-										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{meetingList.map((meeting) => (
-										<TableRow key={meeting.id} id={`meeting-${meeting.id}`}>
-											{!selectedHoa ? <TableCell className="text-muted-foreground">{meeting.hoaName}</TableCell> : null}
-											<TableCell className="font-medium">{meeting.title}</TableCell>
-											<TableCell className="text-muted-foreground">{meetingTypeLabels[meeting.type]}</TableCell>
-											<TableCell className="text-muted-foreground">{meeting.meetingDate ? formatDate(meeting.meetingDate) : "–"}</TableCell>
-											<TableCell>
-												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${ownerMeetingStatusStyles[meeting.status]}`}>
-													{meetingStatusLabels[meeting.status]}
-												</span>
-											</TableCell>
-											<TableCell>
-												<div className="flex items-center justify-end gap-1">
-													<Button variant="ghost" size="icon-sm" aria-label={t("hoaMeetings.meetings.details")} title={t("hoaMeetings.meetings.details")} asChild>
-														<Link href={`/weg/versammlungen/${meeting.id}`}>
-															<ChevronRight className="size-4" />
-														</Link>
-													</Button>
-													<ConfirmDeleteButton action={deleteOwnerMeetingAction.bind(null, meeting.id, meeting.hoaId)} confirmMessage={t("hoaMeetings.meetings.confirm.delete", { title: meeting.title })} />
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<OwnerMeetingsTable rows={meetingList} showHoa={!selectedHoa} />
 						)}
 					</CardContent>
 				</Card>

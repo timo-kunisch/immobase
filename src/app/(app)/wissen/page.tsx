@@ -3,11 +3,10 @@ import { BookOpen } from "lucide-react";
 
 import { listKnowledgeBaseArticles, listKnowledgeBaseCategories } from "@/data/knowledge-base";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArticleFormDialog } from "@/components/wissen/article-form-dialog";
 import { ArticleSearchForm } from "@/components/wissen/article-search-form";
-import { formatDate } from "@/lib/format";
+import { ArticlesTable } from "@/components/wissen/articles-table";
 import { getT } from "@/lib/i18n/server";
 
 export const dynamic = "force-dynamic";
@@ -41,40 +40,18 @@ export default async function WissenPage({ searchParams }: { searchParams: Promi
 					) : null}
 				</div>
 
-				{articles.length === 0 ? (
-					<Card>
-						<CardContent className="flex flex-col items-center gap-2 py-16 text-center text-muted-foreground">
-							<BookOpen className="size-8" />
-							<p>{search ? t("knowledge.empty.noResults") : t("knowledge.empty.noArticles")}</p>
-						</CardContent>
-					</Card>
-				) : (
-					<div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{articles.map((article) => (
-							<Card key={article.id} id={`article-${article.id}`}>
-								<CardHeader className="flex flex-row items-start justify-between gap-2 pb-2">
-									<CardTitle className="text-sm font-medium leading-snug">
-										<Link href={`/wissen/${article.id}`} className="hover:text-primary hover:underline">
-											{article.title}
-										</Link>
-									</CardTitle>
-									{article.category ? <Badge variant="secondary">{article.category}</Badge> : null}
-								</CardHeader>
-								<CardContent className="flex flex-col gap-3">
-									<p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">{article.content}</p>
-									<div className="flex items-center justify-between gap-2">
-										<span className="text-xs text-muted-foreground">
-											{t("knowledge.updatedAt", { date: formatDate(article.updatedAt) })}
-										</span>
-										<Link href={`/wissen/${article.id}`} className="text-xs text-primary hover:underline">
-											{t("knowledge.actions.read")}
-										</Link>
-									</div>
-								</CardContent>
-							</Card>
-						))}
-					</div>
-				)}
+				<Card>
+					<CardContent className="p-0">
+						{articles.length === 0 ? (
+							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+								<BookOpen className="size-8" />
+								<p>{search ? t("knowledge.empty.noResults") : t("knowledge.empty.noArticles")}</p>
+							</div>
+						) : (
+							<ArticlesTable rows={articles} categories={categories} />
+						)}
+					</CardContent>
+				</Card>
 			</div>
 		</div>
 	);

@@ -454,7 +454,8 @@ src/
     layout.tsx              # Root-Layout (Fonts, TooltipProvider)
     globals.css             # Tailwind v4 + shadcn-Theme + tr:target-Highlight
   components/
-    ui/                     # shadcn/ui-Basiskomponenten (via `npx shadcn add`)
+    ui/                     # shadcn/ui-Basiskomponenten (via `npx shadcn add`) + generische
+                            # DataTable (Sortieren/Filtern/Client-Pagination, s. Abschnitt 7)
     <modul>/                # Modul-spezifische Dialoge/Formulare (Client Components)
     layout/                 # AppSidebar, SiteHeader, GlobalSearch, ChatbotDialog, UpdateBanner
   data/                     # REPOSITORY-LAYER - EINZIGER Ort mit SQL
@@ -513,7 +514,7 @@ src/
     templates.ts            # Platzhalter-System für Dokumentvorlagen
     desktop-bridge.ts       # Typen für window.iv (Electron-Brücke)
     format.ts, action-state.ts, form-data.ts, id.ts, utils.ts
-    pagination.ts           # Seitengröße, resolvePagination (page-Param clampen), buildPageNumbers
+    pagination.ts           # LIST_PAGE_SIZE + buildPageNumbers (Client-Pagination der DataTable)
     search-pages.ts         # Statischer Seiten-Katalog der globalen Suche (client-sicher)
     search-types.ts         # Geteilte Typen/Konstanten der globalen Suche (client-sicher)
   proxy.ts                  # Auth-Guard (optimistischer Cookie-Check)
@@ -733,19 +734,33 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Cross-Modul-Verlinkung:** Query-Param-Filter (`?propertyId=`/`?unitId=`/`?hoaId=`) +
   Anchor-Links (`id="<typ>-<id>"`, Hervorhebung via `tr:target` in `globals.css`) +
   `CountLinkBadge` – Muster aus den Listen-Seiten fortführen.
-- **Pagination:** Nur bei fachlich unbegrenzt wachsenden Listen **ohne** eingehende
-  Zeilen-Anker (diese würden sonst ab Seite 2 ins Leere laufen): `/finanzen`
-  (Mieteingänge), `/buchhaltung` (Banktransaktionen), `/weg/buchhaltung` (WEG-Sicht der
-  Buchhaltung), `/weg/hausgeld`, `/dokumente`,
-  `/weg/beschluesse`, `/admin/logs`. Muster: `?page=`
-  (1-basiert) + `resolvePagination()` (`src/lib/pagination.ts`, 50/Seite) + `countX()`/
-  `listXPage()` im Repository (SQL mit `LIMIT`/`OFFSET` und deterministischem
-  Sortier-Tie-Breaker per ID) + `PaginationBar` (`src/components/ui/pagination-bar.tsx`,
-  Link-basierte Server-Komponente, Filter-Params werden mitgeschleift). Seitenübergreifende
-  Summen (Rückstands-Karten) über eigene Aggregat-Funktionen
-  (`listOpenTransactionArrearAmounts`/`listOpenHousingChargeArrearAmounts`). Stammdaten-
-  Listen (Mieter, Einheiten, Verträge, …) und das Rücklagen-Kontobuch (laufender Saldo)
-  bleiben bewusst unpaginiert.
+- **Listen-Tabellen (generische DataTable):** Alle Listen-/Übersichtstabellen nutzen die
+  generische Client-Komponente `DataTable` (`src/components/ui/data-table.tsx`): je Spalte
+  sortierbar (Klick auf Kopf: aufsteigend → absteigend → ursprüngliche Reihenfolge; Zahlen
+  numerisch, Strings per localeCompare „de", ISO-Datums-Strings korrekt, `null` zuletzt) und
+  filterbar (Freitext-Substring case-insensitiv oder Select mit Optionen), optionale
+  Client-Pagination (`pageSize`, Standard `LIST_PAGE_SIZE` = 50 aus `src/lib/pagination.ts`)
+  inkl. Trefferzähler + „Filter zurücksetzen" und „Keine Einträge für die aktuellen Filter"-
+  Leerzeile. Muster je Modul: dünne Client-Komponente `src/components/<modul>/<name>-table.tsx`
+  definiert die Spalten (`DataTableColumn<T>`: `sortValue`-Accessor, `filter`, `cell`-Renderer,
+  Aktionen-Spalte nie sortier-/filterbar) und rendert `DataTable`; die Server-Page lädt die
+  VOLLE Zeilenmenge über den Repository-Layer und reicht sie als **serialisierbare** Props
+  weiter (Maps/Lookups serverseitig in die Zeilen einbetten oder als Array-Props übergeben –
+  Row-Typen ggf. abflachen; Exemplare: `properties-table.tsx`, `transactions-table.tsx`,
+  `resolutions-table.tsx`). Zeilen-Anker (`rowId`) und Status-/Betrags-Konventionen
+  (Status = Select-Filter mit i18n-Labels, Beträge rechtsbündig + `Number()`-Sortierung wegen
+  Decimal-Strings) fortführen. Sortierung/Filterung/Pagination laufen bewusst clientseitig
+  (Desktop-App, lokale SQLite-Datenmengen); serverseitige Query-Param-Filter aus
+  Cross-Modul-Links bleiben als Vorfilter erhalten. Die früheren serverseitigen
+  Status-Filterformulare (GET-Forms) und die Server-Pagination (`?page=`, `PaginationBar`,
+  `resolvePagination`) sind entfallen – `PaginationBar` wurde entfernt;
+  `src/lib/pagination.ts` liefert nur noch `LIST_PAGE_SIZE` + `buildPageNumbers` (Client-
+  Pagination der DataTable), die paginierten Repository-Varianten (`listXPage`/`countX`)
+  bleiben als getestete Primitive erhalten (`src/data/pagination.test.ts`).
+  Seitenübergreifende Summen (Rückstands-Karten) weiterhin über eigene Aggregat-Funktionen
+  (`listOpenTransactionArrearAmounts`/`listOpenHousingChargeArrearAmounts`). Bewusst KEINE
+  DataTable: Ticket-Kanban, Kalender, Postfach (E-Mail-Karten) sowie kleine Dialog-Tabellen
+  (Miet-/Anpassungshistorie, Buchhaltungs-Import-Vorschau).
 
 ## 8. Electron-spezifische Regeln
 

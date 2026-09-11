@@ -3,15 +3,11 @@ import { Scale } from "lucide-react";
 import { listHoasWithProperty } from "@/data/hoas";
 import { listCustomAllocationKeysWithWeights, listUnitsForHoa } from "@/data/hoa-allocation-keys";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { AllocationKeysTable } from "@/components/weg/allocation-keys-table";
 import { CustomAllocationKeyFormDialog } from "@/components/weg/custom-allocation-key-form-dialog";
-import { CustomAllocationWeightsDialog } from "@/components/weg/custom-allocation-weights-dialog";
 import { HoaFilter } from "@/components/weg/hoa-filter";
 import { getT } from "@/lib/i18n/server";
-
-import { deleteCustomAllocationKeyAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -66,30 +62,7 @@ export default async function VerteilerschluesselPage({ searchParams }: { search
 									<p>{t("hoa.allocationKeys.empty")}</p>
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>{t("hoa.table.name")}</TableHead>
-											<TableHead>{t("common.notes")}</TableHead>
-											<TableHead className="w-[120px] text-right">{t("common.actions")}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{customAllocationKeys.map((key) => (
-											<TableRow key={key.id}>
-												<TableCell className="font-medium">{key.label}</TableCell>
-												<TableCell className="text-muted-foreground">{key.notes ?? "–"}</TableCell>
-												<TableCell>
-													<div className="flex items-center justify-end gap-1">
-														<CustomAllocationWeightsDialog hoaId={selectedHoa.id} customAllocationKeyId={key.id} customAllocationKeyLabel={key.label} units={units} weights={key.weights} />
-														<CustomAllocationKeyFormDialog hoaId={selectedHoa.id} customAllocationKey={key} />
-														<ConfirmDeleteButton action={deleteCustomAllocationKeyAction.bind(null, key.id, selectedHoa.id)} confirmMessage={t("hoa.allocationKeys.confirm.delete", { name: key.label })} />
-													</div>
-												</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
+								<AllocationKeysTable rows={customAllocationKeys} hoaId={selectedHoa.id} units={units} />
 							)}
 						</CardContent>
 					</Card>

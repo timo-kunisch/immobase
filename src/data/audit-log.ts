@@ -70,6 +70,18 @@ export function listAuditLogEntriesPage(filter: AuditLogFilter, limit: number, o
 		.all(...params, limit, offset) as AuditLogEntry[];
 }
 
+/**
+ * Alle Log-Einträge, neueste zuerst (gleiche Sortierung wie
+ * listAuditLogEntriesPage). Basis für die clientseitige Sortierung,
+ * Filterung und Pagination der Admin-Übersicht.
+ */
+export function listAuditLogEntries(filter: AuditLogFilter = {}): AuditLogEntry[] {
+	const { where, params } = buildFilterWhere(filter);
+	return getDb()
+		.prepare(`SELECT ${AUDIT_LOG_COLUMNS} FROM audit_log_entries${where} ORDER BY created_at DESC, rowid DESC`)
+		.all(...params) as AuditLogEntry[];
+}
+
 export function countAuditLogEntries(filter: AuditLogFilter = {}): number {
 	const { where, params } = buildFilterWhere(filter);
 	const row = getDb().prepare(`SELECT COUNT(*) AS value FROM audit_log_entries${where}`).get(...params) as { value: number };

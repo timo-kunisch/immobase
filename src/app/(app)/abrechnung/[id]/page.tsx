@@ -6,23 +6,20 @@ import { getBillingPeriodDetail } from "@/data/billing";
 import { listAccountBookingSumsForPeriod } from "@/data/accounts";
 import { buildCustomAllocationWeightsByKey } from "@/data/custom-allocation-keys";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { BankingImportDialog } from "@/components/abrechnung/banking-import-dialog";
-import { CostItemFormDialog } from "@/components/abrechnung/cost-item-form-dialog";
-import { ConsumptionValuesDialog } from "@/components/abrechnung/consumption-values-dialog";
-import { FinalizeBillingPeriodButton } from "@/components/abrechnung/finalize-billing-period-button";
 import { BillingPeriodNotesDialog } from "@/components/abrechnung/billing-period-notes-dialog";
-import { GenerateStatementPdfButton } from "@/components/abrechnung/generate-statement-pdf-button";
+import { CostItemsTable } from "@/components/abrechnung/cost-items-table";
+import { CostItemFormDialog } from "@/components/abrechnung/cost-item-form-dialog";
+import { FinalizeBillingPeriodButton } from "@/components/abrechnung/finalize-billing-period-button";
 import { GenerateAllStatementPdfsButton } from "@/components/abrechnung/generate-all-statement-pdfs-button";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { LeasePreviewTable, type LeasePreviewRow } from "@/components/abrechnung/lease-preview-table";
+import { TenantStatementsTable, type TenantStatementRow } from "@/components/abrechnung/tenant-statements-table";
+import { formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
 import { billingPeriodStatusStyles, calculateBillingResult } from "@/lib/billing";
-
-import { deleteCostItemAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -69,7 +66,46 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 			})
 		: null;
 
+	// Mieter-/Einheitsangaben der Live-Vorschau serverseitig auflösen und in
+	// die Zeilen einbetten (Maps sind als Client-Props nicht serialisierbar).
 	const leaseById = new Map(units.flatMap((unit) => unit.leases.map((lease) => [lease.id, { ...lease, unit }])));
+	const previewRows: LeasePreviewRow[] = (liveResult?.leaseResults ?? []).map((leaseResult) => {
+		const lease = leaseById.get(leaseResult.leaseId);
+		return {
+			leaseId: leaseResult.leaseId,
+			tenantId: lease?.tenantId ?? null,
+			tenantFirstName: lease?.tenant.firstName ?? null,
+			tenantLastName: lease?.tenant.lastName ?? null,
+			unitId: leaseResult.unitId,
+			unitLabel: lease?.unit.label ?? null,
+			occupiedFrom: leaseResult.occupiedFrom.toISOString(),
+			occupiedTo: leaseResult.occupiedTo.toISOString(),
+			occupiedDays: leaseResult.occupiedDays,
+			totalAllocatedCostsCents: leaseResult.totalAllocatedCostsCents,
+			totalPrepaymentsCents: leaseResult.totalPrepaymentsCents,
+			paidPrepaymentCount: leaseResult.paidPrepaymentCount,
+			balanceCents: leaseResult.balanceCents,
+		};
+	});
+
+	// Eingefrorene Einzelabrechnungen zu schlanken Zeilen auflösen (nur die
+	// Felder, die die Tabelle braucht - ohne Positionen/Verträge).
+	const statementRows: TenantStatementRow[] = tenantStatements.map((statement) => ({
+		id: statement.id,
+		tenantId: statement.lease.tenantId,
+		tenantFirstName: statement.lease.tenant.firstName,
+		tenantLastName: statement.lease.tenant.lastName,
+		unitId: statement.lease.unitId,
+		unitLabel: statement.lease.unit.label,
+		occupiedFrom: statement.occupiedFrom,
+		occupiedTo: statement.occupiedTo,
+		occupiedDays: statement.occupiedDays,
+		totalAllocatedCosts: statement.totalAllocatedCosts,
+		totalPrepayments: statement.totalPrepayments,
+		balance: statement.balance,
+		pdfPath: statement.pdfPath,
+		pdfFileSize: statement.pdfFileSize,
+	}));
 
 	// Vorschau des Buchhaltungs-Imports: Nettosumme der Buchungszeilen je
 	// Konto im Abrechnungszeitraum. Konten mit Saldo 0 erzeugen keine
@@ -128,52 +164,13 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 								<p>{t("billing.empty.costItems")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("billing.table.label")}</TableHead>
-										<TableHead>{t("billing.table.allocationKey")}</TableHead>
-										<TableHead className="text-right">{t("common.amount")}</TableHead>
-										<TableHead className="w-[140px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{costItems.map((costItem) => (
-										<TableRow key={costItem.id}>
-											<TableCell className="font-medium">
-												{costItem.label}
-												{costItem.notes ? <span className="block text-xs text-muted-foreground">{costItem.notes}</span> : null}
-											</TableCell>
-											<TableCell className="text-muted-foreground">
-												{t(`billing.allocationKey.${costItem.allocationKey}`)}
-												{costItem.allocationKey === "DIRECT" && costItem.directUnit ? (
-													<span className="block text-xs text-muted-foreground">{costItem.directUnit.label}</span>
-												) : null}
-												{costItem.allocationKey === "CUSTOM" && costItem.customAllocationKey ? (
-													<span className="block text-xs text-muted-foreground">{costItem.customAllocationKey.label}</span>
-												) : null}
-											</TableCell>
-											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
-											<TableCell>
-												{isDraft ? (
-													<div className="flex items-center justify-end gap-1">
-														{costItem.allocationKey === "CONSUMPTION" ? (
-															<ConsumptionValuesDialog costItemId={costItem.id} costItemLabel={costItem.label} units={units} consumptionValues={costItem.consumptionValues} />
-														) : null}
-														<CostItemFormDialog billingPeriodId={billingPeriod.id} costItem={costItem} units={units} customAllocationKeys={customAllocationKeys} />
-														<ConfirmDeleteButton
-															action={deleteCostItemAction.bind(null, costItem.id)}
-															confirmMessage={t("billing.confirm.deleteCostItem", { label: costItem.label })}
-														/>
-													</div>
-												) : (
-													<span className="text-xs text-muted-foreground">{t("billing.detail.finalized")}</span>
-												)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<CostItemsTable
+								billingPeriodId={billingPeriod.id}
+								isDraft={isDraft}
+								rows={costItems}
+								units={units}
+								customAllocationKeys={customAllocationKeys}
+							/>
 						)}
 					</CardContent>
 				</Card>
@@ -215,52 +212,7 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 									<p>{t("billing.empty.leases")}</p>
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>{t("billing.table.tenantUnit")}</TableHead>
-											<TableHead>{t("billing.table.timeShare")}</TableHead>
-											<TableHead className="text-right">{t("billing.table.allocatedCosts")}</TableHead>
-											<TableHead className="text-right">{t("billing.table.prepayments")}</TableHead>
-											<TableHead className="text-right">{t("billing.table.balance")}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{liveResult.leaseResults.map((leaseResult) => {
-											const lease = leaseById.get(leaseResult.leaseId);
-											const balanceEuros = leaseResult.balanceCents / 100;
-											return (
-												<TableRow key={leaseResult.leaseId}>
-													<TableCell className="font-medium">
-														<Link href={`/mieter#tenant-${lease?.tenantId}`} className="hover:underline">
-															{lease?.tenant.firstName} {lease?.tenant.lastName}
-														</Link>
-														<Link href={`/einheiten#unit-${leaseResult.unitId}`} className="block text-xs text-muted-foreground hover:underline">
-															{lease?.unit.label}
-														</Link>
-													</TableCell>
-													<TableCell className="text-muted-foreground">
-														{formatDate(leaseResult.occupiedFrom)} – {formatDate(leaseResult.occupiedTo)} ({leaseResult.occupiedDays} {t("billing.detail.days")})
-													</TableCell>
-													<TableCell className="text-right">{formatCurrency(leaseResult.totalAllocatedCostsCents / 100)}</TableCell>
-													<TableCell className="text-right">
-														{formatCurrency(leaseResult.totalPrepaymentsCents / 100)}
-														{leaseResult.paidPrepaymentCount === 0 ? (
-															<span className="block text-xs text-amber-600 dark:text-amber-400">{t("billing.detail.noPaidPrepayments")}</span>
-														) : null}
-													</TableCell>
-													<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
-														{balanceEuros > 0
-															? t("billing.detail.balancePayment", { amount: formatCurrency(balanceEuros) })
-															: balanceEuros < 0
-																? t("billing.detail.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) })
-																: formatCurrency(0)}
-													</TableCell>
-												</TableRow>
-											);
-										})}
-									</TableBody>
-								</Table>
+								<LeasePreviewTable rows={previewRows} />
 							)
 						) : tenantStatements.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
@@ -268,52 +220,7 @@ export default async function BillingPeriodDetailPage({ params }: { params: Prom
 								<p>{t("billing.empty.statements")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("billing.table.tenantUnit")}</TableHead>
-										<TableHead>{t("billing.table.timeShare")}</TableHead>
-										<TableHead className="text-right">{t("billing.table.allocatedCosts")}</TableHead>
-										<TableHead className="text-right">{t("billing.table.prepayments")}</TableHead>
-										<TableHead className="text-right">{t("billing.table.balance")}</TableHead>
-										<TableHead className="w-[220px] text-right">{t("billing.table.pdf")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{tenantStatements.map((statement) => {
-										const balanceEuros = Number(statement.balance);
-										return (
-											<TableRow key={statement.id}>
-												<TableCell className="font-medium">
-													<Link href={`/mieter#tenant-${statement.lease.tenantId}`} className="hover:underline">
-														{statement.lease.tenant.firstName} {statement.lease.tenant.lastName}
-													</Link>
-													<Link href={`/einheiten#unit-${statement.lease.unitId}`} className="block text-xs text-muted-foreground hover:underline">
-														{statement.lease.unit.label}
-													</Link>
-												</TableCell>
-												<TableCell className="text-muted-foreground">
-													{formatDate(statement.occupiedFrom)} – {formatDate(statement.occupiedTo)} ({statement.occupiedDays} {t("billing.detail.days")})
-												</TableCell>
-												<TableCell className="text-right">{formatCurrency(statement.totalAllocatedCosts)}</TableCell>
-												<TableCell className="text-right">{formatCurrency(statement.totalPrepayments)}</TableCell>
-												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>
-													{balanceEuros > 0
-														? t("billing.detail.balancePayment", { amount: formatCurrency(balanceEuros) })
-														: balanceEuros < 0
-															? t("billing.detail.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) })
-															: formatCurrency(0)}
-												</TableCell>
-												<TableCell>
-													<div className="flex justify-end">
-														<GenerateStatementPdfButton tenantStatementId={statement.id} pdfPath={statement.pdfPath} pdfFileSize={statement.pdfFileSize} postalConfigured={postalConfigured} />
-													</div>
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
+							<TenantStatementsTable rows={statementRows} postalConfigured={postalConfigured} />
 						)}
 					</CardContent>
 				</Card>

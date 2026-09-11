@@ -15,6 +15,7 @@ export const units = {
 	areaValue: "{value} m²",
 	roomsValue: " · {value} Zi.",
 	// Vermietungs-Status (Badge in der Liste)
+	"status.rented": "Vermietet",
 	"status.rentedTo": "Vermietet an {firstName} {lastName}",
 	"status.vacant": "Leerstand",
 	// Beschriftungen der CountLinkBadges (verknüpfte Datensätze)

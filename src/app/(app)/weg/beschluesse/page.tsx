@@ -1,17 +1,11 @@
-import Link from "next/link";
 import { Gavel } from "lucide-react";
 
-import { countOwnerResolutions, listHoas, listOwnerResolutionsPage } from "@/data/meetings";
+import { listHoas, listOwnerResolutions } from "@/data/meetings";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { PaginationBar } from "@/components/ui/pagination-bar";
 import { HoaFilter } from "@/components/weg/hoa-filter";
-import { formatDate } from "@/lib/format";
+import { ResolutionsTable } from "@/components/weg/resolutions-table";
 import { getT } from "@/lib/i18n/server";
-import { resolvePagination } from "@/lib/pagination";
-import { isContestationDeadlinePassed, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
 
 export const dynamic = "force-dynamic";
 
@@ -25,14 +19,9 @@ export const dynamic = "force-dynamic";
  * Seite mit optionalem hoaId-Filter (siehe HoaFilter), analog zu den
  * übrigen WEG-Funktionen.
  */
-export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string; page?: string }> }) {
+export default async function BeschluesseUebersichtPage({ searchParams }: { searchParams: Promise<{ hoaId?: string }> }) {
 	const t = await getT();
-	const { hoaId, page: pageParam } = await searchParams;
-
-	const votingResultLabels: Record<string, string> = {
-		ACCEPTED: t("hoaMeetings.votingResult.ACCEPTED"),
-		REJECTED: t("hoaMeetings.votingResult.REJECTED"),
-	};
+	const { hoaId } = await searchParams;
 
 	const hoaList = listHoas();
 
@@ -49,12 +38,9 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 
 	const selectedHoa = hoaId ? hoaList.find((h) => h.id === hoaId) : undefined;
 
-	const resolutionFilter = selectedHoa ? { hoaId: selectedHoa.id } : undefined;
-	// Paginierte Beschluss-Sammlung (wächst über die Jahre, eine Seite = 50 Einträge).
-	const resolutionPagination = resolvePagination(pageParam, countOwnerResolutions(resolutionFilter));
-	const resolutionList = listOwnerResolutionsPage(resolutionFilter, resolutionPagination);
-
-	const now = new Date();
+	// Vollständige Beschluss-Sammlung (Sortierung/Filterung/Pagination
+	// übernimmt die Client-Datentabelle, 50/Seite).
+	const resolutionList = listOwnerResolutions(selectedHoa ? { hoaId: selectedHoa.id } : undefined);
 
 	return (
 		<div className="flex flex-1 flex-col">
@@ -73,61 +59,10 @@ export default async function BeschluesseUebersichtPage({ searchParams }: { sear
 								<p>{t("hoaMeetings.collection.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead className="w-[60px]">{t("hoaMeetings.collection.table.number")}</TableHead>
-										{!selectedHoa ? <TableHead>{t("hoaMeetings.collection.table.hoa")}</TableHead> : null}
-										<TableHead>{t("hoaMeetings.collection.table.title")}</TableHead>
-										<TableHead>{t("hoaMeetings.collection.table.meeting")}</TableHead>
-										<TableHead>{t("common.date")}</TableHead>
-										<TableHead>{t("hoaMeetings.collection.table.result")}</TableHead>
-										<TableHead>{t("hoaMeetings.collection.table.contestableUntil")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{resolutionList.map((resolution) => {
-										const deadlinePassed = resolution.contestedUntil ? isContestationDeadlinePassed(new Date(resolution.contestedUntil), now) : true;
-										return (
-											<TableRow key={resolution.id} id={`resolution-collection-${resolution.sequenceNumber}`}>
-												<TableCell className="font-medium">{resolution.sequenceNumber}</TableCell>
-												{!selectedHoa ? <TableCell className="text-muted-foreground">{resolution.hoaName}</TableCell> : null}
-												<TableCell>
-													<Link href={`/weg/versammlungen/${resolution.meetingId}#resolution-${resolution.id}`} className="hover:underline">
-														{resolution.title}
-													</Link>
-												</TableCell>
-												<TableCell className="text-muted-foreground">{resolution.meetingTitle}</TableCell>
-												<TableCell className="text-muted-foreground">{formatDate(resolution.resolvedAt)}</TableCell>
-											<TableCell>
-												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${resolutionVotingResultStyles[resolution.votingResult]}`}>
-													{votingResultLabels[resolution.votingResult]}
-												</span>
-											</TableCell>
-											<TableCell>
-												{resolution.contestedUntil ? (
-													<span className="flex items-center gap-2 text-muted-foreground">
-														{formatDate(resolution.contestedUntil)}
-														{!deadlinePassed ? (
-															<Badge variant="outline" className="text-amber-700 dark:text-amber-400">
-																{t("hoaMeetings.collection.contestableBadge")}
-															</Badge>
-														) : null}
-													</span>
-												) : (
-													"–"
-												)}
-											</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
+							<ResolutionsTable rows={resolutionList} showHoa={!selectedHoa} nowIso={new Date().toISOString()} />
 						)}
 					</CardContent>
 				</Card>
-
-				<PaginationBar basePath="/weg/beschluesse" pagination={resolutionPagination} params={{ hoaId }} />
 			</div>
 		</div>
 	);

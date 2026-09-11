@@ -11,17 +11,15 @@ import {
 import { listAccountBookingSumsForPeriod } from "@/data/accounts";
 import { listEconomicPlanTotalsForHoa } from "@/data/economic-plans";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { HoaCostItemFormDialog } from "@/components/weg/hoa-cost-item-form-dialog";
-import { HoaConsumptionValuesDialog } from "@/components/weg/hoa-consumption-values-dialog";
+import { AnnualStatementCostItemsTable, type AnnualStatementCostItemRow } from "@/components/weg/annual-statement-cost-items-table";
+import { AnnualStatementDraftResultsTable, type AnnualStatementDraftResultRow } from "@/components/weg/annual-statement-draft-results-table";
+import { AnnualStatementUnitResultsTable, type AnnualStatementUnitResultRow } from "@/components/weg/annual-statement-unit-results-table";
 import { FinalizeAnnualStatementButton } from "@/components/weg/finalize-annual-statement-button";
-import { BridgeToBetrKvDialog } from "@/components/weg/bridge-to-betrkv-dialog";
 import { AnnualStatementNotesDialog } from "@/components/weg/annual-statement-notes-dialog";
 import { HoaBankingImportDialog } from "@/components/weg/hoa-banking-import-dialog";
-import { GenerateUnitResultPdfButton } from "@/components/weg/generate-unit-result-pdf-button";
 import { GenerateAllUnitResultPdfsButton } from "@/components/weg/generate-all-unit-result-pdfs-button";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { annualStatementStatusStyles, buildAnnualStatementConsistencyCheck, calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
@@ -29,7 +27,7 @@ import { toCents } from "@/lib/money";
 import { getT } from "@/lib/i18n/server";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
 
-import { deleteAnnualStatementCostItemAction, saveAnnualStatementCostItemAction } from "../actions";
+import { saveAnnualStatementCostItemAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +113,55 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 	}
 	const postalConfigured = isLetterXpressConfigured();
 
+	// Zeilen der Kostenpositionen-Tabelle: Bezeichnungen der Direkt-Zuordnung/
+	// des frei definierten Schlüssels für die Zell-Unterzeilen einbetten (Maps
+	// sind als Client-Props nicht serialisierbar).
+	const costItemRows: AnnualStatementCostItemRow[] = costItems.map((costItem) => ({
+		...costItem,
+		directUnitLabel:
+			costItem.allocationKey === "DIRECT" && costItem.directUnitId ? unitById.get(costItem.directUnitId)?.label : undefined,
+		customAllocationKeyLabel:
+			costItem.allocationKey === "CUSTOM" && costItem.customAllocationKeyId
+				? customKeyById.get(costItem.customAllocationKeyId)?.label
+				: undefined,
+	}));
+
+	// Zeilen der Live-Vorschau (Entwurf): Eigentümer-/Einheitsnamen auflösen,
+	// Datums-Objekte der Berechnung als ISO-Strings übergeben.
+	const draftResultRows: AnnualStatementDraftResultRow[] = liveResult
+		? liveResult.ownerResults.map((ownerResult) => ({
+				ownershipId: ownerResult.ownershipId,
+				ownerName: ownerNameById.get(ownerResult.ownerId) ?? null,
+				unitLabel: unitById.get(ownerResult.unitId)?.label ?? null,
+				ownedFrom: ownerResult.ownedFrom.toISOString(),
+				ownedTo: ownerResult.ownedTo.toISOString(),
+				ownedDays: ownerResult.ownedDays,
+				totalAllocatedCostsCents: ownerResult.totalAllocatedCostsCents,
+				totalPrepaymentsCents: ownerResult.totalPrepaymentsCents,
+				paidPrepaymentCount: ownerResult.paidPrepaymentCount,
+				balanceCents: ownerResult.balanceCents,
+			}))
+		: [];
+
+	// Zeilen der eingefrorenen Einzelabrechnungen (finalisiert): Namen und
+	// die für die BetrKV-Brücke auswählbaren Perioden der Liegenschaft je
+	// Zeile einbetten (Maps sind als Client-Props nicht serialisierbar).
+	const unitResultRows: AnnualStatementUnitResultRow[] = unitResults.map((result) => ({
+		id: result.id,
+		ownerFirstName: result.owner.firstName,
+		ownerLastName: result.owner.lastName,
+		unitLabel: result.unit.label,
+		ownedFrom: result.ownedFrom,
+		ownedTo: result.ownedTo,
+		ownedDays: result.ownedDays,
+		totalAllocatedCosts: result.totalAllocatedCosts,
+		totalPrepayments: result.totalPrepayments,
+		balance: result.balance,
+		pdfPath: result.pdfPath,
+		pdfFileSize: result.pdfFileSize,
+		availableBillingPeriods: draftBillingPeriodsByProperty.get(result.unit.propertyId) ?? [],
+	}));
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
@@ -157,53 +204,20 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 
 				<Card>
 					<CardContent className="p-0">
-						{costItems.length === 0 ? (
+						{costItemRows.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
 								<p>{t("hoaStatement.costItems.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("hoaStatement.table.label")}</TableHead>
-										<TableHead>{t("hoaStatement.table.allocationKey")}</TableHead>
-										<TableHead>{t("hoaStatement.table.apportionable")}</TableHead>
-										<TableHead className="text-right">{t("common.amount")}</TableHead>
-										<TableHead className="w-[130px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{costItems.map((costItem) => (
-										<TableRow key={costItem.id}>
-											<TableCell className="font-medium">
-												{costItem.label}
-												{costItem.notes ? <span className="block text-xs text-muted-foreground">{costItem.notes}</span> : null}
-											</TableCell>
-											<TableCell className="text-muted-foreground">
-												{t(`hoaPlan.allocationKey.${costItem.allocationKey}`)}
-												{costItem.allocationKey === "DIRECT" && costItem.directUnitId ? <span className="block text-xs text-muted-foreground">{unitById.get(costItem.directUnitId)?.label}</span> : null}
-												{costItem.allocationKey === "CUSTOM" && costItem.customAllocationKeyId ? (
-													<span className="block text-xs text-muted-foreground">{customKeyById.get(costItem.customAllocationKeyId)?.label}</span>
-												) : null}
-											</TableCell>
-											<TableCell className="text-muted-foreground">{costItem.isApportionable ? t("common.yes") : t("common.no")}</TableCell>
-											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
-											<TableCell>
-												{isDraft ? (
-													<div className="flex items-center justify-end gap-1">
-														{costItem.allocationKey === "CONSUMPTION" ? <HoaConsumptionValuesDialog hoaId={statement.hoaId} costItemId={costItem.id} costItemLabel={costItem.label} units={units} consumptionValues={costItem.consumptionValues} /> : null}
-														<HoaCostItemFormDialog action={saveAnnualStatementCostItemAction} parentIdFieldName="annualStatementId" parentId={statement.id} hoaId={statement.hoaId} costItem={costItem} units={units} customAllocationKeys={customAllocationKeys} showApportionable />
-														<ConfirmDeleteButton action={deleteAnnualStatementCostItemAction.bind(null, costItem.id, statement.hoaId, statement.id)} confirmMessage={t("hoaStatement.confirm.deleteCostItem", { label: costItem.label })} />
-													</div>
-												) : (
-													<span className="text-xs text-muted-foreground">{t("hoaStatement.status.FINALIZED")}</span>
-												)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<AnnualStatementCostItemsTable
+								rows={costItemRows}
+								isDraft={isDraft}
+								statementId={statement.id}
+								hoaId={statement.hoaId}
+								units={units}
+								customAllocationKeys={customAllocationKeys}
+							/>
 						)}
 					</CardContent>
 				</Card>
@@ -264,97 +278,21 @@ export default async function AnnualStatementDetailPage({ params }: { params: Pr
 				<Card>
 					<CardContent className="p-0">
 						{isDraft ? (
-							!liveResult || liveResult.ownerResults.length === 0 ? (
+							draftResultRows.length === 0 ? (
 								<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 									<Calculator className="size-8" />
 									<p>{t("hoaStatement.results.emptyDraft")}</p>
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>{t("hoaStatement.table.ownerUnit")}</TableHead>
-											<TableHead>{t("hoaStatement.table.timeShare")}</TableHead>
-											<TableHead className="text-right">{t("hoaStatement.table.allocatedCosts")}</TableHead>
-											<TableHead className="text-right">{t("hoaStatement.table.prepayments")}</TableHead>
-											<TableHead className="text-right">{t("hoaStatement.table.balance")}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{liveResult.ownerResults.map((ownerResult) => {
-											const balanceEuros = ownerResult.balanceCents / 100;
-											return (
-												<TableRow key={ownerResult.ownershipId}>
-													<TableCell className="font-medium">
-														{ownerNameById.get(ownerResult.ownerId) ?? "–"}
-														<span className="block text-xs text-muted-foreground">{unitById.get(ownerResult.unitId)?.label}</span>
-													</TableCell>
-													<TableCell className="text-muted-foreground">
-														{formatDate(ownerResult.ownedFrom)} – {formatDate(ownerResult.ownedTo)} ({t("hoaStatement.results.days", { days: ownerResult.ownedDays })})
-													</TableCell>
-													<TableCell className="text-right">{formatCurrency(ownerResult.totalAllocatedCostsCents / 100)}</TableCell>
-													<TableCell className="text-right">
-														{formatCurrency(ownerResult.totalPrepaymentsCents / 100)}
-														{ownerResult.paidPrepaymentCount === 0 ? (
-															<span className="block text-xs text-amber-600">{t("hoaStatement.results.noPaidPrepayments")}</span>
-														) : null}
-													</TableCell>
-													<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? t("hoaStatement.results.balanceDue", { amount: formatCurrency(balanceEuros) }) : balanceEuros < 0 ? t("hoaStatement.results.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) }) : formatCurrency(0)}</TableCell>
-												</TableRow>
-											);
-										})}
-									</TableBody>
-								</Table>
+								<AnnualStatementDraftResultsTable rows={draftResultRows} />
 							)
-						) : unitResults.length === 0 ? (
+						) : unitResultRows.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
 								<p>{t("hoaStatement.results.emptyFinalized")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("hoaStatement.table.ownerUnit")}</TableHead>
-										<TableHead>{t("hoaStatement.table.timeShare")}</TableHead>
-										<TableHead className="text-right">{t("hoaStatement.table.allocatedCosts")}</TableHead>
-										<TableHead className="text-right">{t("hoaStatement.table.prepayments")}</TableHead>
-										<TableHead className="text-right">{t("hoaStatement.table.balance")}</TableHead>
-										<TableHead className="text-right">{t("hoaStatement.table.pdf")}</TableHead>
-										<TableHead className="w-[80px] text-right">{t("hoaStatement.table.betrkv")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{unitResults.map((result) => {
-										const balanceEuros = Number(result.balance);
-										const availablePeriods = draftBillingPeriodsByProperty.get(result.unit.propertyId) ?? [];
-										return (
-											<TableRow key={result.id}>
-												<TableCell className="font-medium">
-													{result.owner.firstName} {result.owner.lastName}
-													<span className="block text-xs text-muted-foreground">{result.unit.label}</span>
-												</TableCell>
-												<TableCell className="text-muted-foreground">
-													{formatDate(result.ownedFrom)} – {formatDate(result.ownedTo)} ({t("hoaStatement.results.days", { days: result.ownedDays })})
-												</TableCell>
-												<TableCell className="text-right">{formatCurrency(result.totalAllocatedCosts)}</TableCell>
-												<TableCell className="text-right">{formatCurrency(result.totalPrepayments)}</TableCell>
-												<TableCell className={`text-right font-medium ${balanceEuros > 0 ? "text-red-600" : balanceEuros < 0 ? "text-emerald-600" : ""}`}>{balanceEuros > 0 ? t("hoaStatement.results.balanceDue", { amount: formatCurrency(balanceEuros) }) : balanceEuros < 0 ? t("hoaStatement.results.balanceCredit", { amount: formatCurrency(Math.abs(balanceEuros)) }) : formatCurrency(0)}</TableCell>
-												<TableCell>
-													<div className="flex justify-end">
-														<GenerateUnitResultPdfButton unitResultId={result.id} pdfPath={result.pdfPath} pdfFileSize={result.pdfFileSize} postalConfigured={postalConfigured} />
-													</div>
-												</TableCell>
-												<TableCell>
-													<div className="flex justify-end">
-														<BridgeToBetrKvDialog unitResultId={result.id} hoaId={statement.hoaId} availableBillingPeriods={availablePeriods} />
-													</div>
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
+							<AnnualStatementUnitResultsTable rows={unitResultRows} hoaId={statement.hoaId} postalConfigured={postalConfigured} />
 						)}
 					</CardContent>
 				</Card>

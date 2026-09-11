@@ -23,9 +23,10 @@ import { createUnit } from "@/data/units";
 
 /**
  * Tests für die paginierten Repository-Varianten (LIMIT/OFFSET) samt
- * Zählfunktionen und den seitenübergreifenden Rückstands-Aggregaten -
- * Grundlage der Pagination auf /finanzen, /weg/hausgeld und
- * /weg/beschluesse (siehe src/lib/pagination.ts).
+ * Zählfunktionen und den seitenübergreifenden Rückstands-Aggregaten. Die
+ * Listen-Seiten paginieren inzwischen clientseitig (DataTable), die
+ * Repository-Funktionen bleiben als getestete Primitive für künftige
+ * serverseitige Verbraucher erhalten.
  */
 
 let testDir: string;

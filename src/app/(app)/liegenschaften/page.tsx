@@ -1,15 +1,11 @@
-import { Building2, DoorOpen, FileText, Wrench } from "lucide-react";
+import { Building2 } from "lucide-react";
 
 import { listProperties, getPropertyStats } from "@/data/properties";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
-import { CountLinkBadge } from "@/components/ui/count-link-badge";
+import { PropertiesTable } from "@/components/liegenschaften/properties-table";
 import { PropertyFormDialog } from "@/components/liegenschaften/property-form-dialog";
 import { getT } from "@/lib/i18n/server";
-
-import { deletePropertyAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +14,9 @@ export default async function LiegenschaftenPage() {
 	const propertyList = listProperties();
 	const statsMap = getPropertyStats();
 
+	// Statistiken in die Zeilen einbetten (Maps sind als Client-Props nicht serialisierbar).
+	const rows = propertyList.map((property) => ({ ...property, stats: statsMap.get(property.id) }));
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader title={t("properties.title")} description={t("properties.description")} actions={<PropertyFormDialog />} />
@@ -25,71 +24,13 @@ export default async function LiegenschaftenPage() {
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
 				<Card>
 					<CardContent className="p-0">
-						{propertyList.length === 0 ? (
+						{rows.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 							<Building2 className="size-8" />
 							<p>{t("properties.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-									<TableHead>{t("properties.table.name")}</TableHead>
-									<TableHead>{t("common.address")}</TableHead>
-									<TableHead className="text-right">{t("properties.table.linked")}</TableHead>
-									<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{propertyList.map((property) => {
-										const stats = statsMap.get(property.id);
-										return (
-											<TableRow key={property.id} id={`property-${property.id}`}>
-												<TableCell className="font-medium">{property.name}</TableCell>
-												<TableCell className="text-muted-foreground">
-													{property.street}, {property.zipCode} {property.city}
-												</TableCell>
-												<TableCell className="text-right">
-													<div className="flex items-center justify-end gap-1.5">
-													<CountLinkBadge
-														href={`/einheiten?propertyId=${property.id}`}
-														count={stats?.units ?? 0}
-														label={t("properties.badge.units")}
-														icon={DoorOpen}
-													/>
-													{(stats?.openTickets ?? 0) > 0 ? (
-														<CountLinkBadge
-															href={`/tickets?propertyId=${property.id}`}
-															count={stats!.openTickets}
-															label={t("properties.badge.tickets")}
-															icon={Wrench}
-																className="bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-500/10 dark:text-amber-400"
-															/>
-														) : null}
-														{(stats?.documents ?? 0) > 0 ? (
-														<CountLinkBadge
-															href={`/dokumente?propertyId=${property.id}`}
-															count={stats!.documents}
-															label={t("properties.badge.documents")}
-															icon={FileText}
-														/>
-														) : null}
-													</div>
-												</TableCell>
-												<TableCell>
-													<div className="flex items-center justify-end gap-1">
-														<PropertyFormDialog property={property} />
-													<ConfirmDeleteButton
-														action={deletePropertyAction.bind(null, property.id)}
-														confirmMessage={t("properties.confirm.delete", { name: property.name })}
-													/>
-													</div>
-												</TableCell>
-											</TableRow>
-										);
-									})}
-								</TableBody>
-							</Table>
+							<PropertiesTable rows={rows} />
 						)}
 					</CardContent>
 				</Card>

@@ -12,6 +12,11 @@ export const knowledge = {
 	// Leer-Zustände der Artikelliste
 	"empty.noArticles": "Noch keine Artikel hinterlegt.",
 	"empty.noResults": "Keine Artikel gefunden.",
+	// Tabellen-Spalten der Artikelliste
+	"table.title": "Titel",
+	"table.category": "Kategorie",
+	"table.content": "Inhalt",
+	"table.updatedAt": "Aktualisiert",
 	// Karten- und Detail-Metadaten
 	createdAt: "Erstellt: {date}",
 	updatedAt: "Aktualisiert: {date}",

@@ -4,18 +4,18 @@ import { AlertTriangle, Calculator, ChevronLeft } from "lucide-react";
 
 import { getEconomicPlanDetail } from "@/data/economic-plans";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { HoaCostItemFormDialog } from "@/components/weg/hoa-cost-item-form-dialog";
+import { EconomicPlanCostItemsTable } from "@/components/weg/economic-plan-cost-items-table";
+import { EconomicPlanUnitSharesTable } from "@/components/weg/economic-plan-unit-shares-table";
 import { FinalizeEconomicPlanButton } from "@/components/weg/finalize-economic-plan-button";
 import { GenerateHousingChargesDialog } from "@/components/weg/generate-housing-charges-dialog";
-import { formatCurrency, formatDate } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { economicPlanStatusStyles, calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
 import { getT } from "@/lib/i18n/server";
 
-import { deleteEconomicPlanCostItemAction, saveEconomicPlanCostItemAction } from "../actions";
+import { saveEconomicPlanCostItemAction } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,37 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 	const unitById = new Map(units.map((unit) => [unit.id, unit]));
 	const customKeyById = new Map(customAllocationKeys.map((key) => [key.id, key]));
 
+	// Bezeichnungen der Direkt-Zuordnung/des frei definierten Schlüssels für
+	// die Zell-Unterzeilen in die Zeilen einbetten (Maps sind als Client-Props
+	// nicht serialisierbar).
+	const costItemRows = costItems.map((costItem) => ({
+		...costItem,
+		directUnitLabel:
+			costItem.allocationKey === "DIRECT" && costItem.directUnitId ? unitById.get(costItem.directUnitId)?.label : undefined,
+		customAllocationKeyLabel:
+			costItem.allocationKey === "CUSTOM" && costItem.customAllocationKeyId
+				? customKeyById.get(costItem.customAllocationKeyId)?.label
+				: undefined,
+	}));
+
+	// Zeilen der Einzelwirtschaftsplan-Tabelle: Entwurf = Live-Vorschau der
+	// berechneten Ergebnisse (Key = Einheits-ID), finalisiert = eingefrorene
+	// Ergebnisse (Key = Zeilen-ID).
+	const draftShareRows = liveResult
+		? liveResult.unitShares.map((share) => ({
+				key: share.unitId,
+				unitLabel: unitById.get(share.unitId)?.label ?? "",
+				annualAmount: share.annualAmount,
+				monthlyAmount: share.monthlyAmount,
+			}))
+		: [];
+	const finalizedShareRows = unitShares.map((share) => ({
+		key: share.id,
+		unitLabel: share.unit.label,
+		annualAmount: share.annualAmount,
+		monthlyAmount: share.monthlyAmount,
+	}));
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
@@ -77,45 +108,20 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 
 				<Card>
 					<CardContent className="p-0">
-						{costItems.length === 0 ? (
+						{costItemRows.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
 								<Calculator className="size-8" />
 								<p>{t("hoaPlan.costItems.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("hoaPlan.table.label")}</TableHead>
-										<TableHead>{t("hoaPlan.table.allocationKey")}</TableHead>
-										<TableHead className="text-right">{t("common.amount")}</TableHead>
-										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{costItems.map((costItem) => (
-										<TableRow key={costItem.id}>
-											<TableCell className="font-medium">
-												{costItem.label}
-												{costItem.allocationKey === "DIRECT" && costItem.directUnitId ? <span className="block text-xs text-muted-foreground">{unitById.get(costItem.directUnitId)?.label}</span> : null}
-												{costItem.allocationKey === "CUSTOM" && costItem.customAllocationKeyId ? <span className="block text-xs text-muted-foreground">{customKeyById.get(costItem.customAllocationKeyId)?.label}</span> : null}
-											</TableCell>
-											<TableCell className="text-muted-foreground">{t(`hoaPlan.allocationKey.${costItem.allocationKey}`)}</TableCell>
-											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
-											<TableCell>
-												{isDraft ? (
-													<div className="flex items-center justify-end gap-1">
-														<HoaCostItemFormDialog action={saveEconomicPlanCostItemAction} parentIdFieldName="economicPlanId" parentId={plan.id} hoaId={plan.hoaId} costItem={costItem} units={units} customAllocationKeys={customAllocationKeys} />
-														<ConfirmDeleteButton action={deleteEconomicPlanCostItemAction.bind(null, costItem.id, plan.hoaId, plan.id)} confirmMessage={t("hoaPlan.confirm.deleteCostItem", { label: costItem.label })} />
-													</div>
-												) : (
-													<span className="text-xs text-muted-foreground">{t("hoaPlan.status.FINALIZED")}</span>
-												)}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<EconomicPlanCostItemsTable
+								rows={costItemRows}
+								isDraft={isDraft}
+								planId={plan.id}
+								hoaId={plan.hoaId}
+								units={units}
+								customAllocationKeys={customAllocationKeys}
+							/>
 						)}
 					</CardContent>
 				</Card>
@@ -152,24 +158,7 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 									<p>{t("hoaPlan.unitShares.emptyDraft")}</p>
 								</div>
 							) : (
-								<Table>
-									<TableHeader>
-										<TableRow>
-											<TableHead>{t("common.unit")}</TableHead>
-											<TableHead className="text-right">{t("hoaPlan.table.annualAmount")}</TableHead>
-											<TableHead className="text-right">{t("hoaPlan.table.monthlyAmount")}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{liveResult.unitShares.map((share) => (
-											<TableRow key={share.unitId}>
-												<TableCell className="font-medium">{unitById.get(share.unitId)?.label}</TableCell>
-												<TableCell className="text-right">{formatCurrency(share.annualAmount)}</TableCell>
-												<TableCell className="text-right">{formatCurrency(share.monthlyAmount)}</TableCell>
-											</TableRow>
-										))}
-									</TableBody>
-								</Table>
+								<EconomicPlanUnitSharesTable rows={draftShareRows} />
 							)
 						) : unitShares.length === 0 ? (
 							<div className="flex flex-col items-center justify-center gap-2 py-12 text-center text-muted-foreground">
@@ -177,24 +166,7 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 								<p>{t("hoaPlan.unitShares.emptyFinalized")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("common.unit")}</TableHead>
-										<TableHead className="text-right">{t("hoaPlan.table.annualAmount")}</TableHead>
-										<TableHead className="text-right">{t("hoaPlan.table.monthlyAmount")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{unitShares.map((share) => (
-										<TableRow key={share.id}>
-											<TableCell className="font-medium">{share.unit.label}</TableCell>
-											<TableCell className="text-right">{formatCurrency(share.annualAmount)}</TableCell>
-											<TableCell className="text-right">{formatCurrency(share.monthlyAmount)}</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<EconomicPlanUnitSharesTable rows={finalizedShareRows} />
 						)}
 					</CardContent>
 				</Card>

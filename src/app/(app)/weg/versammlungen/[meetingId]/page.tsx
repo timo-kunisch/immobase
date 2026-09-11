@@ -4,20 +4,20 @@ import { ChevronLeft, ClipboardList, FileText, Gavel } from "lucide-react";
 
 import { getOwnerMeetingWithHoaAndProperty, listAgendaItemsForMeeting, listResolutionsForMeeting } from "@/data/meetings";
 import { SiteHeader } from "@/components/layout/site-header";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { AgendaItemFormDialog } from "@/components/weg/agenda-item-form-dialog";
+import { AgendaItemsTable } from "@/components/weg/agenda-items-table";
 import { ResolutionFormDialog } from "@/components/weg/resolution-form-dialog";
+import { MeetingResolutionsTable } from "@/components/weg/meeting-resolutions-table";
 import { GenerateMeetingPdfButton } from "@/components/weg/generate-meeting-pdf-button";
 import { MinutesTextForm } from "@/components/weg/minutes-text-form";
 import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
 import { formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
-import { ownerMeetingStatusStyles, resolutionVotingResultStyles } from "@/lib/hoa-meetings";
+import { ownerMeetingStatusStyles } from "@/lib/hoa-meetings";
 
-import { deleteAgendaItemAction, deleteResolutionAction, generateInvitationPdfAction, generateMinutesPdfAction, sendInvitationByPostAction, sendMinutesByPostAction } from "../actions";
+import { generateInvitationPdfAction, generateMinutesPdfAction, sendInvitationByPostAction, sendMinutesByPostAction } from "../actions";
 import { isLetterXpressConfigured } from "@/lib/letterxpress";
 
 export const dynamic = "force-dynamic";
@@ -38,10 +38,6 @@ export default async function OwnerMeetingDetailPage({ params }: { params: Promi
 		HELD: t("hoaMeetings.meetingStatus.HELD"),
 		MINUTES_FINALIZED: t("hoaMeetings.meetingStatus.MINUTES_FINALIZED"),
 		CANCELLED: t("hoaMeetings.meetingStatus.CANCELLED"),
-	};
-	const votingResultLabels: Record<string, string> = {
-		ACCEPTED: t("hoaMeetings.votingResult.ACCEPTED"),
-		REJECTED: t("hoaMeetings.votingResult.REJECTED"),
 	};
 
 	const meeting = getOwnerMeetingWithHoaAndProperty(meetingId);
@@ -87,31 +83,7 @@ export default async function OwnerMeetingDetailPage({ params }: { params: Promi
 								<p className="text-sm">{t("hoaMeetings.agenda.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead className="w-[60px]">{t("hoaMeetings.agenda.table.number")}</TableHead>
-										<TableHead>{t("hoaMeetings.agenda.table.title")}</TableHead>
-										<TableHead>{t("common.description")}</TableHead>
-										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{agendaItems.map((item) => (
-										<TableRow key={item.id}>
-											<TableCell>{item.position}</TableCell>
-											<TableCell className="font-medium">{item.title}</TableCell>
-											<TableCell className="text-muted-foreground">{item.description ?? "–"}</TableCell>
-											<TableCell>
-												<div className="flex items-center justify-end gap-1">
-													<AgendaItemFormDialog hoaId={meeting.hoaId} meetingId={meeting.id} agendaItem={item} nextPosition={nextPosition} />
-													<ConfirmDeleteButton action={deleteAgendaItemAction.bind(null, item.id, meeting.hoaId, meeting.id)} confirmMessage={t("hoaMeetings.agenda.confirm.delete", { title: item.title })} />
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<AgendaItemsTable hoaId={meeting.hoaId} meetingId={meeting.id} items={agendaItems} nextPosition={nextPosition} />
 						)}
 					</CardContent>
 				</Card>
@@ -140,35 +112,7 @@ export default async function OwnerMeetingDetailPage({ params }: { params: Promi
 								<p className="text-sm">{t("hoaMeetings.resolutions.empty")}</p>
 							</div>
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead className="w-[60px]">{t("hoaMeetings.resolutions.table.number")}</TableHead>
-										<TableHead>{t("hoaMeetings.resolutions.table.title")}</TableHead>
-										<TableHead>{t("common.date")}</TableHead>
-										<TableHead>{t("hoaMeetings.resolutions.table.result")}</TableHead>
-										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{resolutions.map((resolution) => (
-										<TableRow key={resolution.id} id={`resolution-${resolution.id}`}>
-											<TableCell>{resolution.sequenceNumber}</TableCell>
-											<TableCell className="font-medium">{resolution.title}</TableCell>
-											<TableCell className="text-muted-foreground">{formatDate(resolution.resolvedAt)}</TableCell>
-											<TableCell>
-												<span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${resolutionVotingResultStyles[resolution.votingResult]}`}>{votingResultLabels[resolution.votingResult]}</span>
-											</TableCell>
-											<TableCell>
-												<div className="flex items-center justify-end gap-1">
-													<ResolutionFormDialog hoaId={meeting.hoaId} meetingId={meeting.id} agendaItems={agendaItems} resolution={resolution} />
-													<ConfirmDeleteButton action={deleteResolutionAction.bind(null, resolution.id, meeting.hoaId, meeting.id)} confirmMessage={t("hoaMeetings.resolutions.confirm.delete", { title: resolution.title })} />
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<MeetingResolutionsTable hoaId={meeting.hoaId} meetingId={meeting.id} resolutions={resolutions} agendaItems={agendaItems} />
 						)}
 					</CardContent>
 				</Card>

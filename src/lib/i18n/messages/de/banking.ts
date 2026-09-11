@@ -16,7 +16,6 @@ export const banking = {
 	"empty.noProperties": "Legen Sie zuerst eine Liegenschaft an, um die Buchhaltung nutzen zu können.",
 	"empty.selectProperty": "Bitte eine Liegenschaft auswählen.",
 	"empty.transactions": "Noch keine Banktransaktionen erfasst.",
-	"empty.transactionsFiltered": "Keine Banktransaktionen mit diesem Status gefunden.",
 	"empty.accounts": "Noch keine Konten angelegt.",
 	// Konten
 	"accounts.management": "Kontenrahmen dieser Liegenschaft",
@@ -33,8 +32,6 @@ export const banking = {
 	"table.bookings": "Buchungen",
 	// Filter
 	"filter.allProperties": "Alle Liegenschaften",
-	"filter.allStatuses": "Alle Status",
-	"filter.reset": "Filter zurücksetzen",
 	// Buchungsrichtung (Eingang/Ausgang)
 	"direction.INCOME": "Eingang (Gutschrift)",
 	"direction.EXPENSE": "Ausgang (Belastung)",

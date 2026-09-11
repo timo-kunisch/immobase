@@ -69,11 +69,18 @@ export const common = {
 	"searchableSelect.noResults": "Keine Treffer",
 	// Lösch-Standarddialog (ConfirmDeleteButton)
 	confirmDeleteDefault: "Diesen Eintrag wirklich unwiderruflich löschen?",
-	// Pagination (PaginationBar)
-	"pagination.aria": "Seitennavigation",
+	// Pagination (Client-Pagination der DataTable; pageOf wird zusätzlich von
+	// messages.test.ts als Interpolations-Beispiel genutzt)
 	"pagination.pageOf": "Seite {page} von {totalPages}",
-	"pagination.entries.one": "{count} Eintrag",
-	"pagination.entries.other": "{count} Einträge",
 	"pagination.previous": "Vorherige Seite",
 	"pagination.next": "Nächste Seite",
+	// DataTable (clientseitige Sortierung/Filterung/Pagination)
+	"dataTable.sort": "Spalte sortieren",
+	"dataTable.filter": "Spalte filtern",
+	"dataTable.filterPlaceholder": "Filtern…",
+	"dataTable.noMatches": "Keine Einträge für die aktuellen Filter.",
+	"dataTable.filteredCount": "{count} von {total}",
+	"dataTable.entry.one": "{count} Eintrag",
+	"dataTable.entry.other": "{count} Einträge",
+	"dataTable.showingRange": "{from}–{to} von {total}",
 };

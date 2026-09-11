@@ -71,11 +71,18 @@ export const common: typeof deCommon = {
 	"searchableSelect.noResults": "No results",
 	// Default delete confirmation (ConfirmDeleteButton)
 	confirmDeleteDefault: "Really delete this entry permanently?",
-	// Pagination (PaginationBar)
-	"pagination.aria": "Pagination",
+	// Pagination (client-side pagination of the DataTable; pageOf is also
+	// used by messages.test.ts as an interpolation example)
 	"pagination.pageOf": "Page {page} of {totalPages}",
-	"pagination.entries.one": "{count} entry",
-	"pagination.entries.other": "{count} entries",
 	"pagination.previous": "Previous page",
 	"pagination.next": "Next page",
+	// DataTable (client-side sorting/filtering/pagination)
+	"dataTable.sort": "Sort column",
+	"dataTable.filter": "Filter column",
+	"dataTable.filterPlaceholder": "Filter…",
+	"dataTable.noMatches": "No entries match the current filters.",
+	"dataTable.filteredCount": "{count} of {total}",
+	"dataTable.entry.one": "{count} entry",
+	"dataTable.entry.other": "{count} entries",
+	"dataTable.showingRange": "{from}–{to} of {total}",
 };

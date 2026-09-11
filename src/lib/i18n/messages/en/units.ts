@@ -13,6 +13,7 @@ export const units: typeof deUnits = {
 	areaValue: "{value} m²",
 	roomsValue: " · {value} rms.",
 	// Occupancy status (badge in the list)
+	"status.rented": "Rented",
 	"status.rentedTo": "Rented to {firstName} {lastName}",
 	"status.vacant": "Vacant",
 	// CountLinkBadge labels (linked records)
