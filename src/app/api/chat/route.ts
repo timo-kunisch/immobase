@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/auth/dal";
 import { getLocale, getT } from "@/lib/i18n/server";
 import type { MessageKey, TranslateParams } from "@/lib/i18n/translator";
 import { appendChatMessages, listChatMessages } from "@/data/chat-messages";
+import { userDisplayName } from "@/lib/user-name";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
 				messages: [...history, { role: "user", content: parsed.message }],
 				attachments: parsed.attachments,
 				userEmail: user.email,
+				userName: userDisplayName(user),
 				userRole: user.role,
 				locale,
 			});

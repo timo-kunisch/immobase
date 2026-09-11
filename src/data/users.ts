@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { boolToInt, intToBool, newId, now } from "./helpers";
+import { userDisplayName } from "@/lib/user-name";
 import type { Role, User } from "./types";
 
 /**
@@ -11,8 +12,9 @@ import type { Role, User } from "./types";
  */
 
 const USER_COLUMNS = `
-	id, email, password_hash AS passwordHash, role, is_approved AS isApproved,
-	email_verified AS emailVerified, created_at AS createdAt, updated_at AS updatedAt
+	id, email, first_name AS firstName, last_name AS lastName, password_hash AS passwordHash,
+	role, is_approved AS isApproved, email_verified AS emailVerified,
+	created_at AS createdAt, updated_at AS updatedAt
 `;
 
 /** Zeilenform, wie better-sqlite3 sie liefert (isApproved noch als 0/1). */
@@ -43,18 +45,23 @@ export interface CreateUserInput {
 	passwordHash: string;
 	role: Role;
 	isApproved: boolean;
+	/** Optional (NULL = kein Name hinterlegt); Aufrufer normalisieren selbst. */
+	firstName?: string | null;
+	lastName?: string | null;
 }
 
 export function createUser(input: CreateUserInput): User {
 	const id = newId();
 	const timestamp = now();
+	const firstName = input.firstName ?? null;
+	const lastName = input.lastName ?? null;
 	getDb()
 		.prepare(
-			`INSERT INTO users (id, email, password_hash, role, is_approved, email_verified, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, NULL, ?, ?)`
+			`INSERT INTO users (id, email, first_name, last_name, password_hash, role, is_approved, email_verified, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`
 		)
-		.run(id, input.email, input.passwordHash, input.role, boolToInt(input.isApproved), timestamp, timestamp);
-	return { id, ...input, emailVerified: null, createdAt: timestamp, updatedAt: timestamp };
+		.run(id, input.email, firstName, lastName, input.passwordHash, input.role, boolToInt(input.isApproved), timestamp, timestamp);
+	return { id, ...input, firstName, lastName, emailVerified: null, createdAt: timestamp, updatedAt: timestamp };
 }
 
 /** Setzt/entzieht die Freigabe (isApproved) eines Nutzers. */
@@ -62,6 +69,13 @@ export function updateUserApproval(id: string, isApproved: boolean): void {
 	getDb()
 		.prepare("UPDATE users SET is_approved = ?, updated_at = ? WHERE id = ?")
 		.run(boolToInt(isApproved), now(), id);
+}
+
+/** Ändert Vor- und Nachname eines Nutzers (NULL/leer = Name entfernen). */
+export function updateUserName(id: string, firstName: string | null, lastName: string | null): void {
+	getDb()
+		.prepare("UPDATE users SET first_name = ?, last_name = ?, updated_at = ? WHERE id = ?")
+		.run(firstName, lastName, now(), id);
 }
 
 export function updateUserPassword(id: string, passwordHash: string): void {
@@ -87,4 +101,17 @@ export function countUsers(): number {
 export function listAdminEmails(): string[] {
 	const rows = getDb().prepare("SELECT email FROM users WHERE role = 'ADMIN'").all() as { email: string }[];
 	return rows.map((row) => row.email);
+}
+
+/**
+ * Anzeigenamen je E-Mail-Adresse (z. B. „Max Mustermann"). Dient der
+ * Auflösung denormalisierter E-Mail-Snapshots in Anzeige-Tabellen
+ * (Aktivitätsprotokoll, Ticket-Verlauf); gelöschte oder umbenannte
+ * Konten fehlen hier und fallen in der Anzeige auf die E-Mail zurück.
+ */
+export function listUserDisplayNameByEmail(): Map<string, string> {
+	const rows = getDb()
+		.prepare(`SELECT email, first_name AS firstName, last_name AS lastName FROM users`)
+		.all() as { email: string; firstName: string | null; lastName: string | null }[];
+	return new Map(rows.map((row) => [row.email, userDisplayName(row)]));
 }

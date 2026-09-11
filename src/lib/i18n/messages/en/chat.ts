@@ -85,7 +85,7 @@ export const chat: typeof deChat = {
 	"system.ruleToolErrors": "- Report tool errors (isError/error text) honestly and do not try to hide them.",
 	"system.ruleUserScope":
 		"- The signed-in user is NOT an administrator: administration functions (user management, settings such as the sender details) are not available as tools. For such requests, politely point out that an administrator account is required.",
-	"system.footer": "Current date: {today}. Signed-in user: {userEmail}.",
+	"system.footer": "Current date: {today}. Signed-in user: {user}.",
 	"system.toolInvalidArgsDetail": "Invalid arguments (not JSON) from the model.",
 	"system.toolInvalidArgsMessage": "Error: The requested arguments are not valid JSON - please try again.",
 	"system.toolInternalError": "Internal error during execution (details in the server log).",

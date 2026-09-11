@@ -11,7 +11,7 @@ export const admin = {
 	"users.title": "Nutzerverwaltung",
 	"users.description": "Registrierte Nutzer verwalten und Kontenfreigaben erteilen/entziehen.",
 	"users.empty": "Keine Nutzer vorhanden.",
-	"users.table.email": "E-Mail",
+	"users.table.name": "Name",
 	"users.table.role": "Rolle",
 	"users.table.emailVerified": "E-Mail bestätigt",
 	"users.table.registeredAt": "Registriert am",
@@ -26,6 +26,8 @@ export const admin = {
 	"users.approvalSwitchAria": "Freigabe umschalten",
 	"users.errors.selfToggle": "Sie können Ihren eigenen Freigabestatus nicht ändern.",
 	"users.errors.notFound": "Nutzer nicht gefunden.",
+	"users.edit.title": "Name bearbeiten",
+	"users.edit.description": "Vor- und Nachname des Kontos {email} ändern.",
 	"users.success.approvedWithoutEmail":
 		"Freigabe erteilt. Hinweis: Es ist kein E-Mail-Server konfiguriert (Einstellungen → Integrationen & KI) - der Nutzer wurde nicht per E-Mail benachrichtigt.",
 

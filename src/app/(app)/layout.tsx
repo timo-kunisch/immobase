@@ -7,6 +7,7 @@ import { startDropboxBackupScheduler } from "@/lib/dropbox-backup";
 import { isImapConfigured } from "@/lib/email/imap";
 import { startImapSyncScheduler } from "@/lib/email/imap-sync";
 import { startDocumentTrashPurgeScheduler } from "@/lib/document-trash";
+import { userDisplayName } from "@/lib/user-name";
 
 // Autoritativer Auth-Check für den gesamten geschützten Bereich der App
 // (siehe src/proxy.ts für den vorgelagerten, günstigen Cookie-Check).
@@ -32,7 +33,11 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 
 	return (
 		<SidebarProvider>
-			<AppSidebar user={{ email: user.email, role: user.role }} aiConfigured={isAiConfigured()} mailboxEnabled={isImapConfigured()} />
+			<AppSidebar
+				user={{ email: user.email, role: user.role, name: userDisplayName(user) }}
+				aiConfigured={isAiConfigured()}
+				mailboxEnabled={isImapConfigured()}
+			/>
 			<SidebarInset>
 				<UpdateBanner />
 				{children}

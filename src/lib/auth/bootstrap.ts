@@ -10,6 +10,13 @@ export interface ProvisionResult {
 	emailSent: boolean;
 }
 
+export interface ProvisionNameInput {
+	/** Vorname (null = nicht hinterlegt). */
+	firstName: string | null;
+	/** Nachname (null = nicht hinterlegt). */
+	lastName: string | null;
+}
+
 /**
  * Gemeinsames Anlegen eines Benutzerkontos für Registrierung und
  * Ersteinrichtung (Setup-Wizard) – Bootstrapping-Muster:
@@ -27,9 +34,15 @@ export interface ProvisionResult {
  *   hängt (Self-Healing für Altfälle zusätzlich im Login selbst).
  *
  * Aufrufer validieren vorher selbst (E-Mail-Format, Passwort-Regeln,
- * Duplikat-Prüfung) – diese Funktion legt das Konto ungeprüft an.
+ * Namens-Pflichtfelder, Duplikat-Prüfung) – diese Funktion legt das Konto
+ * ungeprüft an.
  */
-export async function provisionUserAccount(email: string, password: string, isFirstUser: boolean): Promise<ProvisionResult> {
+export async function provisionUserAccount(
+	email: string,
+	password: string,
+	isFirstUser: boolean,
+	name: ProvisionNameInput = { firstName: null, lastName: null },
+): Promise<ProvisionResult> {
 	const passwordHash = await hashPassword(password);
 
 	createUser({
@@ -37,6 +50,8 @@ export async function provisionUserAccount(email: string, password: string, isFi
 		passwordHash,
 		role: isFirstUser ? "ADMIN" : "USER",
 		isApproved: isFirstUser,
+		firstName: name.firstName,
+		lastName: name.lastName,
 	});
 
 	const emailSent = isSmtpConfigured();

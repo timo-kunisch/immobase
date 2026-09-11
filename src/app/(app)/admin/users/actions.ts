@@ -2,13 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 
-import { getUserById, updateUserApproval } from "@/data/users";
+import { getUserById, updateUserApproval, updateUserName } from "@/data/users";
 import { requireAdmin } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { destroyAllSessionsForUser } from "@/lib/auth/session";
+import { MAX_NAME_LENGTH, normalizeName } from "@/lib/auth/validation";
 import { isSmtpConfigured, sendAccountApprovedEmail } from "@/lib/email/mailer";
 import { getT } from "@/lib/i18n/server";
 import { ActionState } from "@/lib/action-state";
+import { userDisplayName } from "@/lib/user-name";
 
 /**
  * Setzt/entzieht die Freigabe (isApproved) eines Nutzers. Nur für Admins
@@ -34,11 +36,13 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 	}
 
 	updateUserApproval(userId, isApproved);
+	// Anzeige-Name statt E-Mail-Adresse (Fallback E-Mail bei Altkonten).
+	const displayName = userDisplayName(targetUser);
 	logActivity(
 		admin,
 		"UPDATE",
 		"admin",
-		isApproved ? `Kontofreigabe für „${targetUser.email}“ erteilt` : `Kontofreigabe für „${targetUser.email}“ entzogen`,
+		isApproved ? `Kontofreigabe für „${displayName}“ erteilt` : `Kontofreigabe für „${displayName}“ entzogen`,
 		userId
 	);
 
@@ -66,6 +70,51 @@ export async function toggleUserApprovalAction(userId: string, isApproved: boole
 			console.error("sendAccountApprovedEmail failed", error);
 		});
 	}
+
+	revalidatePath("/admin/users");
+	return { success: true };
+}
+
+/**
+ * Ändert Vor- und Nachname eines Nutzers (z. B. Korrektur oder Nachpflege
+ * bei Altkonten, die vor der Einführung der Namensfelder angelegt wurden).
+ * Vor-/Nachname sind - wie bei Registrierung und Setup - Pflichtfelder,
+ * damit der Name als Bezeichnung des Nutzers dienen kann.
+ */
+export async function updateUserNameAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const admin = await requireAdmin();
+	const t = await getT();
+
+	const userId = String(formData.get("userId") ?? "");
+	const firstName = normalizeName(String(formData.get("firstName") ?? ""));
+	if (firstName.error) {
+		return { error: t(firstName.error, { max: MAX_NAME_LENGTH }) };
+	}
+	const lastName = normalizeName(String(formData.get("lastName") ?? ""));
+	if (lastName.error) {
+		return { error: t(lastName.error, { max: MAX_NAME_LENGTH }) };
+	}
+	if (!firstName.name || !lastName.name) {
+		return { error: t("auth.errors.nameRequired") };
+	}
+
+	const targetUser = getUserById(userId);
+	if (!targetUser) {
+		return { error: t("admin.users.errors.notFound") };
+	}
+
+	updateUserName(userId, firstName.name, lastName.name);
+	logActivity(
+		admin,
+		"UPDATE",
+		"admin",
+		`Name von „${userDisplayName(targetUser)}“ zu „${userDisplayName({
+			...targetUser,
+			firstName: firstName.name,
+			lastName: lastName.name,
+		})}“ geändert`,
+		userId
+	);
 
 	revalidatePath("/admin/users");
 	return { success: true };

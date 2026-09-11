@@ -26,6 +26,16 @@ export function RegisterForm() {
 					<CardDescription>{t("auth.register.description")}</CardDescription>
 				</CardHeader>
 				<CardContent className="grid gap-4">
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div className="grid gap-2">
+							<Label htmlFor="firstName">{t("common.firstName")}</Label>
+							<Input id="firstName" name="firstName" type="text" autoComplete="given-name" maxLength={100} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="lastName">{t("common.lastName")}</Label>
+							<Input id="lastName" name="lastName" type="text" autoComplete="family-name" maxLength={100} required />
+						</div>
+					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="email">{t("auth.fields.email")}</Label>
 						<Input id="email" name="email" type="email" autoComplete="email" required />

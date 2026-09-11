@@ -213,14 +213,34 @@ describe("searchDatabase", () => {
 
 	it("durchsucht Benutzerkonten nur mit includeUsers (Admin-Gating)", () => {
 		seedBaseData();
-		createUser({ email: "admin@example.org", passwordHash: "hash", role: "ADMIN", isApproved: true });
+		const named = createUser({
+			email: "admin@example.org",
+			passwordHash: "hash",
+			role: "ADMIN",
+			isApproved: true,
+			firstName: "Annika",
+			lastName: "Admin",
+		});
+		// Altkonto ohne Namen: Anzeige fällt auf die E-Mail-Adresse zurück.
+		createUser({ email: "legacy@example.org", passwordHash: "hash", role: "USER", isApproved: true });
 
 		expect(searchDatabase("admin@example.org", { includeUsers: false })).toHaveLength(0);
 
-		const hits = searchDatabase("admin@example.org", { includeUsers: true });
-		const userRow = hits.find((row) => row.type === "user");
-		expect(userRow?.title).toBe("admin@example.org");
-		expect(userRow?.href).toBe("/admin/users");
+		// Treffer über die Adresse: Titel ist der Anzeige-Name.
+		const emailRow = searchDatabase("admin@example.org", { includeUsers: true }).find((row) => row.type === "user");
+		expect(emailRow?.id).toBe(named.id);
+		expect(emailRow?.title).toBe("Annika Admin");
+		expect(emailRow?.subtitle).toBe("admin@example.org");
+		expect(emailRow?.href).toBe("/admin/users");
+
+		// Treffer über den Namen (Heuhaufen umfasst Vor-/Nachname).
+		const nameRow = searchDatabase("annika", { includeUsers: true }).find((row) => row.type === "user");
+		expect(nameRow?.id).toBe(named.id);
+
+		// Konto ohne Namen: Titel = E-Mail, Untertitel = Rolle.
+		const legacyRow = searchDatabase("legacy@example.org", { includeUsers: true }).find((row) => row.type === "user");
+		expect(legacyRow?.title).toBe("legacy@example.org");
+		expect(legacyRow?.subtitle).toBe("USER");
 	});
 
 	it("begrenzt die Treffer je Entitätsart auf das Limit", () => {

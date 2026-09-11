@@ -61,6 +61,8 @@ export const auth: typeof deAuth = {
 	"errors.emailNotVerified": "Your email address has not been confirmed yet.",
 	"errors.notApproved": "Your account is still waiting for approval by an administrator.",
 	"errors.invalidEmail": "Please enter a valid email address.",
+	"errors.nameRequired": "Please enter a first and last name.",
+	"errors.nameTooLong": "First and last name may be at most {max} characters each.",
 	"errors.passwordTooShort": "The password must be at least {min} characters long.",
 	"errors.passwordMismatch": "The passwords do not match.",
 	"errors.emailTaken": "An account already exists for this email address.",

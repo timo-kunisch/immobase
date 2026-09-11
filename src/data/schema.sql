@@ -709,7 +709,7 @@ CREATE TABLE users (
 	email_verified text,
 	created_at text NOT NULL,
 	updated_at text NOT NULL
-);
+, first_name text, last_name text);
 
 CREATE TABLE verification_tokens (
 	identifier text NOT NULL,

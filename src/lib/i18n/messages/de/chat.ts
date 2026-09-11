@@ -88,7 +88,7 @@ export const chat = {
 	"system.ruleToolErrors": "- Melde Werkzeug-Fehler (isError/Fehlertext) ehrlich zurück und versuche nicht, sie zu verbergen.",
 	"system.ruleUserScope":
 		"- Der angemeldete Nutzer ist KEIN Administrator: Administrations-Funktionen (Nutzerverwaltung, Einstellungen wie die Absenderdaten) stehen nicht als Werkzeuge zur Verfügung. Weise bei entsprechenden Anfragen freundlich darauf hin, dass dafür ein Administratorkonto nötig ist.",
-	"system.footer": "Aktuelles Datum: {today}. Angemeldeter Nutzer: {userEmail}.",
+	"system.footer": "Aktuelles Datum: {today}. Angemeldeter Nutzer: {user}.",
 	"system.toolInvalidArgsDetail": "Ungültige Argumente (kein JSON) des Modells.",
 	"system.toolInvalidArgsMessage": "Fehler: Die angeforderten Argumente sind kein gültiges JSON - bitte erneut versuchen.",
 	"system.toolInternalError": "Interner Fehler bei der Ausführung (Details im Server-Log).",

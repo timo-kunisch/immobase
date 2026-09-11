@@ -64,6 +64,8 @@ export const auth = {
 	"errors.emailNotVerified": "Ihre E-Mail-Adresse wurde noch nicht bestätigt.",
 	"errors.notApproved": "Ihr Konto wartet noch auf die Freigabe durch einen Administrator.",
 	"errors.invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse an.",
+	"errors.nameRequired": "Bitte geben Sie Vor- und Nachnamen an.",
+	"errors.nameTooLong": "Vor- und Nachname dürfen jeweils maximal {max} Zeichen lang sein.",
 	"errors.passwordTooShort": "Das Passwort muss mindestens {min} Zeichen lang sein.",
 	"errors.passwordMismatch": "Die Passwörter stimmen nicht überein.",
 	"errors.emailTaken": "Für diese E-Mail-Adresse existiert bereits ein Konto.",

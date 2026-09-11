@@ -88,7 +88,7 @@ const BUDGET_WARNING_REMAINING = 5;
  */
 const MAX_TOOL_RESULT_CHARS = 40_000;
 
-function buildSystemPrompt(t: TranslateFn, userEmail: string, scope: McpToolScope): string {
+function buildSystemPrompt(t: TranslateFn, userLabel: string, scope: McpToolScope): string {
 	const today = new Date().toISOString().slice(0, 10);
 	return [
 		t("chat.system.intro"),
@@ -104,7 +104,7 @@ function buildSystemPrompt(t: TranslateFn, userEmail: string, scope: McpToolScop
 		t("chat.system.ruleToolErrors"),
 		...(scope === "ADMIN" ? [] : [t("chat.system.ruleUserScope")]),
 		"",
-		t("chat.system.footer", { today, userEmail }),
+		t("chat.system.footer", { today, user: userLabel }),
 	].join("\n");
 }
 
@@ -164,6 +164,8 @@ export async function runChat(input: {
 	messages: ChatHistoryMessage[];
 	attachments: ChatAttachmentInput[];
 	userEmail: string;
+	/** Anzeige-Name des Nutzers (optional; ergänzt die Adresse im Systemprompt). */
+	userName?: string | null;
 	userRole: "ADMIN" | "USER";
 	locale?: Locale;
 }): Promise<ChatRunResult> {
@@ -196,7 +198,10 @@ export async function runChat(input: {
 		}
 	}
 
-	const openAiMessages: OpenAiMessage[] = [{ role: "system", content: buildSystemPrompt(t, input.userEmail, scope) }];
+	// Nutzer-Kennzeichnung im Systemprompt: Anzeige-Name mit Adresse in
+	// Klammern - so kann das Modell den Nutzer persönlich ansprechen.
+	const userLabel = input.userName ? `${input.userName} (${input.userEmail})` : input.userEmail;
+	const openAiMessages: OpenAiMessage[] = [{ role: "system", content: buildSystemPrompt(t, userLabel, scope) }];
 	for (let index = 0; index < input.messages.length; index++) {
 		const message = input.messages[index];
 		const isLastUserMessage = index === input.messages.length - 1 && message.role === "user";

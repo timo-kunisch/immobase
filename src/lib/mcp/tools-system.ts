@@ -10,8 +10,9 @@ import {
 import { listLeasesWithDetails } from "@/data/leases";
 import { listOwnerMeetings } from "@/data/meetings";
 import { deleteAllSessionsForUser } from "@/data/sessions";
-import { getUserById, listUsers, updateUserApproval } from "@/data/users";
+import { getUserById, listUsers, updateUserApproval, updateUserName } from "@/data/users";
 import { buildCalendarItems } from "@/lib/calendar";
+import { userDisplayName } from "@/lib/user-name";
 
 import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, registerTool, type FieldSpec } from "./registry";
 
@@ -32,12 +33,47 @@ registerTool({
 		listUsers().map((user) => ({
 			id: user.id,
 			email: user.email,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			displayName: userDisplayName(user),
 			role: user.role,
 			isApproved: user.isApproved,
 			emailVerified: user.emailVerified,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt,
 		})),
+});
+
+registerTool({
+	name: "users_set_name",
+	description:
+		"Ändert Vor- und Nachname eines Benutzerkontos (z. B. Korrektur oder Nachpflege bei Altkonten). " +
+		"Der Name dient in der App als Bezeichnung des Nutzers statt der E-Mail-Adresse.",
+	inputSchema: buildInputSchema({
+		userId: { type: "string" },
+		firstName: { type: "string", description: "Vorname (Pflicht)" },
+		lastName: { type: "string", description: "Nachname (Pflicht)" },
+	}),
+	adminOnly: true,
+	handler: (args) => {
+		const input = coerceArgs(
+			{ userId: { type: "string" }, firstName: { type: "string" }, lastName: { type: "string" } },
+			args
+		) as { userId: string; firstName: string; lastName: string };
+
+		const userId = input.userId;
+		const firstName = input.firstName.trim();
+		const lastName = input.lastName.trim();
+		if (firstName.length === 0 || lastName.length === 0) {
+			throw new McpToolError("Vor- und Nachname dürfen nicht leer sein.");
+		}
+
+		const targetUser = getUserById(userId);
+		if (!targetUser) throw new McpToolError(`Nutzer mit ID "${userId}" wurde nicht gefunden.`);
+
+		updateUserName(userId, firstName, lastName);
+		return { success: true, userId, firstName, lastName };
+	},
 });
 
 registerTool({

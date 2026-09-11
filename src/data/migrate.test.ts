@@ -144,11 +144,11 @@ describe("migrateDatabase", () => {
 		db.prepare("INSERT INTO tickets (id, title, status, created_at, updated_at) VALUES ('t2', 'Organisatorisch', 'OPEN', '2026-01-04', '2026-01-04')").run();
 
 		// ... das Down schlägt dafür bewusst mit Constraint-Fehler fehl und
-		// lässt die Datenbank auf Version 15 stehen (0020, 0019, 0018, 0017
-		// und 0016 wurden zuvor erfolgreich zurückgenommen, 0015 bleibt
+		// lässt die Datenbank auf Version 15 stehen (0021, 0020, 0019, 0018,
+		// 0017 und 0016 wurden zuvor erfolgreich zurückgenommen, 0015 bleibt
 		// unverändert erhalten).
-		expect(() => migrateDatabaseDown(db, 6)).toThrow();
-		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 5);
+		expect(() => migrateDatabaseDown(db, 7)).toThrow();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 6);
 		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
 	});
 });
@@ -156,18 +156,19 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0020:
-		// Postanschrift der Mieter - Spalte tenants.street fällt weg).
-		expect(columnNames(db, "tenants")).toContain("street");
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0021:
+		// Namen der Benutzerkonten - Spalte users.first_name fällt weg).
+		expect(columnNames(db, "users")).toContain("first_name");
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(columnNames(db, "tenants")).not.toContain("street");
+		expect(columnNames(db, "users")).not.toContain("first_name");
+		expect(columnNames(db, "users")).not.toContain("last_name");
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(columnNames(db, "tenants")).toContain("street");
+		expect(columnNames(db, "users")).toContain("first_name");
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

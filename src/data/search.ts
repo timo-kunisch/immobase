@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { MIN_SEARCH_QUERY_LENGTH, type SearchRow } from "@/lib/search-types";
+import { userDisplayName } from "@/lib/user-name";
 
 /**
  * Repository für die GLOBALE SUCHE (Command-Palette, Cmd/Ctrl+K): durchsucht
@@ -743,19 +744,24 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 	// --- Benutzerkonten (NUR Admins - die API-Route entscheidet über includeUsers) --
 	if (options.includeUsers) {
 		const userRows = getDb()
-			.prepare(`SELECT id, email, role FROM users ORDER BY email`)
-			.all() as Array<{ id: string; email: string; role: string }>;
+			.prepare(`SELECT id, email, first_name AS firstName, last_name AS lastName, role FROM users ORDER BY email`)
+			.all() as Array<{ id: string; email: string; firstName: string | null; lastName: string | null; role: string }>;
 		add(
-			collectMatches(trimmed, userRows, limit, (row) => ({
-				haystack: hay(row.email, row.role),
-				result: {
-					type: "user",
-					id: row.id,
-					title: row.email,
-					subtitle: row.role,
-					href: "/admin/users",
-				},
-			})),
+			collectMatches(trimmed, userRows, limit, (row) => {
+				// Anzeige-Name als Titel (Fallback E-Mail bei Konten ohne
+				// Namen), die jeweils andere Angabe als Untertitel.
+				const name = userDisplayName(row);
+				return {
+					haystack: hay(row.email, row.firstName, row.lastName, row.role),
+					result: {
+						type: "user",
+						id: row.id,
+						title: name,
+						subtitle: name === row.email ? row.role : row.email,
+						href: "/admin/users",
+					},
+				};
+			}),
 		);
 	}
 

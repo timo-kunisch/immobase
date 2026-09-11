@@ -7,7 +7,7 @@ import { countUsers, getUserByEmail } from "@/data/users";
 import { ActionState } from "@/lib/action-state";
 import { provisionUserAccount } from "@/lib/auth/bootstrap";
 import { createSession } from "@/lib/auth/session";
-import { isValidEmail, MIN_PASSWORD_LENGTH, normalizeEmail, validatePassword } from "@/lib/auth/validation";
+import { isValidEmail, MAX_NAME_LENGTH, MIN_PASSWORD_LENGTH, normalizeEmail, normalizeName, validatePassword } from "@/lib/auth/validation";
 import { getDataKeyBase64 } from "@/lib/data-key";
 import { getT } from "@/lib/i18n/server";
 
@@ -89,6 +89,20 @@ export async function setupAccountAction(_prevState: ActionState, formData: Form
 	const password = String(formData.get("password") ?? "");
 	const passwordConfirm = String(formData.get("passwordConfirm") ?? "");
 
+	const firstName = normalizeName(String(formData.get("firstName") ?? ""));
+	if (firstName.error) {
+		return { error: t(firstName.error, { max: MAX_NAME_LENGTH }) };
+	}
+	const lastName = normalizeName(String(formData.get("lastName") ?? ""));
+	if (lastName.error) {
+		return { error: t(lastName.error, { max: MAX_NAME_LENGTH }) };
+	}
+	// Vor- und Nachname sind Pflichtfelder, damit der Name (statt der
+	// E-Mail-Adresse) als Bezeichnung des Nutzers dienen kann.
+	if (!firstName.name || !lastName.name) {
+		return { error: t("auth.errors.nameRequired") };
+	}
+
 	if (!isValidEmail(email)) {
 		return { error: t("auth.errors.invalidEmail") };
 	}
@@ -104,7 +118,10 @@ export async function setupAccountAction(_prevState: ActionState, formData: Form
 
 	// Duplikat-Prüfung ist hier defensiv: ensureSetupAllowed() garantiert
 	// bereits, dass noch kein Konto existiert.
-	const { emailSent } = await provisionUserAccount(email, password, true);
+	const { emailSent } = await provisionUserAccount(email, password, true, {
+		firstName: firstName.name,
+		lastName: lastName.name,
+	});
 
 	if (emailSent) {
 		redirect(`/login?registered=1&firstAdmin=1&emailSent=1&email=${encodeURIComponent(email)}`);

@@ -8,6 +8,7 @@ import { listTenants } from "@/data/tenants";
 import { listTicketActivity } from "@/data/ticket-activity";
 import { listTicketMessages } from "@/data/ticket-messages";
 import { getTicket, listTickets, listUnitsByLabel } from "@/data/tickets";
+import { listUserDisplayNameByEmail } from "@/data/users";
 import type { TicketActivity, TicketActivityAction, TicketMessage, TicketStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
@@ -56,10 +57,24 @@ const activityIcons: Record<TicketActivityAction, typeof CirclePlus> = {
 type TimelineItem = { kind: "message"; message: TicketMessage } | { kind: "activity"; activity: TicketActivity };
 
 /** Ein Verlauf-Eintrag (eingehende/ausgehende E-Mail oder interne Notiz). */
-function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage; reassignTickets: ReassignableTicket[]; t: TranslateFn }) {
+function TimelineEntry({
+	message,
+	reassignTickets,
+	t,
+	userNameByEmail,
+}: {
+	message: TicketMessage;
+	reassignTickets: ReassignableTicket[];
+	t: TranslateFn;
+	/** Auflösung E-Mail → Anzeige-Name für interne Notizen (Autor = App-Nutzer). */
+	userNameByEmail: Map<string, string>;
+}) {
 	const isNote = message.direction === "NOTE";
 	const isOutbound = message.direction === "OUTBOUND";
 	const Icon = isNote ? StickyNote : isOutbound ? MailPlus : Mail;
+	// Autor einer internen Notiz ist ein App-Nutzer - angezeigt wird dessen
+	// Name statt der E-Mail-Adresse (Fallback Adresse bei gelöschten Konten).
+	const authorLabel = message.authorEmail ? (userNameByEmail.get(message.authorEmail) ?? message.authorEmail) : null;
 
 	return (
 		<Card className={isNote ? "border-dashed bg-muted/40" : undefined}>
@@ -94,7 +109,7 @@ function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage
 				</div>
 				<p className="text-xs text-muted-foreground">
 					{isNote
-						? (message.authorEmail ?? t("tickets.history.unknownAuthor"))
+						? (authorLabel ?? t("tickets.history.unknownAuthor"))
 						: `${t("common.from")}: ${message.fromAddress ?? "–"}${message.toAddresses ? ` · ${t("tickets.email.to")}: ${message.toAddresses}` : ""}`}
 					{!isNote && message.subject ? ` · ${message.subject}` : ""}
 				</p>
@@ -113,8 +128,18 @@ function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage
  * Zeile mit Aktion, Akteur und Zeitpunkt. Akteur leer = System-Aktion
  * ohne Nutzerkontext (MCP-Werkzeuge).
  */
-function ActivityEntry({ activity, t }: { activity: TicketActivity; t: TranslateFn }) {
+function ActivityEntry({
+	activity,
+	t,
+	userNameByEmail,
+}: {
+	activity: TicketActivity;
+	t: TranslateFn;
+	/** Auflösung E-Mail → Anzeige-Name (Fallback Adresse bei gelöschten Konten). */
+	userNameByEmail: Map<string, string>;
+}) {
 	const Icon = activityIcons[activity.action];
+	const actorLabel = activity.actorEmail ? (userNameByEmail.get(activity.actorEmail) ?? activity.actorEmail) : null;
 	return (
 		<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
 			<Icon className="size-4 shrink-0 text-muted-foreground" />
@@ -144,7 +169,7 @@ function ActivityEntry({ activity, t }: { activity: TicketActivity; t: Translate
 				) : null}
 			</span>
 			<span className="ml-auto text-xs text-muted-foreground">
-				{activity.actorEmail ?? t("tickets.activity.system")} · {formatDateTime(activity.createdAt)}
+				{actorLabel ?? t("tickets.activity.system")} · {formatDateTime(activity.createdAt)}
 			</span>
 		</div>
 	);
@@ -177,6 +202,9 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 	const unitList = listUnitsByLabel();
 	const smtpConfigured = isSmtpConfigured();
+	// Akteure (Aktivitätsprotokoll) und Notiz-Autoren werden über ihre
+	// E-Mail-Adresse gespeichert - hier für die Anzeige zum Namen aufgelöst.
+	const userNameByEmail = listUserDisplayNameByEmail();
 	// Andere offene Tickets als Ziel für „Anderem Ticket zuordnen".
 	const reassignTickets = listTickets()
 		.filter((other) => other.id !== ticket.id && other.status !== "DONE")
@@ -275,9 +303,15 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 				) : (
 					timeline.map((item) =>
 						item.kind === "message" ? (
-							<TimelineEntry key={`message-${item.message.id}`} message={item.message} reassignTickets={reassignTickets} t={t} />
+							<TimelineEntry
+								key={`message-${item.message.id}`}
+								message={item.message}
+								reassignTickets={reassignTickets}
+								t={t}
+								userNameByEmail={userNameByEmail}
+							/>
 						) : (
-							<ActivityEntry key={`activity-${item.activity.id}`} activity={item.activity} t={t} />
+							<ActivityEntry key={`activity-${item.activity.id}`} activity={item.activity} t={t} userNameByEmail={userNameByEmail} />
 						)
 					)
 				)}

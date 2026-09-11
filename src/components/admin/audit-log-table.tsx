@@ -15,6 +15,12 @@ import { LIST_PAGE_SIZE } from "@/lib/pagination";
  */
 export type AuditLogRow = AuditLogEntry;
 
+/** Anzeige-Name je E-Mail-Adresse (serverseitig aufgelöst, serialisierbar). */
+export interface AuditUserLabel {
+	email: string;
+	name: string;
+}
+
 /** Übersetzungs-Schlüssel der Aktions-Labels (AuditAction). */
 const actionLabelKeys: Record<AuditAction, MessageKey> = {
 	CREATE: "admin.action.CREATE",
@@ -75,13 +81,21 @@ const auditCategories = Object.keys(categoryLabelKeys) as AuditCategory[];
  * Filterung je Spalte (Nutzer/Kategorie/Aktion als Select-Filter,
  * Beschreibung als Text-Filter) und Client-Pagination (50/Seite) - die
  * Server-Seite lädt die Vollliste (neueste zuerst als Grundsordnung).
+ *
+ * Die Nutzer-Spalte zeigt den Anzeige-Namen („Vorname Nachname") statt
+ * der gespeicherten E-Mail-Adresse; die Auflösung liefert die Server-Page
+ * als Lookup-Prop mit (gelöschte oder unbenannte Konten fallen auf die
+ * E-Mail-Adresse zurück).
  */
-export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
+export function AuditLogTable({ rows, userLabels }: { rows: AuditLogRow[]; userLabels: AuditUserLabel[] }) {
 	const { t } = useI18n();
 
+	const labelByEmail = new Map(userLabels.map((label) => [label.email, label.name]));
+	const userLabel = (email: string) => labelByEmail.get(email) ?? email;
+
 	// Nutzer-Filter: nur die in den Zeilen tatsächlich vorkommenden
-	// E-Mails (distinct) anbieten.
-	const userEmails = [...new Set(rows.map((row) => row.userEmail))].sort((a, b) => a.localeCompare(b, "de"));
+	// Adressen (distinct) anbieten - beschriftet mit dem Anzeige-Namen.
+	const userEmails = [...new Set(rows.map((row) => row.userEmail))].sort((a, b) => userLabel(a).localeCompare(userLabel(b), "de"));
 
 	const columns: DataTableColumn<AuditLogRow>[] = [
 		{
@@ -94,13 +108,14 @@ export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
 		{
 			key: "user",
 			header: t("admin.logs.table.user"),
+			sortValue: (row) => userLabel(row.userEmail),
 			filter: {
 				type: "select",
 				value: (row) => row.userEmail,
-				options: userEmails.map((email) => ({ value: email, label: email })),
+				options: userEmails.map((email) => ({ value: email, label: userLabel(email) })),
 			},
 			cellClassName: "font-medium",
-			cell: (row) => row.userEmail,
+			cell: (row) => userLabel(row.userEmail),
 		},
 		{
 			key: "action",

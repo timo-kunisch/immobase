@@ -5,9 +5,11 @@ import { ShieldCheck } from "lucide-react";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
 import { Badge } from "@/components/ui/badge";
 import { UserApprovalSwitch } from "@/components/admin/user-approval-switch";
+import { UserNameDialog } from "@/components/admin/user-name-dialog";
 import type { User } from "@/data/types";
 import { formatDate } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
+import { userDisplayName } from "@/lib/user-name";
 
 /**
  * Zeile der Benutzer-Tabelle: bewusst ohne Passwort-Hash, damit dieses
@@ -21,15 +23,22 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
 
 	const columns: DataTableColumn<UserRow>[] = [
 		{
-			key: "email",
-			header: t("admin.users.table.email"),
-			sortValue: (row) => row.email,
-			filter: { type: "text", value: (row) => row.email },
+			// Identitäts-Spalte: Anzeige-Name („Vorname Nachname", Fallback
+			// E-Mail bei Altkonten) mit der E-Mail-Adresse als Nebenzeile -
+			// der Name ist die Bezeichnung des Nutzers, die Adresse bleibt
+			// als Login-/Kontaktinformation sichtbar.
+			key: "name",
+			header: t("admin.users.table.name"),
+			sortValue: (row) => userDisplayName(row),
+			filter: { type: "text", value: (row) => `${userDisplayName(row)} ${row.email}` },
 			cell: (row) => (
-				<span className="font-medium">
-					{row.email}
-					{row.id === currentUserId ? <span className="ml-2 text-xs text-muted-foreground">{t("admin.users.currentUser")}</span> : null}
-				</span>
+				<div className="flex flex-col">
+					<span className="font-medium">
+						{userDisplayName(row)}
+						{row.id === currentUserId ? <span className="ml-2 text-xs text-muted-foreground">{t("admin.users.currentUser")}</span> : null}
+					</span>
+					<span className="text-xs text-muted-foreground">{row.email}</span>
+				</div>
 			),
 		},
 		{
@@ -94,6 +103,16 @@ export function UsersTable({ rows, currentUserId }: { rows: UserRow[]; currentUs
 				],
 			},
 			cell: (row) => <UserApprovalSwitch userId={row.id} initialApproved={row.isApproved} disabled={row.id === currentUserId} />,
+		},
+		{
+			key: "actions",
+			header: t("common.actions"),
+			headClassName: "w-[70px]",
+			cell: (row) => (
+				<div className="flex justify-end">
+					<UserNameDialog user={row} />
+				</div>
+			),
 		},
 	];
 

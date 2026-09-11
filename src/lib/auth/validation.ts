@@ -25,3 +25,19 @@ export function validatePassword(password: string): MessageKey | null {
 export function normalizeEmail(email: string): string {
 	return email.trim().toLowerCase();
 }
+
+/** Maximale Länge eines Namensbestandteils (Vor-/Nachname). */
+export const MAX_NAME_LENGTH = 100;
+
+/**
+ * Normalisiert einen Namensbestandteil: trimmen, leer = null
+ * (kein Name hinterlegt). Längere Eingaben werden als Fehlermeldung
+ * zurückgegeben, Aufrufer übersetzen mit t(key, { max: MAX_NAME_LENGTH }).
+ */
+export function normalizeName(value: string): { name: string | null; error: MessageKey | null } {
+	const trimmed = value.trim();
+	if (trimmed.length > MAX_NAME_LENGTH) {
+		return { name: null, error: "auth.errors.nameTooLong" };
+	}
+	return { name: trimmed.length > 0 ? trimmed : null, error: null };
+}

@@ -196,7 +196,7 @@ describe("MCP-Werkzeug-Scope (ADMIN vs. USER)", () => {
 			expect(names).toContain(expected);
 		}
 		// ...Administrations-Werkzeuge dagegen nicht.
-		for (const hidden of ["users_list", "users_set_approval", "company_settings_get", "company_settings_update"]) {
+		for (const hidden of ["users_list", "users_set_approval", "users_set_name", "company_settings_get", "company_settings_update"]) {
 			expect(names).not.toContain(hidden);
 		}
 	});
@@ -966,12 +966,16 @@ describe("MCP-Werkzeuge: WEG-Fachregeln", () => {
 
 describe("MCP-Werkzeuge: Benutzerverwaltung", () => {
 	it("users_list ohne Passwort-Hash; Aussperr-Schutz für den letzten Admin", async () => {
-		const admin = createUser({ email: "admin@example.de", passwordHash: "hash", role: "ADMIN", isApproved: true });
+		const admin = createUser({ email: "admin@example.de", passwordHash: "hash", role: "ADMIN", isApproved: true, firstName: "Ada", lastName: "Admin" });
 		const user = createUser({ email: "user@example.de", passwordHash: "hash", role: "USER", isApproved: false });
 
-		const users = (await callTool("users_list", {})) as { id: string; email: string; passwordHash?: string }[];
+		const users = (await callTool("users_list", {})) as { id: string; email: string; firstName: string | null; lastName: string | null; displayName: string; passwordHash?: string }[];
 		expect(users).toHaveLength(2);
 		expect(users[0].passwordHash).toBeUndefined();
+		expect(users[0].displayName).toBe("Ada Admin");
+		// Altkonten ohne Namen: Anzeige fällt auf die E-Mail-Adresse zurück.
+		expect(users[1].displayName).toBe("user@example.de");
+		expect(users[1].firstName).toBeNull();
 
 		// Freigabe erteilen/entziehen für NORMAL-User funktioniert.
 		await callTool("users_set_approval", { userId: user.id, isApproved: true });
@@ -979,6 +983,18 @@ describe("MCP-Werkzeuge: Benutzerverwaltung", () => {
 
 		// Letzter freigegebener Admin ist geschützt.
 		await expect(callTool("users_set_approval", { userId: admin.id, isApproved: false })).rejects.toThrow(/letzten freigegebenen Administrator/);
+	});
+
+	it("users_set_name ändert Vor- und Nachname; leere Namen werden abgelehnt", async () => {
+		const user = createUser({ email: "user@example.de", passwordHash: "hash", role: "USER", isApproved: true });
+
+		await callTool("users_set_name", { userId: user.id, firstName: "Max", lastName: "Mustermann" });
+		const loaded = getUserById(user.id);
+		expect(loaded?.firstName).toBe("Max");
+		expect(loaded?.lastName).toBe("Mustermann");
+
+		await expect(callTool("users_set_name", { userId: user.id, firstName: "  ", lastName: "Mustermann" })).rejects.toThrow(/nicht leer/);
+		await expect(callTool("users_set_name", { userId: "unbekannt", firstName: "Max", lastName: "Mustermann" })).rejects.toThrow(/nicht gefunden/);
 	});
 });
 

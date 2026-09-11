@@ -38,7 +38,7 @@ import { createTenant, getTenant, listTenants, updateTenant } from "@/data/tenan
 import { listRentArrearAmounts } from "@/data/dashboard";
 import { createTransaction, generateDueTransactions, listOpenTransactionArrearAmounts, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
 import { createUnit } from "@/data/units";
-import { countUsers, createUser, getUserByEmail, listAdminEmails, updateUserApproval } from "@/data/users";
+import { countUsers, createUser, getUserByEmail, listAdminEmails, listUserDisplayNameByEmail, updateUserApproval, updateUserName } from "@/data/users";
 import { buildCostItemsFromAccountBookingSums } from "@/lib/billing";
 import {
 	createAnnualStatement,
@@ -215,6 +215,35 @@ describe("users + sessions", () => {
 		expect(getSessionByToken("tok-1")?.userId).toBe(admin.id);
 		deleteAllSessionsForUser(admin.id);
 		expect(getSessionByToken("tok-1")).toBeNull();
+	});
+
+	it("speichert Vor-/Nachname und löst E-Mail → Anzeige-Name auf (Fallback E-Mail)", () => {
+		const named = createUser({
+			email: "max@example.com",
+			passwordHash: "hash",
+			role: "USER",
+			isApproved: true,
+			firstName: "Max",
+			lastName: "Mustermann",
+		});
+		const legacy = createUser({ email: "legacy@example.com", passwordHash: "hash", role: "USER", isApproved: true });
+
+		expect(getUserByEmail("max@example.com")?.firstName).toBe("Max");
+		expect(getUserByEmail("legacy@example.com")?.lastName).toBeNull();
+
+		const labels = listUserDisplayNameByEmail();
+		expect(labels.get("max@example.com")).toBe("Max Mustermann");
+		// Altkonto ohne Namen: Fallback auf die E-Mail-Adresse.
+		expect(labels.get("legacy@example.com")).toBe("legacy@example.com");
+
+		// Nachträgliches Setzen/Ändern des Namens.
+		updateUserName(legacy.id, "Lisa", "Legacy");
+		expect(getUserByEmail("legacy@example.com")?.firstName).toBe("Lisa");
+		expect(listUserDisplayNameByEmail().get("legacy@example.com")).toBe("Lisa Legacy");
+
+		// Auflösung unbekannter Adressen (gelöschte Konten) liegt beim Aufrufer.
+		expect(labels.get(named.email)).toBeDefined();
+		expect(labels.get("gone@example.com")).toBeUndefined();
 	});
 });
 

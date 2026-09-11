@@ -44,7 +44,10 @@ afterEach(() => {
 
 describe("provisionUserAccount", () => {
 	it("legt den ersten Nutzer als freigeschalteten Administrator an und bestätigt die E-Mail ohne SMTP sofort", async () => {
-		const result = await provisionUserAccount("admin@example.com", "geheim123", true);
+		const result = await provisionUserAccount("admin@example.com", "geheim123", true, {
+			firstName: "Ada",
+			lastName: "Admin",
+		});
 
 		expect(result.emailSent).toBe(false);
 		expect(mocks.sentMails).toHaveLength(0);
@@ -54,6 +57,9 @@ describe("provisionUserAccount", () => {
 		expect(user?.isApproved).toBe(true);
 		expect(user?.emailVerified).not.toBeNull();
 		expect(user?.passwordHash).not.toBe("geheim123");
+		// Vor-/Nachname werden mit dem Konto gespeichert.
+		expect(user?.firstName).toBe("Ada");
+		expect(user?.lastName).toBe("Admin");
 	});
 
 	it("versendet mit konfiguriertem SMTP eine Verifizierungs-Mail und lässt die Adresse unbestätigt", async () => {
@@ -68,17 +74,22 @@ describe("provisionUserAccount", () => {
 		expect(user?.role).toBe("ADMIN");
 		expect(user?.isApproved).toBe(true);
 		expect(user?.emailVerified).toBeNull();
+		// Ohne Namensangabe bleiben die Felder leer (Anzeige-Fallback E-Mail).
+		expect(user?.firstName).toBeNull();
+		expect(user?.lastName).toBeNull();
 	});
 
 	it("legt weitere Nutzer als nicht freigeschaltete USER an", async () => {
 		await provisionUserAccount("admin@example.com", "geheim123", true);
-		await provisionUserAccount("user@example.com", "geheim123", false);
+		await provisionUserAccount("user@example.com", "geheim123", false, { firstName: "Udo", lastName: "User" });
 
 		expect(countUsers()).toBe(2);
 
 		const user = getUserByEmail("user@example.com");
 		expect(user?.role).toBe("USER");
 		expect(user?.isApproved).toBe(false);
+		expect(user?.firstName).toBe("Udo");
+		expect(user?.lastName).toBe("User");
 		// Ohne SMTP wird die Adresse auch für Folgenutzer sofort bestätigt
 		// (die Mail könnte ohnehin niemanden erreichen, siehe bootstrap.ts).
 		expect(user?.emailVerified).not.toBeNull();

@@ -106,7 +106,8 @@ export function AppSidebar({
 	aiConfigured,
 	mailboxEnabled,
 }: {
-	user: { email: string; role: string };
+	/** `name` = Anzeige-Name (Vor-/Nachname, Fallback E-Mail), siehe userDisplayName(). */
+	user: { email: string; role: string; name: string };
 	aiConfigured: boolean;
 	mailboxEnabled: boolean;
 }) {
@@ -310,7 +311,12 @@ export function AppSidebar({
 			<SidebarFooter>
 				<div className="flex items-center gap-2 px-1 py-1">
 					<div className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
-						<span className="truncate text-xs font-medium">{user.email}</span>
+						{/* Anzeige-Name statt E-Mail-Adresse; die Adresse bleibt
+						    als Tooltip zugänglich (Falls E-Mail zusätzlich sichtbar
+						    sein soll, zeigt der Tooltip sie weiterhin). */}
+						<span className="truncate text-xs font-medium" title={user.email}>
+							{user.name}
+						</span>
 						<span className="text-xs text-muted-foreground">{user.role === "ADMIN" ? t("nav.role.admin") : t("nav.role.user")}</span>
 					</div>
 					<ChatbotDialog aiConfigured={aiConfigured} />

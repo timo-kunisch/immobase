@@ -768,6 +768,9 @@ export type Role = "ADMIN" | "USER";
 export interface User {
 	id: string;
 	email: string;
+	/** Vor-/Nachname (optional, v. a. für Altkonten NULL); Anzeige-Fallback siehe src/lib/user-name.ts. */
+	firstName: string | null;
+	lastName: string | null;
 	passwordHash: string;
 	role: Role;
 	isApproved: boolean;

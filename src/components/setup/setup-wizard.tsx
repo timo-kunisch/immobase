@@ -494,6 +494,16 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className={`${STEP_CONTENT} grid gap-4`}>
+					<div className="grid gap-4 sm:grid-cols-2">
+						<div className="grid gap-2">
+							<Label htmlFor="setup-firstName">{t("common.firstName")}</Label>
+							<Input id="setup-firstName" name="firstName" type="text" autoComplete="given-name" maxLength={100} required />
+						</div>
+						<div className="grid gap-2">
+							<Label htmlFor="setup-lastName">{t("common.lastName")}</Label>
+							<Input id="setup-lastName" name="lastName" type="text" autoComplete="family-name" maxLength={100} required />
+						</div>
+					</div>
 					<div className="grid gap-2">
 						<Label htmlFor="setup-email">{t("auth.fields.email")}</Label>
 						<Input
@@ -521,8 +531,8 @@ function AccountStep({ onBack }: { onBack: () => void }) {
 							required
 						/>
 					</div>
-<ActionErrorToast state={state} />
-			</CardContent>
+					<ActionErrorToast state={state} />
+				</CardContent>
 			<CardFooter className="justify-between">
 				<Button type="button" variant="ghost" onClick={onBack}>
 					<ChevronLeft />

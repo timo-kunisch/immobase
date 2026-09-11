@@ -6,7 +6,7 @@ export const admin: typeof deAdmin = {
 	"users.title": "User management",
 	"users.description": "Manage registered users and grant or revoke account approvals.",
 	"users.empty": "No users found.",
-	"users.table.email": "Email",
+	"users.table.name": "Name",
 	"users.table.role": "Role",
 	"users.table.emailVerified": "Email verified",
 	"users.table.registeredAt": "Registered on",
@@ -21,6 +21,8 @@ export const admin: typeof deAdmin = {
 	"users.approvalSwitchAria": "Toggle approval",
 	"users.errors.selfToggle": "You cannot change your own approval status.",
 	"users.errors.notFound": "User not found.",
+	"users.edit.title": "Edit name",
+	"users.edit.description": "Change the first and last name of the account {email}.",
 	"users.success.approvedWithoutEmail":
 		"Approval granted. Note: No email server is configured (Settings → Integrations & AI) - the user was not notified by email.",
 
