@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -68,49 +68,38 @@ export function UnitOwnershipFormDialog({ units, owners, ownership, defaultUnitI
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
 							<Label htmlFor="unitId">{t("common.unit")} *</Label>
-							<Select name="unitId" defaultValue={ownership?.unitId ?? defaultUnitId ?? units[0]?.id} required>
-								<SelectTrigger id="unitId" className="w-full">
-									<SelectValue placeholder={t("hoa.ownerships.placeholder.unit")} />
-								</SelectTrigger>
-								<SelectContent>
-									{units.map((unit) => (
-										<SelectItem key={unit.id} value={unit.id}>
-											{unit.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="unitId"
+								id="unitId"
+								options={units.map((unit) => ({ value: unit.id, label: unit.label }))}
+								defaultValue={ownership?.unitId ?? defaultUnitId ?? units[0]?.id}
+								placeholder={t("hoa.ownerships.placeholder.unit")}
+								required
+							/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="ownerId">{t("common.owner")} *</Label>
-							<Select name="ownerId" defaultValue={ownership?.ownerId} required>
-								<SelectTrigger id="ownerId" className="w-full">
-									<SelectValue placeholder={t("hoa.ownerships.placeholder.owner")} />
-								</SelectTrigger>
-								<SelectContent>
-									{owners.map((owner) => (
-										<SelectItem key={owner.id} value={owner.id}>
-											{owner.firstName} {owner.lastName}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="ownerId"
+								id="ownerId"
+								options={owners.map((owner) => ({ value: owner.id, label: `${owner.firstName} ${owner.lastName}` }))}
+								defaultValue={ownership?.ownerId}
+								placeholder={t("hoa.ownerships.placeholder.owner")}
+								required
+							/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="coOwnerId">{t("hoa.ownerships.fields.coOwner")}</Label>
-							<Select name="coOwnerId" defaultValue={ownership?.coOwnerId ?? "none"}>
-								<SelectTrigger id="coOwnerId" className="w-full">
-									<SelectValue placeholder={t("hoa.ownerships.fields.noCoOwner")} />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value="none">{t("hoa.ownerships.fields.noCoOwner")}</SelectItem>
-									{owners.map((owner) => (
-										<SelectItem key={owner.id} value={owner.id}>
-											{owner.firstName} {owner.lastName}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="coOwnerId"
+								id="coOwnerId"
+								options={[
+									{ value: "none", label: t("hoa.ownerships.fields.noCoOwner") },
+									...owners.map((owner) => ({ value: owner.id, label: `${owner.firstName} ${owner.lastName}` })),
+								]}
+								defaultValue={ownership?.coOwnerId ?? "none"}
+								placeholder={t("hoa.ownerships.fields.noCoOwner")}
+							/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="startDate">{isEdit ? t("hoa.ownerships.fields.startDate") : t("hoa.ownerships.fields.startDateCreate")} *</Label>

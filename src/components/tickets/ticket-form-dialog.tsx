@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -69,36 +70,32 @@ export function TicketFormDialog({
 					<div className="grid gap-4 py-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="propertyId">{t("common.property")} ({t("common.optional")})</Label>
-								<Select name="propertyId" value={propertyId} onValueChange={setPropertyId}>
-									<SelectTrigger id="propertyId" className="w-full">
-										<SelectValue placeholder={t("tickets.fields.propertyPlaceholder")} />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("tickets.fields.noProperty")}</SelectItem>
-										{properties.map((property) => (
-											<SelectItem key={property.id} value={property.id}>
-												{property.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="propertyId">{t("common.property")} ({t("common.optional")})</Label>
+							<SearchableSelect
+								name="propertyId"
+								id="propertyId"
+								value={propertyId}
+								onValueChange={setPropertyId}
+								options={[
+									{ value: "none", label: t("tickets.fields.noProperty") },
+									...properties.map((property) => ({ value: property.id, label: property.name })),
+								]}
+								placeholder={t("tickets.fields.propertyPlaceholder")}
+							/>
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="unitId">{t("common.unit")} ({t("common.optional")})</Label>
-								<Select name="unitId" defaultValue={ticket?.unitId ?? "none"} key={propertyId}>
-									<SelectTrigger id="unitId" className="w-full">
-										<SelectValue placeholder={t("tickets.fields.noUnit")} />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("tickets.fields.noUnit")}</SelectItem>
-										{filteredUnits.map((unit) => (
-											<SelectItem key={unit.id} value={unit.id}>
-												{unit.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="unitId">{t("common.unit")} ({t("common.optional")})</Label>
+							<SearchableSelect
+								key={propertyId}
+								name="unitId"
+								id="unitId"
+								defaultValue={ticket?.unitId ?? "none"}
+								options={[
+									{ value: "none", label: t("tickets.fields.noUnit") },
+									...filteredUnits.map((unit) => ({ value: unit.id, label: unit.label })),
+								]}
+								placeholder={t("tickets.fields.noUnit")}
+							/>
 							</div>
 						</div>
 

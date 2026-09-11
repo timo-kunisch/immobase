@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -60,19 +60,15 @@ export function HoaFormDialog({ hoa, availableProperties }: { hoa?: Hoa; availab
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="propertyId">{t("common.property")} *</Label>
-							<Select name="propertyId" defaultValue={hoa?.propertyId ?? availableProperties[0]?.id} required>
-								<SelectTrigger id="propertyId" className="w-full">
-									<SelectValue placeholder={t("hoa.placeholder.property")} />
-								</SelectTrigger>
-								<SelectContent>
-									{availableProperties.map((property) => (
-										<SelectItem key={property.id} value={property.id}>
-											{property.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+<Label htmlFor="propertyId">{t("common.property")} *</Label>
+						<SearchableSelect
+							name="propertyId"
+							id="propertyId"
+							options={availableProperties.map((property) => ({ value: property.id, label: property.name }))}
+							defaultValue={hoa?.propertyId ?? availableProperties[0]?.id}
+							placeholder={t("hoa.placeholder.property")}
+							required
+						/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="name">{t("hoa.fields.name")} *</Label>

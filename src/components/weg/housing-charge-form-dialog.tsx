@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -62,33 +63,25 @@ export function HousingChargeFormDialog({ hoaId, units, owners, housingCharge }:
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
 							<Label htmlFor="unitId">{t("common.unit")} *</Label>
-							<Select name="unitId" defaultValue={housingCharge?.unitId ?? units[0]?.id} required>
-								<SelectTrigger id="unitId" className="w-full">
-									<SelectValue placeholder={t("hoaFinance.charges.placeholder.unit")} />
-								</SelectTrigger>
-								<SelectContent>
-									{units.map((unit) => (
-										<SelectItem key={unit.id} value={unit.id}>
-											{unit.label}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="unitId"
+								id="unitId"
+								options={units.map((unit) => ({ value: unit.id, label: unit.label }))}
+								defaultValue={housingCharge?.unitId ?? units[0]?.id}
+								placeholder={t("hoaFinance.charges.placeholder.unit")}
+								required
+							/>
 						</div>
 						<div className="grid gap-2">
 							<Label htmlFor="ownerId">{t("common.owner")} *</Label>
-							<Select name="ownerId" defaultValue={housingCharge?.ownerId ?? owners[0]?.id} required>
-								<SelectTrigger id="ownerId" className="w-full">
-									<SelectValue placeholder={t("hoaFinance.charges.placeholder.owner")} />
-								</SelectTrigger>
-								<SelectContent>
-									{owners.map((owner) => (
-										<SelectItem key={owner.id} value={owner.id}>
-											{owner.firstName} {owner.lastName}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="ownerId"
+								id="ownerId"
+								options={owners.map((owner) => ({ value: owner.id, label: `${owner.firstName} ${owner.lastName}` }))}
+								defaultValue={housingCharge?.ownerId ?? owners[0]?.id}
+								placeholder={t("hoaFinance.charges.placeholder.owner")}
+								required
+							/>
 						</div>
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">

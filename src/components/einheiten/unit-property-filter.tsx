@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { useI18n } from "@/lib/i18n/provider";
 import type { Property } from "@/data/types";
 
@@ -13,23 +13,17 @@ export function UnitPropertyFilter({ properties, value }: { properties: Property
 	const router = useRouter();
 
 	return (
-		<Select
+		<SearchableSelect
 			value={value ?? ALL_VALUE}
 			onValueChange={(next) => {
 				router.push(next === ALL_VALUE ? "/einheiten" : `/einheiten?propertyId=${next}`);
 			}}
-		>
-		<SelectTrigger className="w-full sm:w-64">
-			<SelectValue placeholder={t("units.filter.allProperties")} />
-		</SelectTrigger>
-		<SelectContent>
-			<SelectItem value={ALL_VALUE}>{t("units.filter.allProperties")}</SelectItem>
-				{properties.map((property) => (
-					<SelectItem key={property.id} value={property.id}>
-						{property.name}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
+			options={[
+				{ value: ALL_VALUE, label: t("units.filter.allProperties") },
+				...properties.map((property) => ({ value: property.id, label: property.name })),
+			]}
+			placeholder={t("units.filter.allProperties")}
+			className="w-full sm:w-64"
+		/>
 	);
 }

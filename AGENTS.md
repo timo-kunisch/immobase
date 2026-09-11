@@ -722,6 +722,14 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   deaktiviert (Dialoge synchronisieren bewusst UI-State mit `useActionState` im `useEffect` –
   gültiges Muster; in neuen Dialog-Komponenten fortführen).
 - **Neue shadcn/ui-Komponenten:** `npx shadcn add <component>` (Konfiguration `components.json`).
+- **Select-Felder:** Dynamische Listen aus der Datenbank (Liegenschaften, Einheiten, Mieter,
+  Eigentümer, Verträge, Tickets, Buchungsziele, Umlageschlüssel, ...) verwenden die
+  durchsuchbare Combobox `SearchableSelect` (`src/components/ui/searchable-select.tsx`:
+  Popover + cmdk; Formular-Integration über `name`/`required` per unsichtbarem nativem select
+  wie bei Radix Select, kontrolliert oder über `defaultValue`; Gruppen über `option.group`,
+  Zusatz-Suchbegriffe über `option.keywords`; UI-Texte über `common.searchableSelect.*`).
+  Feste Enum-Listen mit wenigen Optionen (Status, Typen, Sprache) bleiben beim klassischen
+  `Select`.
 - **Cross-Modul-Verlinkung:** Query-Param-Filter (`?propertyId=`/`?unitId=`/`?hoaId=`) +
   Anchor-Links (`id="<typ>-<id>"`, Hervorhebung via `tr:target` in `globals.css`) +
   `CountLinkBadge` – Muster aus den Listen-Seiten fortführen.

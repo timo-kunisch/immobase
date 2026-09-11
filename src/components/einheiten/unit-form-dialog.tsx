@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -52,19 +52,15 @@ export function UnitFormDialog({ unit, properties }: { unit?: Unit; properties: 
 
 					<div className="grid gap-4 py-4">
 					<div className="grid gap-2">
-						<Label htmlFor="propertyId">{t("common.property")} *</Label>
-						<Select name="propertyId" defaultValue={unit?.propertyId ?? properties[0]?.id} required>
-							<SelectTrigger id="propertyId" className="w-full">
-								<SelectValue placeholder={t("units.placeholder.property")} />
-							</SelectTrigger>
-								<SelectContent>
-									{properties.map((property) => (
-										<SelectItem key={property.id} value={property.id}>
-											{property.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+<Label htmlFor="propertyId">{t("common.property")} *</Label>
+						<SearchableSelect
+							name="propertyId"
+							id="propertyId"
+							options={properties.map((property) => ({ value: property.id, label: property.name }))}
+							defaultValue={unit?.propertyId ?? properties[0]?.id}
+							placeholder={t("units.placeholder.property")}
+							required
+						/>
 						</div>
 					<div className="grid gap-2">
 						<Label htmlFor="label">{t("units.fields.label")} *</Label>

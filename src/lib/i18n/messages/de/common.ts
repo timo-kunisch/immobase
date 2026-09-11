@@ -64,6 +64,9 @@ export const common = {
 	owner: "Eigentümer",
 	// Platzhalter in Selects
 	pleaseSelect: "Bitte wählen…",
+	// SearchableSelect (durchsuchbare Auswahllisten dynamischer Datenbestände)
+	"searchableSelect.searchPlaceholder": "Suchen…",
+	"searchableSelect.noResults": "Keine Treffer",
 	// Lösch-Standarddialog (ConfirmDeleteButton)
 	confirmDeleteDefault: "Diesen Eintrag wirklich unwiderruflich löschen?",
 	// Pagination (PaginationBar)

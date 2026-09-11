@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -59,34 +59,26 @@ export function LeaseFormDialog({ lease, units, tenants }: { lease?: Lease; unit
 					<div className="grid gap-4 py-4">
 						<div className="grid grid-cols-2 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="unitId">{t("leases.fields.unit")} *</Label>
-								<Select name="unitId" defaultValue={lease?.unitId ?? units[0]?.id} required>
-									<SelectTrigger id="unitId" className="w-full">
-										<SelectValue placeholder={t("leases.fields.selectUnit")} />
-									</SelectTrigger>
-									<SelectContent>
-										{units.map((unit) => (
-											<SelectItem key={unit.id} value={unit.id}>
-												{unit.property.name} – {unit.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="unitId">{t("leases.fields.unit")} *</Label>
+							<SearchableSelect
+								name="unitId"
+								id="unitId"
+								options={units.map((unit) => ({ value: unit.id, label: `${unit.property.name} – ${unit.label}` }))}
+								defaultValue={lease?.unitId ?? units[0]?.id}
+								placeholder={t("leases.fields.selectUnit")}
+								required
+							/>
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="tenantId">{t("common.tenant")} *</Label>
-								<Select name="tenantId" defaultValue={lease?.tenantId ?? tenants[0]?.id} required>
-									<SelectTrigger id="tenantId" className="w-full">
-										<SelectValue placeholder={t("leases.fields.selectTenant")} />
-									</SelectTrigger>
-									<SelectContent>
-										{tenants.map((tenant) => (
-											<SelectItem key={tenant.id} value={tenant.id}>
-												{tenant.firstName} {tenant.lastName}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="tenantId">{t("common.tenant")} *</Label>
+							<SearchableSelect
+								name="tenantId"
+								id="tenantId"
+								options={tenants.map((tenant) => ({ value: tenant.id, label: `${tenant.firstName} ${tenant.lastName}` }))}
+								defaultValue={lease?.tenantId ?? tenants[0]?.id}
+								placeholder={t("leases.fields.selectTenant")}
+								required
+							/>
 							</div>
 						</div>
 

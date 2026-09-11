@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -100,18 +101,18 @@ export function TransactionFormDialog({ transaction, leases }: { transaction?: T
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
 							<Label htmlFor="leaseId">{t("finances.fields.lease")} *</Label>
-							<Select name="leaseId" value={leaseId} onValueChange={handleLeaseChange} required>
-								<SelectTrigger id="leaseId" className="w-full">
-									<SelectValue placeholder={t("finances.fields.leasePlaceholder")} />
-								</SelectTrigger>
-								<SelectContent>
-									{leases.map((lease) => (
-										<SelectItem key={lease.id} value={lease.id}>
-											{lease.unit.property.name} – {lease.unit.label} ({lease.tenant.firstName} {lease.tenant.lastName})
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+							<SearchableSelect
+								name="leaseId"
+								id="leaseId"
+								value={leaseId}
+								onValueChange={handleLeaseChange}
+								options={leases.map((lease) => ({
+									value: lease.id,
+									label: `${lease.unit.property.name} – ${lease.unit.label} (${lease.tenant.firstName} ${lease.tenant.lastName})`,
+								}))}
+								placeholder={t("finances.fields.leasePlaceholder")}
+								required
+							/>
 							{selectedLease && suggestedTotal !== null ? (
 								<p className="text-xs text-muted-foreground">{t("finances.transactionDialog.suggestedTotal", { total: suggestedTotal.toFixed(2) })}</p>
 							) : null}

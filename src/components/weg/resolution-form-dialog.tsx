@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -74,20 +75,17 @@ export function ResolutionFormDialog({
 					<div className="grid gap-4 py-4">
 						{agendaItems.length > 0 ? (
 							<div className="grid gap-2">
-								<Label htmlFor="agendaItemId">{t("hoaMeetings.resolutions.fields.agendaItem")}</Label>
-								<Select name="agendaItemId" defaultValue={resolution?.agendaItemId ?? "none"}>
-									<SelectTrigger id="agendaItemId" className="w-full">
-										<SelectValue placeholder={t("hoaMeetings.resolutions.agendaItemNone")} />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("hoaMeetings.resolutions.agendaItemNone")}</SelectItem>
-										{agendaItems.map((item) => (
-											<SelectItem key={item.id} value={item.id}>
-												{item.position}. {item.title}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="agendaItemId">{t("hoaMeetings.resolutions.fields.agendaItem")}</Label>
+							<SearchableSelect
+								name="agendaItemId"
+								id="agendaItemId"
+								options={[
+									{ value: "none", label: t("hoaMeetings.resolutions.agendaItemNone") },
+									...agendaItems.map((item) => ({ value: item.id, label: `${item.position}. ${item.title}` })),
+								]}
+								defaultValue={resolution?.agendaItemId ?? "none"}
+								placeholder={t("hoaMeetings.resolutions.agendaItemNone")}
+							/>
 							</div>
 						) : null}
 						<div className="grid gap-2">

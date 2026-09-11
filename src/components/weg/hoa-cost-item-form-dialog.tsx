@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Switch } from "@/components/ui/switch";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
@@ -121,37 +122,29 @@ export function HoaCostItemFormDialog({
 
 						{allocationKey === "DIRECT" ? (
 							<div className="grid gap-2">
-								<Label htmlFor="directUnitId">{t("hoaPlan.costItem.fieldDirectUnit")} *</Label>
-								<Select name="directUnitId" defaultValue={costItem?.directUnitId ?? units[0]?.id} required>
-									<SelectTrigger id="directUnitId" className="w-full">
-										<SelectValue placeholder={t("hoaPlan.costItem.selectUnit")} />
-									</SelectTrigger>
-									<SelectContent>
-										{units.map((unit) => (
-											<SelectItem key={unit.id} value={unit.id}>
-												{unit.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="directUnitId">{t("hoaPlan.costItem.fieldDirectUnit")} *</Label>
+							<SearchableSelect
+								name="directUnitId"
+								id="directUnitId"
+								options={units.map((unit) => ({ value: unit.id, label: unit.label }))}
+								defaultValue={costItem?.directUnitId ?? units[0]?.id}
+								placeholder={t("hoaPlan.costItem.selectUnit")}
+								required
+							/>
 							</div>
 						) : null}
 
 						{allocationKey === "CUSTOM" ? (
 							<div className="grid gap-2">
-								<Label htmlFor="customAllocationKeyId">{t("hoaPlan.costItem.fieldCustomAllocationKey")} *</Label>
-								<Select name="customAllocationKeyId" defaultValue={costItem?.customAllocationKeyId ?? customAllocationKeys[0]?.id} required>
-									<SelectTrigger id="customAllocationKeyId" className="w-full">
-										<SelectValue placeholder={t("hoaPlan.costItem.selectCustomAllocationKey")} />
-									</SelectTrigger>
-									<SelectContent>
-										{customAllocationKeys.map((key) => (
-											<SelectItem key={key.id} value={key.id}>
-												{key.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="customAllocationKeyId">{t("hoaPlan.costItem.fieldCustomAllocationKey")} *</Label>
+							<SearchableSelect
+								name="customAllocationKeyId"
+								id="customAllocationKeyId"
+								options={customAllocationKeys.map((key) => ({ value: key.id, label: key.label }))}
+								defaultValue={costItem?.customAllocationKeyId ?? customAllocationKeys[0]?.id}
+								placeholder={t("hoaPlan.costItem.selectCustomAllocationKey")}
+								required
+							/>
 								{customAllocationKeys.length === 0 ? (
 									<p className="text-xs text-destructive">{t("hoaPlan.costItem.noCustomKeys")}</p>
 								) : null}

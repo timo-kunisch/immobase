@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -22,12 +22,6 @@ import type { Account } from "@/data/types";
  * ("housingcharge:<id>").
  */
 type AllocationTarget = { accountId: string | null; transactionId: string | null; housingChargeId: string | null };
-
-interface TargetOption {
-	value: string;
-	label: string;
-	group: "account" | "transaction" | "housingcharge";
-}
 
 export interface OpenTransactionOption {
 	id: string;
@@ -90,11 +84,33 @@ export function BankTransactionAllocateDialog({
 	const [rows, setRows] = useState<{ target: string; amount: string }[]>([]);
 	const [initialized, setInitialized] = useState(false);
 
+	// Auswahlziele gruppiert nach Konto / offener Miet-Sollstellung / offener
+	// Hausgeld-Sollstellung; Betrag und Fälligkeit sind als Suchbegriffe
+	// hinterlegt, ohne die Anzeige-Zeile zu verlängern.
+	const options = useMemo((): SearchableSelectOption[] => [
+		...accounts.map((account) => ({
+			value: `account:${account.id}`,
+			label: account.label,
+			group: t("banking.allocate.groupAccounts"),
+		})),
+		...openTransactions.map((transaction) => ({
+			value: `transaction:${transaction.id}`,
+			label: transaction.label,
+			keywords: [`(${transaction.amount} €, fällig ${transaction.dueDate.slice(0, 10)})`],
+			group: t("banking.allocate.groupTransactions"),
+		})),
+		...housingCharges.map((housingCharge) => ({
+			value: `housingcharge:${housingCharge.id}`,
+			label: housingCharge.label,
+			keywords: [`(${housingCharge.amount} €, fällig ${housingCharge.dueDate.slice(0, 10)})`],
+			group: t("banking.allocate.groupHousingCharges"),
+		})),
+	], [accounts, openTransactions, housingCharges, t]);
+
 	// Beim Öffnen: bestehende Buchungszeilen (Konto/Miet-/Hausgeld-Sollstellung
 	// + Betrag) als Zeilen vorbelegen, sonst eine leere Zeile mit dem Rest-Betrag.
 	useEffect(() => {
 		if (!open || initialized) return;
-		const options = buildOptions();
 		const initialRows =
 			bankTransaction.allocations && bankTransaction.allocations.length > 0
 				? bankTransaction.allocations.map((allocation) => ({
@@ -120,24 +136,6 @@ export function BankTransactionAllocateDialog({
 			setInitialized(false);
 		}
 	}, [state]);
-
-	function buildOptions(): TargetOption[] {
-		return [
-			...accounts.map((account) => ({ value: `account:${account.id}`, label: account.label, group: "account" as const })),
-			...openTransactions.map((transaction) => ({
-				value: `transaction:${transaction.id}`,
-				label: `${transaction.label} (${transaction.amount} €, fällig ${transaction.dueDate.slice(0, 10)})`,
-				group: "transaction" as const,
-			})),
-			...housingCharges.map((housingCharge) => ({
-				value: `housingcharge:${housingCharge.id}`,
-				label: `${housingCharge.label} (${housingCharge.amount} €, fällig ${housingCharge.dueDate.slice(0, 10)})`,
-				group: "housingcharge" as const,
-			})),
-		];
-	}
-
-	const options = useMemo(buildOptions, [accounts, openTransactions, housingCharges]);
 
 	const allocatedCents = rows.reduce((sum, row) => sum + Math.round(Number(row.amount.replace(",", ".")) * 100) || 0, 0);
 	const remainingCents = amountCents - allocatedCents;
@@ -171,8 +169,9 @@ export function BankTransactionAllocateDialog({
 									<div className="grid grid-cols-[1fr_auto] items-center gap-2">
 										<div className="grid gap-1">
 											<Label htmlFor={`target-${index}`}>{t("banking.allocate.target")}</Label>
-											<Select
+											<SearchableSelect
 												name={`target-${index}`}
+												id={`target-${index}`}
 												value={row.target}
 												onValueChange={(next) => {
 													const nextTarget = parseTarget(next);
@@ -185,37 +184,9 @@ export function BankTransactionAllocateDialog({
 															: Math.abs(Number(row.amount.replace(",", ".")) || 0);
 													setRows((current) => current.map((r, i) => (i === index ? { target: next, amount: suggestedAmount.toFixed(2) } : r)));
 												}}
-											>
-												<SelectTrigger id={`target-${index}`} className="w-full">
-													<SelectValue placeholder={t("banking.allocate.targetPlaceholder")} />
-												</SelectTrigger>
-												<SelectContent>
-													{accounts.length > 0 ? (
-														<div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{t("banking.allocate.groupAccounts")}</div>
-													) : null}
-													{accounts.map((account) => (
-														<SelectItem key={`account:${account.id}`} value={`account:${account.id}`}>
-															{account.label}
-														</SelectItem>
-													))}
-													{openTransactions.length > 0 ? (
-														<div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{t("banking.allocate.groupTransactions")}</div>
-													) : null}
-													{openTransactions.map((transaction) => (
-														<SelectItem key={`transaction:${transaction.id}`} value={`transaction:${transaction.id}`}>
-															{transaction.label}
-														</SelectItem>
-													))}
-													{housingCharges.length > 0 ? (
-														<div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{t("banking.allocate.groupHousingCharges")}</div>
-													) : null}
-													{housingCharges.map((housingCharge) => (
-														<SelectItem key={`housingcharge:${housingCharge.id}`} value={`housingcharge:${housingCharge.id}`}>
-															{housingCharge.label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
+												options={options}
+												placeholder={t("banking.allocate.targetPlaceholder")}
+											/>
 										</div>
 										<Button
 											type="button"

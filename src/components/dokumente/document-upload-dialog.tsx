@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n/translator";
@@ -84,52 +85,40 @@ export function DocumentUploadDialog({ properties, units, tenants }: { propertie
 
 						<div className="grid grid-cols-3 gap-4">
 							<div className="grid gap-2">
-								<Label htmlFor="propertyId">{t("common.property")}</Label>
-								<Select name="propertyId" defaultValue="none">
-									<SelectTrigger id="propertyId" className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("common.none")}</SelectItem>
-										{properties.map((property) => (
-											<SelectItem key={property.id} value={property.id}>
-												{property.name}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="propertyId">{t("common.property")}</Label>
+							<SearchableSelect
+								name="propertyId"
+								id="propertyId"
+								options={[
+									{ value: "none", label: t("common.none") },
+									...properties.map((property) => ({ value: property.id, label: property.name })),
+								]}
+								defaultValue="none"
+							/>
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="unitId">{t("common.unit")}</Label>
-								<Select name="unitId" defaultValue="none">
-									<SelectTrigger id="unitId" className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("common.none")}</SelectItem>
-										{units.map((unit) => (
-											<SelectItem key={unit.id} value={unit.id}>
-												{unit.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="unitId">{t("common.unit")}</Label>
+							<SearchableSelect
+								name="unitId"
+								id="unitId"
+								options={[
+									{ value: "none", label: t("common.none") },
+									...units.map((unit) => ({ value: unit.id, label: unit.label })),
+								]}
+								defaultValue="none"
+							/>
 							</div>
 							<div className="grid gap-2">
-								<Label htmlFor="tenantId">{t("common.tenant")}</Label>
-								<Select name="tenantId" defaultValue="none">
-									<SelectTrigger id="tenantId" className="w-full">
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="none">{t("documents.fields.noTenant")}</SelectItem>
-										{tenants.map((tenant) => (
-											<SelectItem key={tenant.id} value={tenant.id}>
-												{tenant.firstName} {tenant.lastName}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="tenantId">{t("common.tenant")}</Label>
+							<SearchableSelect
+								name="tenantId"
+								id="tenantId"
+								options={[
+									{ value: "none", label: t("documents.fields.noTenant") },
+									...tenants.map((tenant) => ({ value: tenant.id, label: `${tenant.firstName} ${tenant.lastName}` })),
+								]}
+								defaultValue="none"
+							/>
 							</div>
 						</div>
 

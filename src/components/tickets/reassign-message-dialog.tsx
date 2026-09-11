@@ -7,7 +7,7 @@ import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -60,20 +60,17 @@ export function ReassignMessageDialog({ message, tickets }: { message: TicketMes
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="reassign-ticketId">{t("tickets.fields.ticket")} *</Label>
-							<Select name="ticketId" required>
-								<SelectTrigger id="reassign-ticketId" className="w-full">
-									<SelectValue placeholder={t("tickets.fields.ticketPlaceholder")} />
-								</SelectTrigger>
-								<SelectContent>
-									{tickets.map((ticket) => (
-										<SelectItem key={ticket.id} value={ticket.id}>
-											{ticket.title}
-											{ticket.propertyName ? ` (${ticket.propertyName})` : ""}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+<Label htmlFor="reassign-ticketId">{t("tickets.fields.ticket")} *</Label>
+						<SearchableSelect
+							name="ticketId"
+							id="reassign-ticketId"
+							options={tickets.map((ticket) => ({
+								value: ticket.id,
+								label: ticket.propertyName ? `${ticket.title} (${ticket.propertyName})` : ticket.title,
+							}))}
+							placeholder={t("tickets.fields.ticketPlaceholder")}
+							required
+						/>
 						</div>
 
 						<ActionErrorToast state={state} />

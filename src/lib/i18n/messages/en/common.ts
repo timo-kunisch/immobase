@@ -66,6 +66,9 @@ export const common: typeof deCommon = {
 	owner: "Owner",
 	// Placeholders in selects
 	pleaseSelect: "Please select…",
+	// SearchableSelect (searchable pick lists for dynamic data sets)
+	"searchableSelect.searchPlaceholder": "Search…",
+	"searchableSelect.noResults": "No results",
 	// Default delete confirmation (ConfirmDeleteButton)
 	confirmDeleteDefault: "Really delete this entry permanently?",
 	// Pagination (PaginationBar)

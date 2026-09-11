@@ -6,7 +6,7 @@ import { ArrowRightLeft, Loader2 } from "lucide-react";
 import { ActionErrorToast } from "@/components/action-error-toast";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { initialActionState } from "@/lib/action-state";
 import { formatDate } from "@/lib/format";
@@ -53,19 +53,18 @@ export function BridgeToBetrKvDialog({ unitResultId, hoaId, availableBillingPeri
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="billingPeriodId">{t("hoaStatement.bridge.field")} *</Label>
-							<Select name="billingPeriodId" defaultValue={availableBillingPeriods[0]?.id} required>
-								<SelectTrigger id="billingPeriodId" className="w-full">
-									<SelectValue placeholder={t("hoaStatement.bridge.placeholder")} />
-								</SelectTrigger>
-								<SelectContent>
-									{availableBillingPeriods.map((period) => (
-										<SelectItem key={period.id} value={period.id}>
-											{formatDate(period.periodFrom)} – {formatDate(period.periodTo)}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+<Label htmlFor="billingPeriodId">{t("hoaStatement.bridge.field")} *</Label>
+						<SearchableSelect
+							name="billingPeriodId"
+							id="billingPeriodId"
+							options={availableBillingPeriods.map((period) => ({
+								value: period.id,
+								label: `${formatDate(period.periodFrom)} – ${formatDate(period.periodTo)}`,
+							}))}
+							defaultValue={availableBillingPeriods[0]?.id}
+							placeholder={t("hoaStatement.bridge.placeholder")}
+							required
+						/>
 						</div>
 						<ActionErrorToast state={state} />
 						{state.success && state.message ? <p className="text-sm text-emerald-600">{state.message}</p> : null}

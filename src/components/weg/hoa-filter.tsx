@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import type { Hoa } from "@/data/types";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -21,23 +21,17 @@ export function HoaFilter({ hoas, value, basePath }: { hoas: Hoa[]; value?: stri
 	const { t } = useI18n();
 
 	return (
-		<Select
+		<SearchableSelect
 			value={value ?? ALL_VALUE}
 			onValueChange={(next) => {
 				router.push(next === ALL_VALUE ? basePath : `${basePath}?hoaId=${next}`);
 			}}
-		>
-			<SelectTrigger className="w-full sm:w-64">
-				<SelectValue placeholder={t("hoa.filter.placeholder")} />
-			</SelectTrigger>
-			<SelectContent>
-				<SelectItem value={ALL_VALUE}>{t("hoa.filter.all")}</SelectItem>
-				{hoas.map((hoa) => (
-					<SelectItem key={hoa.id} value={hoa.id}>
-						{hoa.name}
-					</SelectItem>
-				))}
-			</SelectContent>
-		</Select>
+			options={[
+				{ value: ALL_VALUE, label: t("hoa.filter.all") },
+				...hoas.map((hoa) => ({ value: hoa.id, label: hoa.name })),
+			]}
+			placeholder={t("hoa.filter.placeholder")}
+			className="w-full sm:w-64"
+		/>
 	);
 }

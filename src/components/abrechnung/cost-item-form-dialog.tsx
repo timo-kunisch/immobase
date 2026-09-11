@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
 
@@ -94,37 +95,29 @@ export function CostItemFormDialog({
 
 						{allocationKey === "DIRECT" ? (
 							<div className="grid gap-2">
-								<Label htmlFor="directUnitId">{t("billing.fields.directUnit")} *</Label>
-								<Select name="directUnitId" defaultValue={costItem?.directUnitId ?? units[0]?.id} required>
-									<SelectTrigger id="directUnitId" className="w-full">
-										<SelectValue placeholder={t("billing.fields.directUnitPlaceholder")} />
-									</SelectTrigger>
-									<SelectContent>
-										{units.map((unit) => (
-											<SelectItem key={unit.id} value={unit.id}>
-												{unit.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="directUnitId">{t("billing.fields.directUnit")} *</Label>
+							<SearchableSelect
+								name="directUnitId"
+								id="directUnitId"
+								options={units.map((unit) => ({ value: unit.id, label: unit.label }))}
+								defaultValue={costItem?.directUnitId ?? units[0]?.id}
+								placeholder={t("billing.fields.directUnitPlaceholder")}
+								required
+							/>
 							</div>
 						) : null}
 
 						{allocationKey === "CUSTOM" ? (
 							<div className="grid gap-2">
-								<Label htmlFor="customAllocationKeyId">{t("billing.fields.customAllocationKey")} *</Label>
-								<Select name="customAllocationKeyId" defaultValue={costItem?.customAllocationKeyId ?? customAllocationKeys[0]?.id} required>
-									<SelectTrigger id="customAllocationKeyId" className="w-full">
-										<SelectValue placeholder={t("billing.fields.customAllocationKeyPlaceholder")} />
-									</SelectTrigger>
-									<SelectContent>
-										{customAllocationKeys.map((key) => (
-											<SelectItem key={key.id} value={key.id}>
-												{key.label}
-											</SelectItem>
-										))}
-									</SelectContent>
-								</Select>
+<Label htmlFor="customAllocationKeyId">{t("billing.fields.customAllocationKey")} *</Label>
+							<SearchableSelect
+								name="customAllocationKeyId"
+								id="customAllocationKeyId"
+								options={customAllocationKeys.map((key) => ({ value: key.id, label: key.label }))}
+								defaultValue={costItem?.customAllocationKeyId ?? customAllocationKeys[0]?.id}
+								placeholder={t("billing.fields.customAllocationKeyPlaceholder")}
+								required
+							/>
 								{customAllocationKeys.length === 0 ? (
 									<p className="text-xs text-destructive">{t("billing.costItemDialog.noCustomKeys")}</p>
 								) : null}

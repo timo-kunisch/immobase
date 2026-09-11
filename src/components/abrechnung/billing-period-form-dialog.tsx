@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { initialActionState } from "@/lib/action-state";
 import { toDateInputValue } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
@@ -56,19 +56,15 @@ export function BillingPeriodFormDialog({ billingPeriod, properties }: { billing
 
 					<div className="grid gap-4 py-4">
 						<div className="grid gap-2">
-							<Label htmlFor="propertyId">{t("common.property")} *</Label>
-							<Select name="propertyId" defaultValue={billingPeriod?.propertyId ?? properties[0]?.id} required>
-								<SelectTrigger id="propertyId" className="w-full">
-									<SelectValue placeholder={t("billing.fields.propertyPlaceholder")} />
-								</SelectTrigger>
-								<SelectContent>
-									{properties.map((property) => (
-										<SelectItem key={property.id} value={property.id}>
-											{property.name}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
+<Label htmlFor="propertyId">{t("common.property")} *</Label>
+						<SearchableSelect
+							name="propertyId"
+							id="propertyId"
+							options={properties.map((property) => ({ value: property.id, label: property.name }))}
+							defaultValue={billingPeriod?.propertyId ?? properties[0]?.id}
+							placeholder={t("billing.fields.propertyPlaceholder")}
+							required
+						/>
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">
