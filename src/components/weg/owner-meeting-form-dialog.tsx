@@ -48,7 +48,7 @@ export function OwnerMeetingFormDialog({ hoaId, meeting }: { hoaId: string; meet
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

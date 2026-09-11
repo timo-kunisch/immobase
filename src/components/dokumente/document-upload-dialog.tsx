@@ -34,7 +34,7 @@ export function DocumentUploadDialog({ properties, units, tenants }: { propertie
 			setOpen(false);
 			formRef.current?.reset();
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

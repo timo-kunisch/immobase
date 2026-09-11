@@ -35,7 +35,7 @@ export function CustomAllocationWeightsDialog({
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const weightByUnit = new Map(weights.map((w) => [w.unitId, w.weight]));
 

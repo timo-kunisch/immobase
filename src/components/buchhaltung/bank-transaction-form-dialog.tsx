@@ -24,7 +24,7 @@ export function BankTransactionFormDialog({ propertyId }: { propertyId: string }
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
@@ -116,7 +116,7 @@ export function EditBankTransactionDialog({
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const direction = Number(transaction.amount) < 0 ? "EXPENSE" : "INCOME";
 	const absoluteAmount = String(Math.abs(Number(transaction.amount)));

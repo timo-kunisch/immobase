@@ -28,9 +28,12 @@ export function RentAdjustmentFormDialog({ leaseId, adjustment, onSaved }: { lea
 			onSaved?.();
 		}
 		// onSaved bewusst nicht in den Deps, um bei jedem Render neu ausgelöste
-		// Effekte zu vermeiden - reagiert werden soll nur auf state.success.
+		// Effekte zu vermeiden - reagiert werden soll pro abgeschlossenem
+		// Speichern (state ist je Action-Lauf ein neues Objekt; state.success
+		// bliebe bei Folgespeicherungen dauerhaft true, der Effekt würde
+		// dann nicht erneut feuern).
 		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

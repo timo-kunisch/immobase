@@ -119,7 +119,7 @@ export function BankTransactionAllocateDialog({
 			setOpen(false);
 			setInitialized(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	function buildOptions(): TargetOption[] {
 		return [

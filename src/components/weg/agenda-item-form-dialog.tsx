@@ -25,7 +25,7 @@ export function AgendaItemFormDialog({ hoaId, meetingId, agendaItem, nextPositio
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

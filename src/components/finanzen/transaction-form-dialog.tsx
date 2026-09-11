@@ -38,7 +38,7 @@ export function TransactionFormDialog({ transaction, leases }: { transaction?: T
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const selectedLease = useMemo(() => leases.find((lease) => lease.id === leaseId), [leases, leaseId]);
 

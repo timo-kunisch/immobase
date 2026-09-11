@@ -22,7 +22,7 @@ export function TicketNoteForm({ ticketId }: { ticketId: string }) {
 		if (state.success) {
 			formRef.current?.reset();
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<form ref={formRef} action={formAction} className="grid gap-3">

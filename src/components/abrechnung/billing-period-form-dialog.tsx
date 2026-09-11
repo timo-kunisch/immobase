@@ -27,7 +27,7 @@ export function BillingPeriodFormDialog({ billingPeriod, properties }: { billing
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const disabled = !isEdit && properties.length === 0;
 

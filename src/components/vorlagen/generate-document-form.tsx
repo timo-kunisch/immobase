@@ -65,7 +65,7 @@ export function GenerateDocumentForm({ templateId, leases }: { templateId: strin
 			setSubject("");
 			setBody("");
 		}
-	}, [generateState.success]);
+	}, [generateState]);
 
 	function handleLeaseChange(leaseId: string) {
 		setSelectedLeaseId(leaseId);

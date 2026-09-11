@@ -32,7 +32,7 @@ export function ReserveFundBookingFormDialog({ hoaId, booking }: { hoaId: string
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

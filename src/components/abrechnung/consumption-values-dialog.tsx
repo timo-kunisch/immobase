@@ -33,7 +33,7 @@ export function ConsumptionValuesDialog({
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const valueByUnit = new Map(consumptionValues.map((cv) => [cv.unitId, cv.value]));
 

@@ -25,7 +25,7 @@ export function UnitFormDialog({ unit, properties }: { unit?: Unit; properties: 
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

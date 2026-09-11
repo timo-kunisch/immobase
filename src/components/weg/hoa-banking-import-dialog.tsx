@@ -49,7 +49,7 @@ export function HoaBankingImportDialog({ annualStatementId, accountSums }: { ann
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const hasSums = accountSums.length > 0;
 

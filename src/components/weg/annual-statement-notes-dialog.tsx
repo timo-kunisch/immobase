@@ -31,7 +31,7 @@ export function AnnualStatementNotesDialog({ statement }: { statement: AnnualSta
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

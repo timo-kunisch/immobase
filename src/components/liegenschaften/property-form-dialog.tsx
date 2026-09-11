@@ -25,7 +25,7 @@ export function PropertyFormDialog({ property }: { property?: Property }) {
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog

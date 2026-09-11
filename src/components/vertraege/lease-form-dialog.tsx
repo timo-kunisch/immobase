@@ -29,7 +29,7 @@ export function LeaseFormDialog({ lease, units, tenants }: { lease?: Lease; unit
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const disabled = units.length === 0 || tenants.length === 0;
 

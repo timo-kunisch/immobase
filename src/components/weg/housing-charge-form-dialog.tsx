@@ -33,7 +33,7 @@ export function HousingChargeFormDialog({ hoaId, units, owners, housingCharge }:
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>

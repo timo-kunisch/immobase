@@ -47,7 +47,7 @@ export function BankingImportDialog({ billingPeriodId, accountSums }: { billingP
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	const hasSums = accountSums.length > 0;
 

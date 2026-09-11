@@ -36,7 +36,7 @@ export function EventFormDialog({ event, defaultDate, label, className }: { even
 		if (state.success) {
 			setOpen(false);
 		}
-	}, [state.success]);
+	}, [state]);
 
 	function handleDelete() {
 		if (!event) return;
