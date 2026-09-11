@@ -230,6 +230,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 			 LEFT JOIN properties p ON p.id = d.property_id
 			 LEFT JOIN units u ON u.id = d.unit_id
 			 LEFT JOIN tenants t ON t.id = d.tenant_id
+			 WHERE d.deleted_at IS NULL
 			 ORDER BY d.created_at DESC
 			 LIMIT ${SCAN_LIMIT}`
 		)
@@ -261,7 +262,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 			 LEFT JOIN properties p ON p.id = d.property_id
 			 LEFT JOIN units u ON u.id = d.unit_id
 			 LEFT JOIN tenants t ON t.id = d.tenant_id
-			 WHERE d.ocr_text LIKE ?
+			 WHERE d.deleted_at IS NULL AND d.ocr_text LIKE ?
 			 ORDER BY d.created_at DESC`
 		)
 		.all(`%${trimmed}%`) as Array<{
@@ -297,6 +298,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 			 LEFT JOIN leases l ON l.id = g.lease_id
 			 LEFT JOIN units u ON u.id = l.unit_id
 			 LEFT JOIN properties p ON p.id = u.property_id
+			 WHERE g.deleted_at IS NULL
 			 ORDER BY g.created_at DESC
 			 LIMIT ${SCAN_LIMIT}`
 		)

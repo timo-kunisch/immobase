@@ -107,7 +107,7 @@ export function getPropertyStats(): Map<string, PropertyStats> {
 	for (const row of ticketCounts) ensure(row.propertyId).openTickets = row.value;
 
 	const documentCounts = db
-		.prepare("SELECT property_id AS propertyId, COUNT(*) AS value FROM documents GROUP BY property_id")
+		.prepare("SELECT property_id AS propertyId, COUNT(*) AS value FROM documents WHERE deleted_at IS NULL GROUP BY property_id")
 		.all() as { propertyId: string | null; value: number }[];
 	for (const row of documentCounts) {
 		if (row.propertyId) ensure(row.propertyId).documents = row.value;

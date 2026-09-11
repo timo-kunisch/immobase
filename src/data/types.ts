@@ -274,6 +274,8 @@ export interface DocumentRecord {
 	ocrText: string | null;
 	createdAt: string;
 	updatedAt: string;
+	/** Papierkorb: ISO-Zeitpunkt des Verschiebens in den Papierkorb (null = aktiv). */
+	deletedAt: string | null;
 }
 
 // ============================================================
@@ -471,6 +473,8 @@ export interface GeneratedDocument {
 	filePath: string;
 	fileSize: number | null;
 	createdAt: string;
+	/** Papierkorb: ISO-Zeitpunkt des Verschiebens in den Papierkorb (null = aktiv). */
+	deletedAt: string | null;
 }
 
 // ============================================================

@@ -34,7 +34,7 @@ const GENERATED_DOCUMENT_COLUMNS = `
 	id, template_id AS templateId, template_title AS templateTitle,
 	lease_id AS leaseId, tenant_id AS tenantId, subject,
 	rendered_body AS renderedBody, file_path AS filePath, file_size AS fileSize,
-	created_at AS createdAt
+	created_at AS createdAt, deleted_at AS deletedAt
 `;
 
 /** Dasselbe wie GENERATED_DOCUMENT_COLUMNS, aber mit Tabellen-Alias "d" qualifiziert (für JOINs). */
@@ -42,7 +42,7 @@ const GENERATED_DOCUMENT_COLUMNS_QUALIFIED = `
 	d.id, d.template_id AS templateId, d.template_title AS templateTitle,
 	d.lease_id AS leaseId, d.tenant_id AS tenantId, d.subject,
 	d.rendered_body AS renderedBody, d.file_path AS filePath, d.file_size AS fileSize,
-	d.created_at AS createdAt
+	d.created_at AS createdAt, d.deleted_at AS deletedAt
 `;
 
 // ------------------------------------------------------------
@@ -102,7 +102,9 @@ export function deleteDocumentTemplate(id: string): void {
  */
 export function getGeneratedDocumentCountsByTemplate(): Map<string, number> {
 	const rows = getDb()
-		.prepare("SELECT template_id AS templateId, COUNT(*) AS value FROM generated_documents GROUP BY template_id")
+		.prepare(
+			"SELECT template_id AS templateId, COUNT(*) AS value FROM generated_documents WHERE deleted_at IS NULL GROUP BY template_id"
+		)
 		.all() as { templateId: string | null; value: number }[];
 	const counts = new Map<string, number>();
 	for (const row of rows) {
@@ -134,7 +136,7 @@ function mapGeneratedDocumentJoinRow(row: GeneratedDocumentJoinRow): GeneratedDo
 	};
 }
 
-/** Alle Schreiben einer Vorlage, neueste zuerst (Detailansicht der Vorlage). */
+/** Alle aktiven (nicht im Papierkorb liegenden) Schreiben einer Vorlage, neueste zuerst (Detailansicht der Vorlage). */
 export function listGeneratedDocumentsByTemplate(templateId: string): GeneratedDocumentWithTenant[] {
 	const rows = getDb()
 		.prepare(
@@ -142,7 +144,7 @@ export function listGeneratedDocumentsByTemplate(templateId: string): GeneratedD
 				t.id AS tenantRefId, t.first_name AS tenantFirstName, t.last_name AS tenantLastName
 			 FROM generated_documents d
 			 LEFT JOIN tenants t ON t.id = d.tenant_id
-			 WHERE d.template_id = ?
+			 WHERE d.template_id = ? AND d.deleted_at IS NULL
 			 ORDER BY d.created_at DESC`
 		)
 		.all(templateId) as GeneratedDocumentJoinRow[];
@@ -155,12 +157,13 @@ export interface GeneratedDocumentFilter {
 }
 
 /**
- * Schreiben gefiltert nach Mieter und/oder Vertrag (beide Bedingungen werden
- * UND-verknüpft, Filter-Verlinkung von Mieter-/Vertragsansicht), neueste
- * zuerst. Ohne Filter werden alle Schreiben geliefert.
+ * Aktive (nicht im Papierkorb liegende) Schreiben gefiltert nach Mieter
+ * und/oder Vertrag (beide Bedingungen werden UND-verknüpft, Filter-Verlinkung
+ * von Mieter-/Vertragsansicht), neueste zuerst. Ohne Filter werden alle
+ * aktiven Schreiben geliefert.
  */
 export function listGeneratedDocumentsFiltered(filter: GeneratedDocumentFilter): GeneratedDocumentWithTenant[] {
-	const conditions: string[] = [];
+	const conditions: string[] = ["d.deleted_at IS NULL"];
 	const params: string[] = [];
 	if (filter.tenantId) {
 		conditions.push("d.tenant_id = ?");
@@ -184,10 +187,19 @@ export function listGeneratedDocumentsFiltered(filter: GeneratedDocumentFilter):
 	return rows.map(mapGeneratedDocumentJoinRow);
 }
 
+/** Aktives (nicht im Papierkorb liegendes) Schreiben per ID - Papierkorb-Einträge liefern null. */
 export function getGeneratedDocument(id: string): GeneratedDocument | null {
-	const row = getDb().prepare(`SELECT ${GENERATED_DOCUMENT_COLUMNS} FROM generated_documents WHERE id = ?`).get(id) as
-		| GeneratedDocument
-		| undefined;
+	const row = getDb()
+		.prepare(`SELECT ${GENERATED_DOCUMENT_COLUMNS} FROM generated_documents WHERE id = ? AND deleted_at IS NULL`)
+		.get(id) as GeneratedDocument | undefined;
+	return row ?? null;
+}
+
+/** Im Papierkorb liegendes Schreiben per ID (Wiederherstellen/endgültiges Löschen) - aktive liefern null. */
+export function getTrashedGeneratedDocument(id: string): GeneratedDocument | null {
+	const row = getDb()
+		.prepare(`SELECT ${GENERATED_DOCUMENT_COLUMNS} FROM generated_documents WHERE id = ? AND deleted_at IS NOT NULL`)
+		.get(id) as GeneratedDocument | undefined;
 	return row ?? null;
 }
 
@@ -223,11 +235,53 @@ export function createGeneratedDocument(input: CreateGeneratedDocumentInput): Ge
 			input.fileSize,
 			timestamp
 		);
-	return { id, ...input, createdAt: timestamp };
+	return { id, ...input, createdAt: timestamp, deletedAt: null };
 }
 
+/**
+ * Verschiebt ein aktives Schreiben in den Papierkorb (Soft-Delete). Die
+ * PDF-Datei in der Ablage wird nicht angetastet. Liefert false, wenn das
+ * Schreiben nicht (mehr) aktiv ist.
+ */
+export function trashGeneratedDocument(id: string): boolean {
+	const result = getDb()
+		.prepare("UPDATE generated_documents SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL")
+		.run(now(), id);
+	return result.changes > 0;
+}
+
+/** Holt ein Schreiben aus dem Papierkorb zurück (löscht nur den Papierkorb-Marker). */
+export function restoreGeneratedDocument(id: string): boolean {
+	const result = getDb()
+		.prepare("UPDATE generated_documents SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL")
+		.run(id);
+	return result.changes > 0;
+}
+
+/** Endgültiges Löschen der DB-Zeile (Datei in der Ablage muss separat entfernt werden). */
 export function deleteGeneratedDocument(id: string): void {
 	getDb().prepare("DELETE FROM generated_documents WHERE id = ?").run(id);
+}
+
+/**
+ * Endgültiges Löschen aller abgelaufenen Papierkorb-Einträge
+ * (`deletedAt` älter als der übergebene ISO-Zeitpunkt), atomar in einer
+ * Transaktion. Liefert die Ablagepfade der gelöschten Zeilen zurück, damit
+ * der Aufrufer die zugehörigen Dateien entfernen kann.
+ */
+export function deleteExpiredTrashedGeneratedDocuments(cutoffIso: string): { id: string; filePath: string }[] {
+	const db = getDb();
+	const expired = db
+		.prepare(
+			`SELECT id, file_path AS filePath FROM generated_documents WHERE deleted_at IS NOT NULL AND deleted_at < ?`
+		)
+		.all(cutoffIso) as { id: string; filePath: string }[];
+	const purge = db.transaction(() => {
+		const statement = db.prepare("DELETE FROM generated_documents WHERE id = ?");
+		for (const row of expired) statement.run(row.id);
+	});
+	purge();
+	return expired;
 }
 
 // ------------------------------------------------------------

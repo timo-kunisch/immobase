@@ -579,7 +579,13 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
   (IMAP-Abgleichstand je Ordner: UIDVALIDITY, letzte UID, letzter Sync-Status),
   `ticket_activity_log` (Aktivitätsprotokoll je Ticket: Aktion + alt/neu + Kontext + Akteur +
   Zeitpunkt, append-only)
-- **Dokumente (DMS):** `documents`
+- **Dokumente (DMS):** `documents` (Papierkorb über `deleted_at`: Das Löschen verschiebt hochgeladene
+  DMS-Dokumente und erzeugte Vorlagen-Schreiben in den Papierkorb `/dokumente?trash=1` — 28 Tage
+  Aufbewahrung (`DOCUMENT_TRASH_RETENTION_DAYS`), dort Wiederherstellen oder endgültiges Löschen;
+  abgelaufene Einträge werden automatisch endgültig gelöscht (DB-Zeile + Datei) durch den Scheduler
+  in `src/lib/document-trash.ts` (Start im App-Layout) sowie einen Purge beim Öffnen der
+  Papierkorb-Ansicht. Reguläre Lesezugriffe, Suche, Zähler und Postversand-Auflösung sehen nur
+  aktive Dokumente; `generated_documents` ist analog über sein eigenes `deleted_at` angebunden)
 - **Finanzen:** `transactions` (Sollstellungen/Mieteingänge)
 - **Buchhaltung:** `accounts` (Kontenrahmen je Liegenschaft, z. B. „Gebäudeversicherung"),
   `bank_transactions` (tatsächliche Bewegungen auf dem Bankkonto einer Liegenschaft, Betrag
@@ -864,6 +870,9 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Fehler-Rolle/Anhang-Metadaten, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
   Kaskade),  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,
   Verlauf-Ablage; Mailer gemockt), `src/lib/ticket-ref.test.ts` (Ticket-Kennung im Betreff),
+  `src/lib/document-trash.test.ts` (Dokumenten-Papierkorb: Verschieben/Wiederherstellen beider
+  Quellen, Sichtbarkeiten der regulären Lesezugriffe, Endlöschung nach Ablauf der 28-Tage-Frist
+  inkl. Datei-Entfernung und Stichtag-Grenzfall),
   `src/lib/letterxpress.test.ts`, `src/lib/postal-shipments.test.ts` (Mocks),
   `src/lib/dropbox.test.ts`/`src/lib/dropbox-backup.test.ts` (API-Client + Orchestrierung, fetch
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und

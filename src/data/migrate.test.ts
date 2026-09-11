@@ -144,10 +144,11 @@ describe("migrateDatabase", () => {
 		db.prepare("INSERT INTO tickets (id, title, status, created_at, updated_at) VALUES ('t2', 'Organisatorisch', 'OPEN', '2026-01-04', '2026-01-04')").run();
 
 		// ... das Down schlägt dafür bewusst mit Constraint-Fehler fehl und
-		// lässt die Datenbank auf Version 15 stehen (0018, 0017 und 0016 wurden
-		// zuvor erfolgreich zurückgenommen, 0015 bleibt unverändert erhalten).
-		expect(() => migrateDatabaseDown(db, 4)).toThrow();
-		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 3);
+		// lässt die Datenbank auf Version 15 stehen (0019, 0018, 0017 und
+		// 0016 wurden zuvor erfolgreich zurückgenommen, 0015 bleibt
+		// unverändert erhalten).
+		expect(() => migrateDatabaseDown(db, 5)).toThrow();
+		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 4);
 		expect(db.prepare("SELECT COUNT(*) c FROM ticket_messages").get().c).toBe(1);
 	});
 });
@@ -155,18 +156,18 @@ describe("migrateDatabase", () => {
 describe("migrateDatabaseDown", () => {
 	it("kann die letzte Migration zurücknehmen (vor/zurück)", () => {
 		const db = getDb();
-		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0018:
-		// ausgeblendete E-Mails - Spalte ticket_messages.hidden fällt weg).
-		expect(columnNames(db, "ticket_messages")).toContain("hidden");
+		// Stichprobe = Änderung der jeweils letzten Migration (derzeit 0019:
+		// Dokumenten-Papierkorb - Spalte documents.deleted_at fällt weg).
+		expect(columnNames(db, "documents")).toContain("deleted_at");
 
 		migrateDatabaseDown(db, 1);
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION - 1);
-		expect(columnNames(db, "ticket_messages")).not.toContain("hidden");
+		expect(columnNames(db, "documents")).not.toContain("deleted_at");
 
 		// ...und wieder hochmigrieren
 		migrateDatabase(db, path.join(testDir, "data.db"));
 		expect(db.pragma("user_version", { simple: true })).toBe(LATEST_SCHEMA_VERSION);
-		expect(columnNames(db, "ticket_messages")).toContain("hidden");
+		expect(columnNames(db, "documents")).toContain("deleted_at");
 	});
 
 	it("kann vollständig zurück auf Version 0 (leere Datenbank)", () => {

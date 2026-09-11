@@ -100,16 +100,18 @@ export function getTenantStatementPdfFile(sourceId: string): PostalSourceFile | 
 
 export function getGeneratedDocumentPdfFile(sourceId: string): PostalSourceFile | null {
 	const row = getDb()
-		.prepare("SELECT file_path AS filePath, subject, template_title AS templateTitle FROM generated_documents WHERE id = ?")
+		.prepare(
+			"SELECT file_path AS filePath, subject, template_title AS templateTitle FROM generated_documents WHERE id = ? AND deleted_at IS NULL"
+		)
 		.get(sourceId) as { filePath: string; subject: string | null; templateTitle: string } | undefined;
 	if (!row) return null;
 	return { filePath: row.filePath, fileName: `${row.subject || row.templateTitle}.pdf` };
 }
 
 export function getDocumentPdfFile(sourceId: string): PostalSourceFile | null {
-	const row = getDb().prepare("SELECT file_path AS filePath, file_name AS fileName FROM documents WHERE id = ?").get(sourceId) as
-		| { filePath: string; fileName: string }
-		| undefined;
+	const row = getDb()
+		.prepare("SELECT file_path AS filePath, file_name AS fileName FROM documents WHERE id = ? AND deleted_at IS NULL")
+		.get(sourceId) as { filePath: string; fileName: string } | undefined;
 	if (!row) return null;
 	return { filePath: row.filePath, fileName: row.fileName };
 }

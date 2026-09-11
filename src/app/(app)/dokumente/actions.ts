@@ -2,7 +2,15 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createDocument, deleteDocument, getDocument, updateDocument } from "@/data/documents";
+import {
+	createDocument,
+	deleteDocument,
+	getDocument,
+	getTrashedDocument,
+	restoreDocument,
+	trashDocument,
+	updateDocument,
+} from "@/data/documents";
 import type { DocumentType } from "@/data/types";
 import { requireUser } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
@@ -12,7 +20,12 @@ import { deleteUploadedFile, saveUploadedFile } from "@/lib/storage";
 import { sendPdfByPostForSource, type PostalShipmentActionState } from "@/lib/postal-shipments";
 import type { DocumentSourceType } from "@/lib/documents-overview";
 import { ALLOWED_DOCUMENT_TYPES_LABEL, isAllowedDocumentFile } from "@/app/(app)/dokumente/upload-constraints";
-import { deleteGeneratedDocumentAction, sendGeneratedDocumentByPostAction } from "@/app/(app)/vorlagen/actions";
+import {
+	deleteGeneratedDocumentAction,
+	deleteGeneratedDocumentPermanentlyAction,
+	restoreGeneratedDocumentAction,
+	sendGeneratedDocumentByPostAction,
+} from "@/app/(app)/vorlagen/actions";
 import { sendStatementByPostAction } from "@/app/(app)/abrechnung/actions";
 import { sendHoaAnnualStatementByPostAction } from "@/app/(app)/weg/jahresabrechnung/actions";
 
@@ -110,6 +123,12 @@ export async function updateDocumentAction(_prevState: ActionState, formData: Fo
 	return { success: true };
 }
 
+/**
+ * Löscht ein hochgeladenes DMS-Dokument: landet im Papierkorb
+ * (28 Tage Aufbewahrung, danach automatische endgültige Löschung) und kann
+ * bis dahin über /dokumente?trash=1 wiederhergestellt werden. Die Datei
+ * in der Ablage bleibt unangetastet.
+ */
 export async function deleteDocumentAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
@@ -119,12 +138,62 @@ export async function deleteDocumentAction(id: string): Promise<ActionState> {
 			return { error: t("documents.errors.notFound") };
 		}
 
-		deleteDocument(id);
-		await deleteUploadedFile(document.filePath);
-		logActivity(user, "DELETE", "dokumente", `Dokument „${document.fileName}“ gelöscht`, id);
+		if (!trashDocument(id)) {
+			return { error: t("documents.errors.notFound") };
+		}
+		logActivity(user, "DELETE", "dokumente", `Dokument „${document.fileName}“ in den Papierkorb verschoben`, id);
 	} catch (error) {
 		console.error("deleteDocumentAction failed", error);
 		return { error: t("documents.errors.deleteFailed") };
+	}
+
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/** Holt ein im Papierkorb liegendes Dokument zurück (Papierkorb-Ansicht). */
+export async function restoreDocumentAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	try {
+		const document = getTrashedDocument(id);
+		if (!document) {
+			return { error: t("documents.errors.notTrashed") };
+		}
+
+		if (!restoreDocument(id)) {
+			return { error: t("documents.errors.notTrashed") };
+		}
+		logActivity(user, "UPDATE", "dokumente", `Dokument „${document.fileName}“ aus dem Papierkorb wiederhergestellt`, id);
+	} catch (error) {
+		console.error("restoreDocumentAction failed", error);
+		return { error: t("documents.errors.restoreFailed") };
+	}
+
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/**
+ * Endgültiges Löschen aus dem Papierkorb (DB-Zeile + Datei in der Ablage,
+ * unwiderruflich) - bewusst nur für bereits im Papierkorb liegende
+ * Dokumente, aktive Dokumente laufen über den normalen Löschpfad.
+ */
+export async function deleteDocumentPermanentlyAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	try {
+		const document = getTrashedDocument(id);
+		if (!document) {
+			return { error: t("documents.errors.notTrashed") };
+		}
+
+		deleteDocument(id);
+		await deleteUploadedFile(document.filePath);
+		logActivity(user, "DELETE", "dokumente", `Dokument „${document.fileName}“ endgültig gelöscht`, id);
+	} catch (error) {
+		console.error("deleteDocumentPermanentlyAction failed", error);
+		return { error: t("documents.errors.permanentDeleteFailed") };
 	}
 
 	revalidatePath("/dokumente");
@@ -181,12 +250,32 @@ export async function sendDocumentByPostAction(documentId: string): Promise<Post
  * eine abgeleitete Momentaufnahme, siehe abrechnung/actions.ts bzw.
  * weg/jahresabrechnung/actions.ts) - Löschen ist für diese Quellen in der
  * Gesamtübersicht daher nicht möglich.
+ *
+ * Das Löschen selbst führt bei DOCUMENT und GENERATED_DOCUMENT in den
+ * Papierkorb (28 Tage Aufbewahrung, danach automatische Endlöschung);
+ * Wiederherstellen/Endgültig Löschen läuft über die Dispatcher unten.
  */
 export async function deleteAnyDocumentAction(sourceType: DocumentSourceType, id: string): Promise<ActionState> {
 	if (sourceType === "DOCUMENT") return deleteDocumentAction(id);
 	if (sourceType === "GENERATED_DOCUMENT") return deleteGeneratedDocumentAction(id);
 	const t = await getT();
 	return { error: t("documents.errors.statementDelete") };
+}
+
+/** Wiederherstellen aus dem Papierkorb, quellenspezifisch dispatcht (Papierkorb-Ansicht). */
+export async function restoreAnyDocumentAction(sourceType: DocumentSourceType, id: string): Promise<ActionState> {
+	if (sourceType === "DOCUMENT") return restoreDocumentAction(id);
+	if (sourceType === "GENERATED_DOCUMENT") return restoreGeneratedDocumentAction(id);
+	const t = await getT();
+	return { error: t("documents.errors.notTrashed") };
+}
+
+/** Endgültiges Löschen aus dem Papierkorb, quellenspezifisch dispatcht (Papierkorb-Ansicht). */
+export async function deleteAnyDocumentPermanentlyAction(sourceType: DocumentSourceType, id: string): Promise<ActionState> {
+	if (sourceType === "DOCUMENT") return deleteDocumentPermanentlyAction(id);
+	if (sourceType === "GENERATED_DOCUMENT") return deleteGeneratedDocumentPermanentlyAction(id);
+	const t = await getT();
+	return { error: t("documents.errors.notTrashed") };
 }
 
 export async function sendAnyDocumentByPostAction(sourceType: DocumentSourceType, id: string): Promise<PostalShipmentActionState> {

@@ -45,7 +45,14 @@ import {
 } from "@/data/bank-transactions";
 import { getCompanySettings, saveCompanySettings, type CompanySettingsInput } from "@/data/company-settings";
 import { upsertDepositForLease, getDepositByLeaseId, type DepositInput } from "@/data/deposits";
-import { createDocument, deleteDocument, getDocument, listUploadedDocumentOverviewRows } from "@/data/documents";
+import {
+	createDocument,
+	getDocument,
+	getTrashedDocument,
+	listUploadedDocumentOverviewRows,
+	restoreDocument,
+	trashDocument,
+} from "@/data/documents";
 import {
 	createLease,
 	createRentAdjustment,
@@ -63,11 +70,13 @@ import { createProperty, deleteProperty, getProperty, listProperties, updateProp
 import {
 	createDocumentTemplate,
 	deleteDocumentTemplate,
-	deleteGeneratedDocument,
 	getDocumentTemplate,
 	getGeneratedDocument,
+	getTrashedGeneratedDocument,
 	listDocumentTemplates,
 	listGeneratedDocumentsFiltered,
+	restoreGeneratedDocument,
+	trashGeneratedDocument,
 	updateDocumentTemplate,
 	type DocumentTemplateInput,
 } from "@/data/templates";
@@ -102,7 +111,7 @@ import { createUnit, deleteUnit, getUnit, listUnits, updateUnit, type UnitInput 
 import { calculateBillingResult } from "@/lib/billing";
 import { centsToDecimalString } from "@/lib/money";
 import { getTotalRentForDate } from "@/lib/rent-history";
-import { deleteUploadedFile, getUploadedFile, saveUploadedFile } from "@/lib/storage";
+import { getUploadedFile, saveUploadedFile } from "@/lib/storage";
 import { sendTicketEmail } from "@/lib/ticket-mailer";
 
 import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, registerTool, type FieldSpec } from "./registry";
@@ -821,14 +830,27 @@ registerTool({
 
 registerTool({
 	name: "documents_delete",
-	description: "Löscht ein Dokument unwiderruflich (Datensatz und Datei in der Ablage).",
+	description:
+		"Verschiebt ein Dokument in den Papierkorb (28 Tage Aufbewahrung, danach automatische endgültige Löschung inkl. Datei; " +
+		"bis dahin über documents_restore wiederherstellbar).",
 	inputSchema: buildInputSchema({ id: { type: "string" } }),
-	handler: async (args) => {
+	handler: (args) => {
 		const { id } = coerceArgs({ id: { type: "string" } }, args);
 		const document = getDocument(id as string);
 		if (!document) throw new McpToolError(`Dokument mit ID "${id as string}" wurde nicht gefunden.`);
-		deleteDocument(id as string);
-		await deleteUploadedFile(document.filePath);
+		if (!trashDocument(id as string)) throw new McpToolError(`Dokument mit ID "${id as string}" wurde nicht gefunden.`);
+		return { success: true, id };
+	},
+});
+
+registerTool({
+	name: "documents_restore",
+	description: "Stellt ein im Papierkorb liegendes Dokument wieder her (Gegenteil von documents_delete).",
+	inputSchema: buildInputSchema({ id: { type: "string" } }),
+	handler: (args) => {
+		const { id } = coerceArgs({ id: { type: "string" } }, args);
+		if (!getTrashedDocument(id as string)) throw new McpToolError(`Dokument mit ID "${id as string}" liegt nicht im Papierkorb.`);
+		if (!restoreDocument(id as string)) throw new McpToolError(`Dokument mit ID "${id as string}" liegt nicht im Papierkorb.`);
 		return { success: true, id };
 	},
 });
@@ -1450,12 +1472,26 @@ registerTool({
 
 registerTool({
 	name: "generated_documents_delete",
-	description: "Löscht ein erzeugtes Schreiben (Datensatz; die PDF-Datei bleibt in der Ablage erhalten, falls sie anderweitig referenziert ist).",
+	description:
+		"Verschiebt ein erzeugtes Schreiben in den Papierkorb (28 Tage Aufbewahrung, danach automatische endgültige Löschung inkl. PDF-Datei; " +
+		"bis dahin über generated_documents_restore wiederherstellbar).",
 	inputSchema: buildInputSchema({ id: { type: "string" } }),
 	handler: (args) => {
 		const { id } = coerceArgs({ id: { type: "string" } }, args);
 		if (!getGeneratedDocument(id as string)) throw new McpToolError(`Schreiben mit ID "${id as string}" wurde nicht gefunden.`);
-		deleteGeneratedDocument(id as string);
+		if (!trashGeneratedDocument(id as string)) throw new McpToolError(`Schreiben mit ID "${id as string}" wurde nicht gefunden.`);
+		return { success: true, id };
+	},
+});
+
+registerTool({
+	name: "generated_documents_restore",
+	description: "Stellt ein im Papierkorb liegendes erzeugtes Schreiben wieder her (Gegenteil von generated_documents_delete).",
+	inputSchema: buildInputSchema({ id: { type: "string" } }),
+	handler: (args) => {
+		const { id } = coerceArgs({ id: { type: "string" } }, args);
+		if (!getTrashedGeneratedDocument(id as string)) throw new McpToolError(`Schreiben mit ID "${id as string}" liegt nicht im Papierkorb.`);
+		if (!restoreGeneratedDocument(id as string)) throw new McpToolError(`Schreiben mit ID "${id as string}" liegt nicht im Papierkorb.`);
 		return { success: true, id };
 	},
 });

@@ -10,6 +10,9 @@ import {
 	getDocumentTemplate,
 	getGeneratedDocument,
 	getLeaseTemplateContext,
+	getTrashedGeneratedDocument,
+	restoreGeneratedDocument,
+	trashGeneratedDocument,
 	updateDocumentTemplate,
 } from "@/data/templates";
 import type { DocumentTemplateCategory } from "@/data/types";
@@ -233,20 +236,67 @@ export async function sendGeneratedDocumentByPostAction(generatedDocumentId: str
 	return result;
 }
 
+/**
+ * Löscht ein erzeugtes Schreiben: landet im Papierkorb (28 Tage
+ * Aufbewahrung, danach automatische endgültige Löschung) und kann bis
+ * dahin über /dokumente?trash=1 wiederhergestellt werden. Die PDF-Datei
+ * in der Ablage bleibt unangetastet.
+ */
 export async function deleteGeneratedDocumentAction(id: string): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
 	try {
 		const document = getGeneratedDocument(id);
 		if (!document) return { error: t("templates.errors.documentNotFound") };
-		deleteGeneratedDocument(id);
-		await deleteUploadedFile(document.filePath);
-		logActivity(user, "DELETE", "vorlagen", `Dokument „${document.subject ?? document.templateTitle}“ gelöscht`, id);
+		if (!trashGeneratedDocument(id)) return { error: t("templates.errors.documentNotFound") };
+		logActivity(user, "DELETE", "vorlagen", `Dokument „${document.subject ?? document.templateTitle}“ in den Papierkorb verschoben`, id);
 	} catch (error) {
 		console.error("deleteGeneratedDocumentAction failed", error);
 		return { error: t("templates.errors.documentDeleteFailed") };
 	}
 
 	revalidatePath("/vorlagen");
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/** Holt ein im Papierkorb liegendes Schreiben zurück (Papierkorb-Ansicht /dokumente?trash=1). */
+export async function restoreGeneratedDocumentAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	try {
+		const document = getTrashedGeneratedDocument(id);
+		if (!document) return { error: t("documents.errors.notTrashed") };
+
+		if (!restoreGeneratedDocument(id)) return { error: t("documents.errors.notTrashed") };
+		logActivity(user, "UPDATE", "vorlagen", `Dokument „${document.subject ?? document.templateTitle}“ aus dem Papierkorb wiederhergestellt`, id);
+	} catch (error) {
+		console.error("restoreGeneratedDocumentAction failed", error);
+		return { error: t("documents.errors.restoreFailed") };
+	}
+
+	revalidatePath("/vorlagen");
+	revalidatePath("/dokumente");
+	return { success: true };
+}
+
+/** Endgültiges Löschen eines Schreibens aus dem Papierkorb (DB-Zeile + PDF-Datei, unwiderruflich). */
+export async function deleteGeneratedDocumentPermanentlyAction(id: string): Promise<ActionState> {
+	const user = await requireUser();
+	const t = await getT();
+	try {
+		const document = getTrashedGeneratedDocument(id);
+		if (!document) return { error: t("documents.errors.notTrashed") };
+
+		deleteGeneratedDocument(id);
+		await deleteUploadedFile(document.filePath);
+		logActivity(user, "DELETE", "vorlagen", `Dokument „${document.subject ?? document.templateTitle}“ endgültig gelöscht`, id);
+	} catch (error) {
+		console.error("deleteGeneratedDocumentPermanentlyAction failed", error);
+		return { error: t("documents.errors.permanentDeleteFailed") };
+	}
+
+	revalidatePath("/vorlagen");
+	revalidatePath("/dokumente");
 	return { success: true };
 }

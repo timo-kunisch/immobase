@@ -92,14 +92,14 @@ export function getTenantStats(): Map<string, TenantStats> {
 	for (const row of leaseCounts) ensure(row.tenantId).leases = row.value;
 
 	const documentCounts = db
-		.prepare("SELECT tenant_id AS tenantId, COUNT(*) AS value FROM documents GROUP BY tenant_id")
+		.prepare("SELECT tenant_id AS tenantId, COUNT(*) AS value FROM documents WHERE deleted_at IS NULL GROUP BY tenant_id")
 		.all() as { tenantId: string | null; value: number }[];
 	for (const row of documentCounts) {
 		if (row.tenantId) ensure(row.tenantId).documents = row.value;
 	}
 
 	const generatedDocumentCounts = db
-		.prepare("SELECT tenant_id AS tenantId, COUNT(*) AS value FROM generated_documents GROUP BY tenant_id")
+		.prepare("SELECT tenant_id AS tenantId, COUNT(*) AS value FROM generated_documents WHERE deleted_at IS NULL GROUP BY tenant_id")
 		.all() as { tenantId: string | null; value: number }[];
 	for (const row of generatedDocumentCounts) {
 		if (row.tenantId) ensure(row.tenantId).generatedDocuments = row.value;

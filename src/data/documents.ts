@@ -19,7 +19,7 @@ const DOCUMENT_COLUMNS = `
 	id, property_id AS propertyId, unit_id AS unitId, tenant_id AS tenantId,
 	type, file_name AS fileName, file_path AS filePath, mime_type AS mimeType,
 	file_size AS fileSize, ocr_text AS ocrText,
-	created_at AS createdAt, updated_at AS updatedAt
+	created_at AS createdAt, updated_at AS updatedAt, deleted_at AS deletedAt
 `;
 
 const UNIT_COLUMNS = `
@@ -44,10 +44,25 @@ export interface DocumentInput {
 	fileSize: number | null;
 }
 
+/**
+ * Aktives (nicht im Papierkorb liegendes) Dokument per ID - alle regulären
+ * Lese-/Schreibzugriffe der App sehen Papierkorb-Dokumente bewusst nicht.
+ */
 export function getDocument(id: string): DocumentRecord | null {
-	const row = getDb().prepare(`SELECT ${DOCUMENT_COLUMNS} FROM documents WHERE id = ?`).get(id) as
-		| DocumentRecord
-		| undefined;
+	const row = getDb()
+		.prepare(`SELECT ${DOCUMENT_COLUMNS} FROM documents WHERE id = ? AND deleted_at IS NULL`)
+		.get(id) as DocumentRecord | undefined;
+	return row ?? null;
+}
+
+/**
+ * Im Papierkorb liegendes Dokument per ID (für Wiederherstellen und
+ * endgültiges Löschen) - aktive Dokumente liefern null.
+ */
+export function getTrashedDocument(id: string): DocumentRecord | null {
+	const row = getDb()
+		.prepare(`SELECT ${DOCUMENT_COLUMNS} FROM documents WHERE id = ? AND deleted_at IS NOT NULL`)
+		.get(id) as DocumentRecord | undefined;
 	return row ?? null;
 }
 
@@ -72,7 +87,7 @@ export function createDocument(input: DocumentInput): DocumentRecord {
 			timestamp,
 			timestamp
 		);
-	return { id, ...input, ocrText: null, createdAt: timestamp, updatedAt: timestamp };
+	return { id, ...input, ocrText: null, createdAt: timestamp, updatedAt: timestamp, deletedAt: null };
 }
 
 /** Änderbare Felder eines hochgeladenen DMS-Dokuments (Typ + Zuordnungen). */
@@ -97,8 +112,57 @@ export function updateDocument(id: string, input: DocumentUpdateInput): void {
 		.run(input.propertyId, input.unitId, input.tenantId, input.type, now(), id);
 }
 
+/**
+ * Verschiebt ein aktives Dokument in den Papierkorb (Soft-Delete): Die
+ * DB-Zeile samt Datei-Verknüpfung bleibt erhalten, die Datei in der Ablage
+ * wird nicht angetastet. Liefert false, wenn das Dokument nicht (mehr)
+ * aktiv ist.
+ */
+export function trashDocument(id: string): boolean {
+	const result = getDb()
+		.prepare(
+			`UPDATE documents
+			 SET deleted_at = ?, updated_at = ?
+			 WHERE id = ? AND deleted_at IS NULL`
+		)
+		.run(now(), now(), id);
+	return result.changes > 0;
+}
+
+/** Holt ein Dokument aus dem Papierkorb zurück (löscht nur den Papierkorb-Marker). */
+export function restoreDocument(id: string): boolean {
+	const result = getDb()
+		.prepare(
+			`UPDATE documents
+			 SET deleted_at = NULL, updated_at = ?
+			 WHERE id = ? AND deleted_at IS NOT NULL`
+		)
+		.run(now(), id);
+	return result.changes > 0;
+}
+
+/** Endgültiges Löschen der DB-Zeile (Datei in der Ablage muss separat entfernt werden). */
 export function deleteDocument(id: string): void {
 	getDb().prepare("DELETE FROM documents WHERE id = ?").run(id);
+}
+
+/**
+ * Endgültiges Löschen aller abgelaufenen Papierkorb-Einträge
+ * (`deletedAt` älter als der übergebene ISO-Zeitpunkt), atomar in einer
+ * Transaktion. Liefert die Ablagepfade der gelöschten Zeilen zurück, damit
+ * der Aufrufer die zugehörigen Dateien entfernen kann.
+ */
+export function deleteExpiredTrashedDocuments(cutoffIso: string): { id: string; filePath: string }[] {
+	const db = getDb();
+	const expired = db
+		.prepare(`SELECT id, file_path AS filePath FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?`)
+		.all(cutoffIso) as { id: string; filePath: string }[];
+	const purge = db.transaction(() => {
+		const statement = db.prepare("DELETE FROM documents WHERE id = ?");
+		for (const row of expired) statement.run(row.id);
+	});
+	purge();
+	return expired;
 }
 
 // ------------------------------------------------------------
@@ -209,7 +273,7 @@ function buildOverviewWhere(conditions: string[]): string {
  * Freitextsuche erfolgt wie bisher anwendungsseitig in der lib.
  */
 export function listUploadedDocumentOverviewRows(filters: DocumentOverviewFilters): UploadedDocumentOverviewRow[] {
-	const conditions: string[] = [];
+	const conditions: string[] = ["d.deleted_at IS NULL"];
 	const params: string[] = [];
 	if (filters.propertyId) {
 		conditions.push("d.property_id = ?");
@@ -248,7 +312,7 @@ export function listUploadedDocumentOverviewRows(filters: DocumentOverviewFilter
  * (lease -> unit -> property).
  */
 export function listGeneratedDocumentOverviewRows(filters: DocumentOverviewFilters): GeneratedDocumentOverviewRow[] {
-	const conditions: string[] = [];
+	const conditions: string[] = ["gd.deleted_at IS NULL"];
 	const params: string[] = [];
 	if (filters.tenantId) {
 		conditions.push("gd.tenant_id = ?");
@@ -279,6 +343,73 @@ export function listGeneratedDocumentOverviewRows(filters: DocumentOverviewFilte
 			 ${buildOverviewWhere(conditions)}`
 		)
 		.all(...params) as GeneratedDocumentOverviewRow[];
+}
+
+/**
+ * Papierkorb-Zeile eines hochgeladenen DMS-Dokuments (Quelle `documents`).
+ */
+export interface TrashedUploadedDocumentOverviewRow extends OverviewLinkedColumns {
+	id: string;
+	type: DocumentType;
+	fileName: string;
+	filePath: string;
+	mimeType: string | null;
+	fileSize: number | null;
+	deletedAt: string;
+}
+
+/**
+ * Papierkorb-Zeile eines generierten Vorlagen-Schreibens (Quelle
+ * `generated_documents`).
+ */
+export interface TrashedGeneratedDocumentOverviewRow extends OverviewLinkedColumns {
+	id: string;
+	subject: string | null;
+	templateTitle: string;
+	filePath: string;
+	fileSize: number | null;
+	deletedAt: string;
+}
+
+/** Im Papierkorb liegende hochgeladene DMS-Dokumente, zuletzt gelöscht zuerst. */
+export function listTrashedUploadedDocumentOverviewRows(): TrashedUploadedDocumentOverviewRow[] {
+	return getDb()
+		.prepare(
+			`SELECT
+				d.id AS id, d.type AS type, d.file_name AS fileName, d.file_path AS filePath,
+				d.mime_type AS mimeType, d.file_size AS fileSize, d.deleted_at AS deletedAt,
+				p.id AS propertyId, p.name AS propertyName,
+				u.id AS unitId, u.label AS unitLabel,
+				t.id AS tenantId, t.first_name AS tenantFirstName, t.last_name AS tenantLastName
+			 FROM documents d
+			 LEFT JOIN properties p ON d.property_id = p.id
+			 LEFT JOIN units u ON d.unit_id = u.id
+			 LEFT JOIN tenants t ON d.tenant_id = t.id
+			 WHERE d.deleted_at IS NOT NULL
+			 ORDER BY d.deleted_at DESC`
+		)
+		.all() as TrashedUploadedDocumentOverviewRow[];
+}
+
+/** Im Papierkorb liegende generierte Vorlagen-Schreiben, zuletzt gelöscht zuerst. */
+export function listTrashedGeneratedDocumentOverviewRows(): TrashedGeneratedDocumentOverviewRow[] {
+	return getDb()
+		.prepare(
+			`SELECT
+				gd.id AS id, gd.subject AS subject, gd.template_title AS templateTitle,
+				gd.file_path AS filePath, gd.file_size AS fileSize, gd.deleted_at AS deletedAt,
+				p.id AS propertyId, p.name AS propertyName,
+				u.id AS unitId, u.label AS unitLabel,
+				t.id AS tenantId, t.first_name AS tenantFirstName, t.last_name AS tenantLastName
+			 FROM generated_documents gd
+			 LEFT JOIN leases l ON gd.lease_id = l.id
+			 LEFT JOIN units u ON l.unit_id = u.id
+			 LEFT JOIN properties p ON u.property_id = p.id
+			 LEFT JOIN tenants t ON gd.tenant_id = t.id
+			 WHERE gd.deleted_at IS NOT NULL
+			 ORDER BY gd.deleted_at DESC`
+		)
+		.all() as TrashedGeneratedDocumentOverviewRow[];
 }
 
 /**

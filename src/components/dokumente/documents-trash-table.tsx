@@ -1,28 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { useTransition } from "react";
+import { ArchiveRestore, FileText, Loader2 } from "lucide-react";
 
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
-import { SendByPostButton } from "@/components/postal-shipments/send-by-post-button";
-import { DocumentEditDialog } from "@/components/dokumente/document-edit-dialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { DataTable, type DataTableColumn } from "@/components/ui/data-table";
-import type { DocumentSourceType, UnifiedDocument } from "@/lib/documents-overview";
-import type { Property, Tenant, Unit } from "@/data/types";
+import type { TrashedDocumentRow, TrashedDocumentSourceType } from "@/lib/document-trash";
 import { formatDate, formatFileSize } from "@/lib/format";
 import { useI18n } from "@/lib/i18n/provider";
 import type { MessageKey } from "@/lib/i18n/translator";
 import { LIST_PAGE_SIZE } from "@/lib/pagination";
+import { showError } from "@/lib/toast";
 
-import { deleteAnyDocumentAction, sendAnyDocumentByPostAction } from "@/app/(app)/dokumente/actions";
+import { deleteAnyDocumentPermanentlyAction, restoreAnyDocumentAction } from "@/app/(app)/dokumente/actions";
 
 /**
- * Zeilen-Typ der Dokumente-Tabelle: die vereinheitlichte Übersichts-Zeile
- * über alle vier Datei-Quellen (siehe src/lib/documents-overview.ts) -
- * vollständig serialisierbar, daher direkt als Client-Prop geeignet.
+ * Papierkorb-Tabelle (/dokumente?trash=1): die im Papierkorb liegenden
+ * hochgeladenen Dokumente und Vorlagen-Schreiben (siehe
+ * src/lib/document-trash.ts) mit Wiederherstellen und endgültigem Löschen.
  */
-export type DocumentRow = UnifiedDocument;
 
 const typeLabelKeys: Record<string, MessageKey> = {
 	CONTRACT: "documents.category.CONTRACT",
@@ -34,43 +33,47 @@ const typeLabelKeys: Record<string, MessageKey> = {
 const sourceTypeLabelKeys: Record<string, MessageKey> = {
 	DOCUMENT: "documents.sourceType.DOCUMENT",
 	GENERATED_DOCUMENT: "documents.sourceType.GENERATED_DOCUMENT",
-	TENANT_STATEMENT: "documents.sourceType.TENANT_STATEMENT",
-	HOA_ANNUAL_STATEMENT: "documents.sourceType.HOA_ANNUAL_STATEMENT",
 };
 
 const sourceTypeStyles: Record<string, string> = {
 	DOCUMENT: "bg-muted text-muted-foreground",
 	GENERATED_DOCUMENT: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
-	TENANT_STATEMENT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
-	HOA_ANNUAL_STATEMENT: "bg-teal-100 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
 };
 
-/** Alle Datei-Quellen der Übersicht (DocumentSourceType) für den Select-Filter. */
-const sourceTypes: DocumentSourceType[] = ["DOCUMENT", "GENERATED_DOCUMENT", "TENANT_STATEMENT", "HOA_ANNUAL_STATEMENT"];
+/** Beide Papierkorb-Quellen (TrashedDocumentSourceType) für den Select-Filter. */
+const sourceTypes: TrashedDocumentSourceType[] = ["DOCUMENT", "GENERATED_DOCUMENT"];
 
-/**
- * Dokumente-Tabelle (/dokumente): clientseitige Sortierung, Filterung je
- * Spalte und Client-Pagination (50/Seite) über ALLE Datei-Quellen - die
- * Server-Seite lädt die per ?q=/?propertyId=/?unitId=/?tenantId=
- * vorgefilterte Vollliste.
- */
-export function DocumentsTable({
-	rows,
-	postalConfigured,
-	properties,
-	units,
-	tenants,
-}: {
-	rows: DocumentRow[];
-	postalConfigured: boolean;
-	/** Picker-Listen für den Bearbeiten-Dialog (nur Quelle "DOCUMENT"). */
-	properties: Property[];
-	units: Unit[];
-	tenants: Tenant[];
-}) {
+/** Wiederherstellen ohne Bestätigungsdialog (nicht destruktiv). */
+function RestoreButton({ action }: { action: () => Promise<{ error?: string } | void> }) {
+	const { t } = useI18n();
+	const [isPending, startTransition] = useTransition();
+
+	return (
+		<Button
+			type="button"
+			variant="ghost"
+			size="icon-sm"
+			disabled={isPending}
+			aria-label={t("documents.trash.restore")}
+			title={t("documents.trash.restore")}
+			onClick={() =>
+				startTransition(async () => {
+					const result = await action();
+					if (result?.error) {
+						showError(result.error);
+					}
+				})
+			}
+		>
+			{isPending ? <Loader2 className="size-4 animate-spin" /> : <ArchiveRestore className="size-4" />}
+		</Button>
+	);
+}
+
+export function DocumentsTrashTable({ rows }: { rows: TrashedDocumentRow[] }) {
 	const { t } = useI18n();
 
-	const columns: DataTableColumn<DocumentRow>[] = [
+	const columns: DataTableColumn<TrashedDocumentRow>[] = [
 		{
 			key: "file",
 			header: t("documents.table.file"),
@@ -134,33 +137,31 @@ export function DocumentsTable({
 				),
 		},
 		{
-			key: "createdAt",
-			header: t("common.date"),
-			sortValue: (row) => row.createdAt,
+			key: "deletedAt",
+			header: t("documents.table.deletedAt"),
+			sortValue: (row) => row.deletedAt,
 			cellClassName: "text-muted-foreground",
-			cell: (row) => formatDate(row.createdAt),
+			cell: (row) => (
+				<>
+					{formatDate(row.deletedAt)}
+					<span className="block text-xs text-muted-foreground">
+						{t("documents.trash.permanentDeleteAt", { date: formatDate(row.permanentDeleteAt) })}
+					</span>
+				</>
+			),
 		},
 		{
 			key: "actions",
 			header: t("common.actions"),
-			headClassName: "w-[132px] text-right",
+			headClassName: "w-[100px] text-right",
 			cellClassName: "text-right",
 			cell: (row) => (
 				<div className="flex items-center justify-end gap-1">
-					<SendByPostButton
-						sendAction={sendAnyDocumentByPostAction.bind(null, row.sourceType, row.id)}
-						disabled={!postalConfigured || row.mimeType !== "application/pdf"}
-						disabledReason={!postalConfigured ? t("postal.notConfiguredShort") : t("documents.errors.onlyPdf")}
-					/>
-					{row.sourceType === "DOCUMENT" ? (
-						<DocumentEditDialog row={row} properties={properties} units={units} tenants={tenants} />
-					) : null}
-				{row.sourceType !== "TENANT_STATEMENT" && row.sourceType !== "HOA_ANNUAL_STATEMENT" ? (
+					<RestoreButton action={restoreAnyDocumentAction.bind(null, row.sourceType, row.id)} />
 					<ConfirmDeleteButton
-						action={deleteAnyDocumentAction.bind(null, row.sourceType, row.id)}
-						confirmMessage={t("documents.confirm.trash", { name: row.fileName })}
+						action={deleteAnyDocumentPermanentlyAction.bind(null, row.sourceType, row.id)}
+						confirmMessage={t("documents.confirm.permanentDelete", { name: row.fileName })}
 					/>
-				) : null}
 				</div>
 			),
 		},

@@ -226,7 +226,7 @@ CREATE TABLE documents (
 	file_size integer,
 	ocr_text text,
 	created_at text NOT NULL,
-	updated_at text NOT NULL,
+	updated_at text NOT NULL, deleted_at text,
 	FOREIGN KEY (property_id) REFERENCES properties(id) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (unit_id) REFERENCES units(id) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON UPDATE no action ON DELETE set null
@@ -267,7 +267,7 @@ CREATE TABLE generated_documents (
 	rendered_body text NOT NULL,
 	file_path text NOT NULL,
 	file_size integer,
-	created_at text NOT NULL,
+	created_at text NOT NULL, deleted_at text,
 	FOREIGN KEY (template_id) REFERENCES document_templates(id) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (lease_id) REFERENCES leases(id) ON UPDATE no action ON DELETE set null,
 	FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON UPDATE no action ON DELETE set null

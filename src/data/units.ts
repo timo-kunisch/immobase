@@ -157,7 +157,7 @@ export function getUnitStats(): Map<string, UnitStats> {
 	}
 
 	const documentCounts = db
-		.prepare("SELECT unit_id AS unitId, COUNT(*) AS value FROM documents GROUP BY unit_id")
+		.prepare("SELECT unit_id AS unitId, COUNT(*) AS value FROM documents WHERE deleted_at IS NULL GROUP BY unit_id")
 		.all() as { unitId: string | null; value: number }[];
 	for (const row of documentCounts) {
 		if (row.unitId) ensure(row.unitId).documents = row.value;

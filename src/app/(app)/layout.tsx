@@ -6,6 +6,7 @@ import { isAiConfigured } from "@/lib/ai/config";
 import { startDropboxBackupScheduler } from "@/lib/dropbox-backup";
 import { isImapConfigured } from "@/lib/email/imap";
 import { startImapSyncScheduler } from "@/lib/email/imap-sync";
+import { startDocumentTrashPurgeScheduler } from "@/lib/document-trash";
 
 // Autoritativer Auth-Check für den gesamten geschützten Bereich der App
 // (siehe src/proxy.ts für den vorgelagerten, günstigen Cookie-Check).
@@ -24,6 +25,10 @@ export default async function AppLayout({ children }: Readonly<{ children: React
 	// (idempotent, no-op ohne IMAP-Konfiguration; gleicher Startpunkt-Grund
 	// wie beim Dropbox-Scheduler oben).
 	startImapSyncScheduler();
+	// Scheduler für die automatische Endlöschung abgelaufener Dokumente aus
+	// dem Papierkorb (28 Tage Aufbewahrung; idempotent, gleicher
+	// Startpunkt-Grund wie beim Dropbox-Scheduler oben).
+	startDocumentTrashPurgeScheduler();
 
 	return (
 		<SidebarProvider>
