@@ -13,7 +13,6 @@ export const tickets = {
 	filteredBy: "Gefiltert nach:",
 	empty: "Noch keine Tickets erfasst.",
 	emptyColumn: "Keine Tickets",
-	contractorLabel: "Handwerker:",
 	// Ticket-Status (Enum-Labels)
 	"status.OPEN": "Offen",
 	"status.IN_PROGRESS": "In Bearbeitung",
@@ -57,8 +56,6 @@ export const tickets = {
 	"fields.title": "Titel",
 	"fields.titlePlaceholder": "z. B. Heizung defekt",
 	"fields.descriptionPlaceholder": "Was ist das Problem?",
-	"fields.contractorNotes": "Handwerker-Notizen",
-	"fields.contractorNotesPlaceholder": "Rückmeldung, Termine, Ersatzteile…",
 	"fields.propertyPlaceholder": "Liegenschaft auswählen",
 	"fields.noProperty": "Keine bestimmte Liegenschaft",
 	"fields.noUnit": "Keine bestimmte Einheit",

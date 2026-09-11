@@ -9,7 +9,6 @@ export const tickets: typeof deTickets = {
 	filteredBy: "Filtered by:",
 	empty: "No tickets recorded yet.",
 	emptyColumn: "No tickets",
-	contractorLabel: "Contractor:",
 	// Ticket statuses (enum labels)
 	"status.OPEN": "Open",
 	"status.IN_PROGRESS": "In progress",
@@ -52,8 +51,6 @@ export const tickets: typeof deTickets = {
 	"fields.title": "Title",
 	"fields.titlePlaceholder": "e.g. heating broken",
 	"fields.descriptionPlaceholder": "What is the problem?",
-	"fields.contractorNotes": "Contractor notes",
-	"fields.contractorNotesPlaceholder": "Feedback, appointments, spare parts…",
 	"fields.propertyPlaceholder": "Select property",
 	"fields.noProperty": "No specific property",
 	"fields.noUnit": "No specific unit",

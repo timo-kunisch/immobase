@@ -12,7 +12,7 @@ import type { Ticket, TicketStatus, Unit } from "./types";
 const TICKET_COLUMNS = `
 	t.id AS id, t.property_id AS propertyId, t.unit_id AS unitId,
 	t.title AS title, t.description AS description, t.status AS status,
-	t.contractor_notes AS contractorNotes, t.resolved_at AS resolvedAt,
+	t.resolved_at AS resolvedAt,
 	t.created_at AS createdAt, t.updated_at AS updatedAt
 `;
 
@@ -43,7 +43,6 @@ export interface TicketInput {
 	title: string;
 	description: string | null;
 	status: TicketStatus;
-	contractorNotes: string | null;
 	/** ISO-Zeitpunkt bei status "DONE", sonst null (wird von der Action gesetzt). */
 	resolvedAt: string | null;
 }
@@ -109,8 +108,8 @@ export function createTicket(input: TicketInput): Ticket {
 	const timestamp = now();
 	getDb()
 		.prepare(
-			`INSERT INTO tickets (id, property_id, unit_id, title, description, status, contractor_notes, resolved_at, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO tickets (id, property_id, unit_id, title, description, status, resolved_at, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			id,
@@ -119,7 +118,6 @@ export function createTicket(input: TicketInput): Ticket {
 			input.title,
 			input.description,
 			input.status,
-			input.contractorNotes,
 			input.resolvedAt,
 			timestamp,
 			timestamp
@@ -132,7 +130,7 @@ export function updateTicket(id: string, input: TicketInput): void {
 		.prepare(
 			`UPDATE tickets
 			 SET property_id = ?, unit_id = ?, title = ?, description = ?, status = ?,
-			     contractor_notes = ?, resolved_at = ?, updated_at = ?
+			     resolved_at = ?, updated_at = ?
 			 WHERE id = ?`
 		)
 		.run(
@@ -141,7 +139,6 @@ export function updateTicket(id: string, input: TicketInput): void {
 			input.title,
 			input.description,
 			input.status,
-			input.contractorNotes,
 			input.resolvedAt,
 			now(),
 			id

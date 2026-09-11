@@ -113,7 +113,6 @@ describe("searchDatabase", () => {
 			title: "Heizung defekt",
 			description: null,
 			status: "OPEN",
-			contractorNotes: null,
 			resolvedAt: null,
 		});
 		const document = createDocument({
@@ -233,7 +232,6 @@ describe("searchDatabase", () => {
 				title: `Wasserschaden Raum ${index}`,
 				description: null,
 				status: "OPEN",
-				contractorNotes: null,
 				resolvedAt: null,
 			});
 		}

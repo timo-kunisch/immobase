@@ -72,7 +72,6 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 			title,
 			description: description || null,
 			status: "OPEN",
-			contractorNotes: null,
 			resolvedAt: null,
 		});
 		logActivity(user, "CREATE", "tickets", `Ticket „${title}“ aus E-Mail „${message.subject ?? "(ohne Betreff)"}“ angelegt`, ticket.id);

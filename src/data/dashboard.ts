@@ -170,7 +170,7 @@ export function listLatestOpenTickets(limit = 5): DashboardTicket[] {
 		.prepare(
 			`SELECT t.id AS id, t.property_id AS propertyId, t.unit_id AS unitId,
 				t.title AS title, t.description AS description, t.status AS status,
-				t.contractor_notes AS contractorNotes, t.resolved_at AS resolvedAt,
+				t.resolved_at AS resolvedAt,
 				t.created_at AS createdAt, t.updated_at AS updatedAt,
 				p.name AS propertyName, u.label AS unitLabel
 			 FROM tickets t

@@ -103,12 +103,6 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
 															) : null}
 														</p>
 														{ticket.description ? <p className="text-sm text-muted-foreground line-clamp-3">{ticket.description}</p> : null}
-														{ticket.contractorNotes ? (
-															<p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-																<span className="font-medium">{t("tickets.contractorLabel")} </span>
-																{ticket.contractorNotes}
-															</p>
-														) : null}
 														<div className="flex items-center justify-between gap-2">
 															<span className="flex items-center gap-2 text-xs text-muted-foreground">
 																{formatDate(ticket.createdAt)}

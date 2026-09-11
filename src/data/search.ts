@@ -189,7 +189,7 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 	// --- Tickets --------------------------------------------------------------
 	const ticketRows = getDb()
 		.prepare(
-			`SELECT t.id, t.title, t.status, t.contractor_notes AS contractorNotes, t.created_at AS createdAt,
+			`SELECT t.id, t.title, t.status, t.created_at AS createdAt,
 			        p.name AS propertyName, u.label AS unitLabel
 			 FROM tickets t
 			 LEFT JOIN properties p ON p.id = t.property_id
@@ -201,14 +201,13 @@ export function searchDatabase(query: string, options: SearchDatabaseOptions = {
 		id: string;
 		title: string;
 		status: string;
-		contractorNotes: string | null;
 		createdAt: string;
 		propertyName: string | null;
 		unitLabel: string | null;
 	}>;
 	add(
 		collectMatches(trimmed, ticketRows, limit, (row) => ({
-			haystack: hay(row.title, row.contractorNotes, row.propertyName, row.unitLabel, row.status),
+			haystack: hay(row.title, row.propertyName, row.unitLabel, row.status),
 			result: {
 				type: "ticket",
 				id: row.id,

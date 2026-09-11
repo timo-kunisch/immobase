@@ -51,7 +51,6 @@ function createTestTicket(): string {
 		title: "Heizung defekt",
 		description: null,
 		status: "OPEN",
-		contractorNotes: null,
 		resolvedAt: null,
 	}).id;
 }

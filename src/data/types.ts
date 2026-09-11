@@ -158,7 +158,6 @@ export interface Ticket {
 	title: string;
 	description: string | null;
 	status: TicketStatus;
-	contractorNotes: string | null;
 	resolvedAt: string | null;
 	createdAt: string;
 	updatedAt: string;

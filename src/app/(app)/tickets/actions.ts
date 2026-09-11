@@ -43,7 +43,6 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 	const title = getString(formData, "title");
 	const description = getString(formData, "description");
 	const statusRaw = getString(formData, "status") as TicketStatus;
-	const contractorNotes = getString(formData, "contractorNotes");
 
 	if (!title) {
 		return {
@@ -60,7 +59,6 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 		title,
 		description: description || null,
 		status,
-		contractorNotes: contractorNotes || null,
 		resolvedAt: status === "DONE" ? new Date().toISOString() : null,
 	};
 

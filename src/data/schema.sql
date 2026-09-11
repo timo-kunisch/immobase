@@ -638,7 +638,6 @@ CREATE TABLE "tickets" (
 	title text NOT NULL,
 	description text,
 	status text DEFAULT 'OPEN' NOT NULL,
-	contractor_notes text,
 	resolved_at text,
 	created_at text NOT NULL,
 	updated_at text NOT NULL,

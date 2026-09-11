@@ -43,7 +43,6 @@ function createTestTicket(propertyId: string): string {
 		title: "Heizung defekt",
 		description: null,
 		status: "OPEN",
-		contractorNotes: null,
 		resolvedAt: null,
 	}).id;
 }
@@ -107,7 +106,6 @@ describe("ticket_messages: Postfach und Verknüpfung", () => {
 			title: "Schimmel im Bad",
 			description: "Bitte prüfen.",
 			status: "OPEN",
-			contractorNotes: null,
 			resolvedAt: null,
 		});
 

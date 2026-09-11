@@ -174,14 +174,8 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 								</>
 							) : null}
 						</p>
-						{ticket.description ? <p className="text-sm whitespace-pre-wrap">{ticket.description}</p> : null}
-						{ticket.contractorNotes ? (
-							<p className="rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
-								<span className="font-medium">{t("tickets.contractorLabel")} </span>
-								{ticket.contractorNotes}
-							</p>
-						) : null}
-					</CardContent>
+					{ticket.description ? <p className="text-sm whitespace-pre-wrap">{ticket.description}</p> : null}
+				</CardContent>
 				</Card>
 
 				<div className="flex flex-col gap-3">

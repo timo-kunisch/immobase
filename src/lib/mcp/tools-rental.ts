@@ -320,7 +320,6 @@ registerCrudTools<TicketInput>({
 		title: { type: "string" },
 		description: { type: "string", nullable: true },
 		status: { type: "enum", values: TICKET_STATUS },
-		contractorNotes: { type: "string", nullable: true, description: "Notizen zum Handwerker" },
 	},
 	fieldsHint: "Bei Status \"DONE\" wird resolvedAt automatisch auf jetzt gesetzt, sonst auf null.",
 	listFilters: {
@@ -497,7 +496,6 @@ registerTool({
 			title: input.title as string,
 			description: (input.description as string) ?? null,
 			status: "OPEN",
-			contractorNotes: null,
 			resolvedAt: null,
 		});
 	},
