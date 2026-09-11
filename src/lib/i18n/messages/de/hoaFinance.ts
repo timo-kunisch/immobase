@@ -97,4 +97,14 @@ export const hoaFinance = {
 	"reserve.errors.amountPositive": "Der Betrag muss größer als 0 sein (die Buchungsart bestimmt das Vorzeichen).",
 	"reserve.errors.saveFailed": "Die Buchung konnte nicht gespeichert werden.",
 	"reserve.errors.deleteFailed": "Die Buchung konnte nicht gelöscht werden.",
+
+	// ============================================================
+	// WEG-Buchhaltung (/weg/buchhaltung, geteilte liegenschaftsbezogene
+	// Tabellen mit der Mietverwaltung - WEG-Sicht mit Hausgeld-Zielen)
+	// ============================================================
+	"banking.title": "WEG-Buchhaltung",
+	"banking.description": "Banktransaktionen und Konten je WEG - Zahlungseingänge von Eigentümern gegen Hausgeld-Sollstellungen buchen.",
+	"banking.info":
+		"Erfassen Sie die Bewegungen des Gemeinschaftskontos der WEG und ordnen Sie sie Konten (z. B. Gebäudeversicherung) oder offenen Hausgeld-Sollstellungen zu. Vollständig zugeordnete Hausgelder gelten automatisch als bezahlt und fließen so als tatsächlich geleistete Vorauszahlungen in die Jahresabrechnung ein.",
+	"banking.selectHoa": "Wählen Sie oben eine WEG aus, um Konten anzusehen oder zu verwalten.",
 };

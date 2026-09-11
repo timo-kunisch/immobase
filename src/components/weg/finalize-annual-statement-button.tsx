@@ -8,12 +8,34 @@ import { useI18n } from "@/lib/i18n/provider";
 import { showError } from "@/lib/toast";
 import { finalizeAnnualStatementAction } from "@/app/(app)/weg/jahresabrechnung/actions";
 
-export function FinalizeAnnualStatementButton({ annualStatementId, hoaId }: { annualStatementId: string; hoaId: string }) {
+/**
+ * Finalisieren mit vorgeschalteter Bestätigung. Bei offenen Hinweisen der
+ * Plausibilitätsprüfung (siehe Detailseite) weist die Bestätigungsmeldung
+ * zusätzlich darauf hin - die Finalisierung bleibt bewusst möglich
+ * (Abweichungen können fachlich gewollt sein), wird aber sichtbar gemacht.
+ */
+export function FinalizeAnnualStatementButton({
+	annualStatementId,
+	hoaId,
+	consistencyIssueCount,
+}: {
+	annualStatementId: string;
+	hoaId: string;
+	/** Anzahl offener Hinweise der Plausibilitätsprüfung (0 = normale Bestätigung). */
+	consistencyIssueCount: number;
+}) {
 	const { t } = useI18n();
 	const [isPending, startTransition] = useTransition();
 
 	function handleClick() {
-		if (typeof window !== "undefined" && !window.confirm(t("hoaStatement.confirm.finalize"))) {
+		if (typeof window === "undefined") {
+			return;
+		}
+		const message =
+			consistencyIssueCount > 0
+				? t("hoaStatement.confirm.finalizeWithIssues", { count: consistencyIssueCount })
+				: t("hoaStatement.confirm.finalize");
+		if (!window.confirm(message)) {
 			return;
 		}
 		startTransition(async () => {

@@ -5,21 +5,24 @@ import type { Account, BankTransaction, BankTransactionAllocation, BankTransacti
 
 /**
  * Repository für die Buchhaltung (Tabellen `bank_transactions` +
- * `bank_transaction_allocations`): Tatsächliche Bewegungen auf dem
- * Bankkonto einer Liegenschaft sowie ihre Buchungszeilen - die Zuordnung
- * eines Teilbetrags entweder auf ein Konto (accountId, z. B.
- * "Gebäudeversicherung") oder gegen eine fällige Sollstellung
- * (transactionId, "Mieteingänge"). Genau eines von beiden ist je Zeile
- * gesetzt (anwendungsseitig geprüft).
+ * `bank_transaction_allocations`): Tatsächliche Bewegungen auf dem Bankkonto
+ * einer Liegenschaft sowie ihre Buchungszeilen - die Zuordnung eines
+ * Teilbetrags entweder auf ein Konto (accountId, z. B. "Gebäudeversicherung"),
+ * gegen eine fällige Miet-Sollstellung (transactionId, "Mieteingänge") oder
+ * gegen eine Hausgeld-Sollstellung (housingChargeId, WEG-Verwaltung). Genau
+ * eines der drei ist je Zeile gesetzt (anwendungsseitig geprüft); die
+ * Buchungskreise Miete und WEG berühren sich nie - dieselbe Liegenschaft
+ * kann beides gleichzeitig führen, ohne dass Buchungen des einen Kreises den
+ * Bezahl-Status des anderen verändern.
  *
  * Der Zuordnungsstatus einer Banktransaktion (OPEN/PARTIAL/RECONCILED)
  * wird nicht gespeichert, sondern aus der Summe der Buchungszeilen
- * berechnet. Der Bezahl-Status einer Sollstellung wird aus den
- * Buchungszeilen ABGELEITET und gepflegt (recomputeTransactionStatus):
- * Vollständig zugeordnet = bezahlt (PAID inkl. paid_date aus dem
- * Buchungsdatum) - damit berücksichtigt die Nebenkostenabrechnung nur
- * tatsächlich geleistete Vorauszahlungen (computePaidPrepaymentsCents in
- * src/lib/billing.ts).
+ * berechnet. Der Bezahl-Status einer Sollstellung (Miete ODER Hausgeld)
+ * wird aus den Buchungszeilen ABGELEITET und gepflegt
+ * (recomputeDueItemStatuses): Vollständig zugeordnet = bezahlt (PAID inkl.
+ * paid_date aus dem Buchungsdatum) - damit berücksichtigen sowohl die
+ * Nebenkostenabrechnung als auch die WEG-Jahresabrechnung ausschließlich
+ * tatsächlich geleistete Vorauszahlungen.
  *
  * Zusammenhängende Mehr-Schreib-Operationen (Zuordnung ersetzen, Löschen)
  * laufen in echten better-sqlite3-Transaktionen (atomar).
@@ -39,10 +42,15 @@ export interface BankTransactionInput {
 	notes: string | null;
 }
 
-/** Eine zu setztende Buchungszeile: genau EINES von accountId/transactionId ist gesetzt. */
+/**
+ * Eine zu setztende Buchungszeile: genau EINES von accountId/transactionId/
+ * housingChargeId ist gesetzt (Konto, Miet-Sollstellung oder Hausgeld-
+ * Sollstellung).
+ */
 export interface BankTransactionAllocationInput {
 	accountId: string | null;
 	transactionId: string | null;
+	housingChargeId: string | null;
 	/** Signed wie die zugeordnete Banktransaktion (Teilbetrag, Decimal-String). */
 	amount: string;
 }
@@ -52,6 +60,8 @@ export interface BankTransactionAllocationView extends BankTransactionAllocation
 	account: Account | null;
 	/** Anzeige-Bezeichnung des Zuordnungsziels (Kontobezeichnung oder Sollstellung). */
 	transactionLabel: string | null;
+	/** Anzeige-Bezeichnung des Zuordnungsziels im Buchungskreis WEG (Hausgeld-Sollstellung). */
+	housingChargeLabel: string | null;
 }
 
 /** Banktransaktion inkl. Buchungszeilen und abgeleiteter Zuordnungs-Summe. */
@@ -65,6 +75,8 @@ export interface BankTransactionWithAllocations extends BankTransaction {
 
 export interface BankTransactionFilter {
 	propertyId?: string;
+	/** Mehrere Liegenschaften (z. B. alle WEGs der WEG-Buchhaltung, /weg/buchhaltung). */
+	propertyIds?: string[];
 	status?: BankTransactionStatus;
 }
 
@@ -86,10 +98,20 @@ interface TransactionInfoRow {
 	lastName: string;
 }
 
+/** Kompakte Anzeige-Infos einer Hausgeld-Sollstellung (für die Zuordnungs-Ansicht). */
+interface HousingChargeInfoRow {
+	id: string;
+	purpose: string | null;
+	amount: string;
+	dueDate: string;
+	firstName: string;
+	lastName: string;
+}
+
 /**
  * Lädt die Buchungszeilen der übergebenen Banktransaktionen in EINEM Zug
- * (Batch) inkl. aufgelöster Anzeige-Referenzen (Konto-Bezeichnung bzw.
- * Sollstellungs-Beschreibung mit Mieter) - kein N+1.
+ * (Batch) inkl. aufgelöster Anzeige-Referenzen (Konto-Bezeichnung, Miet-
+ * bzw. Hausgeld-Sollstellungs-Beschreibung mit Eigentümer/Mieter) - kein N+1.
  */
 function loadAllocationViews(bankTransactionIds: string[]): Map<string, BankTransactionAllocationView[]> {
 	const viewsByBankTransaction = new Map<string, BankTransactionAllocationView[]>();
@@ -100,7 +122,8 @@ function loadAllocationViews(bankTransactionIds: string[]): Map<string, BankTran
 	const allocations = db
 		.prepare(
 			`SELECT id, bank_transaction_id AS bankTransactionId, account_id AS accountId,
-			 		transaction_id AS transactionId, amount, created_at AS createdAt, updated_at AS updatedAt
+			 		transaction_id AS transactionId, housing_charge_id AS housingChargeId, amount,
+			 		created_at AS createdAt, updated_at AS updatedAt
 			 FROM bank_transaction_allocations WHERE bank_transaction_id IN (${placeholders}) ORDER BY created_at`
 		)
 		.all(...bankTransactionIds) as BankTransactionAllocation[];
@@ -128,6 +151,20 @@ function loadAllocationViews(bankTransactionIds: string[]): Map<string, BankTran
 		: [];
 	const infoById = new Map(transactionInfos.map((info) => [info.id, info]));
 
+	const housingChargeIds = [...new Set(allocations.map((a) => a.housingChargeId).filter((id): id is string => id !== null))];
+	const housingChargeInfos = housingChargeIds.length
+		? (db
+				.prepare(
+					`SELECT hc.id, hc.purpose, hc.amount, hc.due_date AS dueDate,
+						 	 owner.first_name AS firstName, owner.last_name AS lastName
+					 FROM housing_charges hc
+					 JOIN owners owner ON owner.id = hc.owner_id
+					 WHERE hc.id IN (${housingChargeIds.map(() => "?").join(", ")})`
+				)
+				.all(...housingChargeIds) as HousingChargeInfoRow[])
+		: [];
+	const housingChargeInfoById = new Map(housingChargeInfos.map((info) => [info.id, info]));
+
 	for (const allocation of allocations) {
 		const account = allocation.accountId ? accountsById.get(allocation.accountId) ?? null : null;
 		let transactionLabel: string | null = null;
@@ -137,7 +174,14 @@ function loadAllocationViews(bankTransactionIds: string[]): Map<string, BankTran
 				transactionLabel = `${info.purpose ?? "Sollstellung"} · ${info.firstName} ${info.lastName} (${info.amount} €)`;
 			}
 		}
-		const view: BankTransactionAllocationView = { ...allocation, account, transactionLabel };
+		let housingChargeLabel: string | null = null;
+		if (allocation.housingChargeId) {
+			const info = housingChargeInfoById.get(allocation.housingChargeId);
+			if (info) {
+				housingChargeLabel = `${info.purpose ?? "Hausgeld"} · ${info.firstName} ${info.lastName} (${info.amount} €)`;
+			}
+		}
+		const view: BankTransactionAllocationView = { ...allocation, account, transactionLabel, housingChargeLabel };
 		const list = viewsByBankTransaction.get(allocation.bankTransactionId) ?? [];
 		list.push(view);
 		viewsByBankTransaction.set(allocation.bankTransactionId, list);
@@ -152,6 +196,9 @@ export function listBankTransactions(filter: BankTransactionFilter = {}): BankTr
 	if (filter.propertyId) {
 		conditions.push("bt.property_id = ?");
 		params.push(filter.propertyId);
+	} else if (filter.propertyIds && filter.propertyIds.length > 0) {
+		conditions.push(`bt.property_id IN (${filter.propertyIds.map(() => "?").join(", ")})`);
+		params.push(...filter.propertyIds);
 	}
 	if (filter.status) {
 		// Abgeleiteter Status per Teilbetrags-Summe (Subselect) filterbar.
@@ -246,63 +293,76 @@ export function updateBankTransaction(id: string, input: BankTransactionInput): 
 
 /**
  * Löscht eine Banktransaktion; ihre Buchungszeilen werden per ON DELETE
- * CASCADE mitentfernt. Die davon betroffenen Sollstellungen werden danach
- * neu bewertet (vollständig zugeordnete verlieren den bezahlt-Status).
+ * CASCADE mitentfernt. Die davon betroffenen Sollstellungen beider
+ * Buchungskreise (Miete UND Hausgeld) werden danach neu bewertet
+ * (vollständig zugeordnete verlieren den bezahlt-Status).
  */
 export function deleteBankTransaction(id: string): void {
-	const affectedTransactionIds = (
-		getDb()
-			.prepare("SELECT DISTINCT transaction_id AS transactionId FROM bank_transaction_allocations WHERE bank_transaction_id = ? AND transaction_id IS NOT NULL")
-			.all(id) as { transactionId: string }[]
-	).map((row) => row.transactionId);
+	const affected = listAffectedDueItemIds(id);
 	getDb().prepare("DELETE FROM bank_transactions WHERE id = ?").run(id);
-	recomputeTransactionStatuses(affectedTransactionIds);
+	recomputeDueItemStatuses(affected);
+}
+
+/** IDs aller über Buchungszeilen dieser Banktransaktion angebundenen Sollstellungen (Miete + Hausgeld). */
+function listAffectedDueItemIds(bankTransactionId: string): { transactionIds: string[]; housingChargeIds: string[] } {
+	const rows = getDb()
+		.prepare(
+			`SELECT transaction_id AS transactionId, housing_charge_id AS housingChargeId
+			 FROM bank_transaction_allocations WHERE bank_transaction_id = ?`
+		)
+		.all(bankTransactionId) as { transactionId: string | null; housingChargeId: string | null }[];
+	return {
+		transactionIds: rows.map((row) => row.transactionId).filter((id): id is string => id !== null),
+		housingChargeIds: rows.map((row) => row.housingChargeId).filter((id): id is string => id !== null),
+	};
 }
 
 /**
  * Ersetzt SÄMTLICHE Buchungszeilen einer Banktransaktion durch die
  * übergebenen (leere Liste = Zuordnung entfernen). Läuft in EINER
  * better-sqlite3-Transaktion; danach werden alle betroffenen Sollstellungen
- * (alte wie neue) neu bewertet. Die fachlichen Prüfungen (Referenzen,
- * gleiche Liegenschaft, kein Storno, Vorzeichen, Summe) liegen in der
- * aufrufenden Schicht (Server Action + MCP-Werkzeug, identisch).
+ * beider Buchungskreise (alte wie neue) neu bewertet. Die fachlichen
+ * Prüfungen (Referenzen, gleiche Liegenschaft, kein Storno, Vorzeichen,
+ * Summe) liegen in der aufrufenden Schicht (Server Action + MCP-Werkzeug,
+ * identisch über src/lib/bank-allocations.ts).
  */
 export function setBankTransactionAllocations(bankTransactionId: string, allocations: BankTransactionAllocationInput[]): void {
 	const db = getDb();
 	const timestamp = now();
 
-	const oldTransactionIds = (
-		db
-			.prepare("SELECT DISTINCT transaction_id AS transactionId FROM bank_transaction_allocations WHERE bank_transaction_id = ? AND transaction_id IS NOT NULL")
-			.all(bankTransactionId) as { transactionId: string }[]
-	).map((row) => row.transactionId);
+	const oldAffected = listAffectedDueItemIds(bankTransactionId);
 
 	db.transaction(() => {
 		db.prepare("DELETE FROM bank_transaction_allocations WHERE bank_transaction_id = ?").run(bankTransactionId);
 		const insert = db.prepare(
-			`INSERT INTO bank_transaction_allocations (id, bank_transaction_id, account_id, transaction_id, amount, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			`INSERT INTO bank_transaction_allocations (id, bank_transaction_id, account_id, transaction_id, housing_charge_id, amount, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 		);
 		for (const allocation of allocations) {
-			insert.run(newId(), bankTransactionId, allocation.accountId, allocation.transactionId, allocation.amount, timestamp, timestamp);
+			insert.run(newId(), bankTransactionId, allocation.accountId, allocation.transactionId, allocation.housingChargeId, allocation.amount, timestamp, timestamp);
 		}
 	})();
 
-	recomputeTransactionStatuses([...new Set([...oldTransactionIds, ...allocations.map((a) => a.transactionId).filter((id): id is string => id !== null)])]);
+	recomputeDueItemStatuses({
+		transactionIds: [...oldAffected.transactionIds, ...allocations.map((a) => a.transactionId).filter((id): id is string => id !== null)],
+		housingChargeIds: [...oldAffected.housingChargeIds, ...allocations.map((a) => a.housingChargeId).filter((id): id is string => id !== null)],
+	});
 }
 
 /**
  * Bewertet den Bezahl-Status der übergebenen Sollstellungen anhand ihrer
  * Buchungszeilen NEU (wird nach jeder Änderung von Buchungszeilen
- * aufgerufen):
+ * aufgerufen) - einmalig implementiert und identisch verwendet für BEIDE
+ * Buchungskreise, deren Tabellen (`transactions` der Mietverwaltung und
+ * `housing_charges` der WEG-Verwaltung) den gleichen Spaltenaufbau haben
+ * (id, amount, status, paid_date):
  * - vollständig zugeordnet (Betragssumme >= Sollbetrag): Status PAID,
  *   paid_date = frühestes Buchungsdatum der zugeordneten Banktransaktionen
  *   (überschreibt auch einen manuell gesetzten PAID-Status, siehe
- *   /finanzen).
+ *   /finanzen bzw. /weg/hausgeld).
  * - gar nicht zugeordnet: Status OPEN, paid_date = null. Ein manuell
- *   (über /finanzen) auf PAID gesetzter Status bleibt dabei unberührt -
- *   nur Sollstellungen, die Buchungszeilen HATTEN, werden überhaupt
- *   neubewertet.
+ *   auf PAID gesetzter Status bleibt dabei unberührt - nur Sollstellungen,
+ *   die Buchungszeilen HATTEN, werden überhaupt neubewertet.
  * - teilweise zugeordnet (0 < Summe < Sollbetrag): Status unverändert -
  *   Teilzahlungen werden im Zahlungsmodell nicht abgebildet; die
  *   teilweise Zuordnung ist als Arbeitsstand sichtbar, der Rest kann
@@ -310,37 +370,47 @@ export function setBankTransactionAllocations(bankTransactionId: string, allocat
  *   markiert werden.
  * Stornierte (CANCELLED) Sollstellungen werden nie angefasst.
  */
-function recomputeTransactionStatuses(transactionIds: string[]): void {
+function recomputeDueItemStatuses(affected: { transactionIds: string[]; housingChargeIds: string[] }): void {
 	const db = getDb();
-	const uniqueIds = [...new Set(transactionIds)];
-	if (uniqueIds.length === 0) return;
 
-	for (const transactionId of uniqueIds) {
-		const transaction = db
-			.prepare("SELECT id, amount, status, paid_date AS paidDate FROM transactions WHERE id = ?")
-			.get(transactionId) as { id: string; amount: string; status: string; paidDate: string | null } | undefined;
-		if (!transaction || transaction.status === "CANCELLED") continue;
+	const recompute = (tableName: "transactions" | "housing_charges", dueItemIds: string[]): void => {
+		const uniqueIds = [...new Set(dueItemIds)];
+		if (uniqueIds.length === 0) return;
 
-		const amounts = db
-			.prepare("SELECT amount FROM bank_transaction_allocations WHERE transaction_id = ?")
-			.all(transactionId) as { amount: string }[];
-		const allocatedCents = amounts.reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0);
-		const targetCents = Math.round(Number(transaction.amount) * 100);
+		// Die Spalte der Buchungszeilen hängt vom Buchungskreis ab - beide
+		// Kreis-Tabellen werden über ihre eigene Spalte verknüpft.
+		const allocationColumn = tableName === "transactions" ? "transaction_id" : "housing_charge_id";
 
-		if (allocatedCents >= targetCents) {
-			const earliest = db
-				.prepare(
-					`SELECT MIN(bt.booking_date) AS earliest FROM bank_transaction_allocations a
-					 JOIN bank_transactions bt ON bt.id = a.bank_transaction_id WHERE a.transaction_id = ?`
-				)
-				.get(transactionId) as { earliest: string | null };
-			db.prepare("UPDATE transactions SET status = 'PAID', paid_date = ?, updated_at = ? WHERE id = ?").run(
-				earliest?.earliest ?? now(),
-				now(),
-				transactionId
-			);
-		} else if (allocatedCents === 0) {
-			db.prepare("UPDATE transactions SET status = 'OPEN', paid_date = NULL, updated_at = ? WHERE id = ?").run(now(), transactionId);
+		for (const dueItemId of uniqueIds) {
+			const dueItem = db
+				.prepare(`SELECT id, amount, status, paid_date AS paidDate FROM ${tableName} WHERE id = ?`)
+				.get(dueItemId) as { id: string; amount: string; status: string; paidDate: string | null } | undefined;
+			if (!dueItem || dueItem.status === "CANCELLED") continue;
+
+			const allocationAmounts = db
+				.prepare(`SELECT amount FROM bank_transaction_allocations WHERE ${allocationColumn} = ?`)
+				.all(dueItemId) as { amount: string }[];
+			const allocatedCents = allocationAmounts.reduce((sum, row) => sum + Math.round(Number(row.amount) * 100), 0);
+			const targetCents = Math.round(Number(dueItem.amount) * 100);
+
+			if (allocatedCents >= targetCents) {
+				const earliest = db
+					.prepare(
+						`SELECT MIN(bt.booking_date) AS earliest FROM bank_transaction_allocations a
+						 JOIN bank_transactions bt ON bt.id = a.bank_transaction_id WHERE a.${allocationColumn} = ?`
+					)
+					.get(dueItemId) as { earliest: string | null };
+				db.prepare(`UPDATE ${tableName} SET status = 'PAID', paid_date = ?, updated_at = ? WHERE id = ?`).run(
+					earliest?.earliest ?? now(),
+					now(),
+					dueItemId
+				);
+			} else if (allocatedCents === 0) {
+				db.prepare(`UPDATE ${tableName} SET status = 'OPEN', paid_date = NULL, updated_at = ? WHERE id = ?`).run(now(), dueItemId);
+			}
 		}
-	}
+	};
+
+	recompute("transactions", affected.transactionIds);
+	recompute("housing_charges", affected.housingChargeIds);
 }

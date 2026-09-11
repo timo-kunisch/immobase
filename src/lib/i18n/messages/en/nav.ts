@@ -32,6 +32,7 @@ export const nav: typeof deNav = {
 	"item.annualStatements": "Annual statement",
 	"item.housingCharges": "HOA fees",
 	"item.reserveFund": "Reserve fund",
+	"item.hoaBanking": "Bookkeeping",
 	"item.meetings": "Meetings",
 	"item.resolutions": "Resolutions",
 	"item.users": "User management",

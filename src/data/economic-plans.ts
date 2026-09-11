@@ -1,10 +1,10 @@
 import { getDb } from "./db";
 import { newId, now, intToBool } from "./helpers";
+import { toCents } from "@/lib/money";
 import type {
 	EconomicPlan,
 	EconomicPlanUnitShare,
 	Hoa,
-	HoaCostCategory,
 	HoaCostItem,
 	HoaCustomAllocationKey,
 	HoaAllocationKey,
@@ -43,7 +43,7 @@ const UNIT_SHARE_COLUMNS = `
 // Alias gemappt, sondern in mapHoaCostItemRow (intToBool).
 const HOA_COST_ITEM_RAW_COLUMNS = `
 	id, context, economic_plan_id AS economicPlanId, annual_statement_id AS annualStatementId,
-	category, label, amount, allocation_key AS allocationKey,
+	label, amount, allocation_key AS allocationKey,
 	direct_unit_id AS directUnitId, custom_allocation_key_id AS customAllocationKeyId,
 	is_apportionable, notes,
 	created_at AS createdAt, updated_at AS updatedAt
@@ -152,7 +152,6 @@ export function deleteEconomicPlan(id: string): void {
 // ============================================================
 
 export interface EconomicPlanCostItemInput {
-	category: HoaCostCategory;
 	label: string;
 	amount: string;
 	allocationKey: HoaAllocationKey;
@@ -169,14 +168,13 @@ export function createEconomicPlanCostItem(economicPlanId: string, input: Econom
 	getDb()
 		.prepare(
 			`INSERT INTO hoa_cost_items
-			 (id, context, economic_plan_id, annual_statement_id, category, label, amount,
+			 (id, context, economic_plan_id, annual_statement_id, label, amount,
 			  allocation_key, direct_unit_id, custom_allocation_key_id, notes, created_at, updated_at)
-			 VALUES (?, 'PLAN', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			 VALUES (?, 'PLAN', ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			id,
 			economicPlanId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
@@ -203,13 +201,12 @@ export function updateEconomicPlanCostItem(id: string, economicPlanId: string, i
 		.prepare(
 			`UPDATE hoa_cost_items
 			 SET context = 'PLAN', economic_plan_id = ?, annual_statement_id = NULL,
-			     category = ?, label = ?, amount = ?, allocation_key = ?,
+			     label = ?, amount = ?, allocation_key = ?,
 			     direct_unit_id = ?, custom_allocation_key_id = ?, notes = ?, updated_at = ?
 			 WHERE id = ?`
 		)
 		.run(
 			economicPlanId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
@@ -282,6 +279,28 @@ export function getEconomicPlanDetail(id: string): EconomicPlanDetail | null {
 	}));
 
 	return { plan, hoa, units, customAllocationKeys, costItems, unitShares };
+}
+
+/**
+ * Summen der Wirtschaftspläne einer WEG für den Plan-/Ist-Abgleich der
+ * Jahresabrechnung (src/lib/hoa-annual-statement.ts): je Plan Geschäftsjahr,
+ * Status und Summe der PLAN-Kostenpositionen. Die Betragssumme wird
+ * anwendungsseitig über toCents gebildet (kein SQLite-SUM über TEXT-
+ * Decimal-Strings, Muster wie listAccountBookingSumsForPeriod).
+ */
+export function listEconomicPlanTotalsForHoa(hoaId: string): { id: string; fiscalYearFrom: string; fiscalYearTo: string; status: EconomicPlan["status"]; plannedTotalCents: number }[] {
+	const plans = getDb().prepare(`SELECT ${ECONOMIC_PLAN_COLUMNS} FROM economic_plans WHERE hoa_id = ? ORDER BY fiscal_year_from`).all(hoaId) as EconomicPlan[];
+	return plans.map((plan) => {
+		const rows = getDb().prepare("SELECT amount FROM hoa_cost_items WHERE economic_plan_id = ?").all(plan.id) as { amount: string }[];
+		const plannedTotalCents = rows.reduce((sum, row) => sum + toCents(row.amount), 0);
+		return {
+			id: plan.id,
+			fiscalYearFrom: plan.fiscalYearFrom,
+			fiscalYearTo: plan.fiscalYearTo,
+			status: plan.status,
+			plannedTotalCents,
+		};
+	});
 }
 
 /** Gewicht je Einheit eines frei definierten Verteilerschlüssels (für CUSTOM-Kostenpositionen). */

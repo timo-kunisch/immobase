@@ -150,9 +150,14 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   KI-Clients sämtliche Fachdaten lesen/anlegen/bearbeiten/löschen können (~150 Werkzeuge:
   CRUD aller Entitäten beider Fachbereiche inkl. der fachlichen Operationen wie
   Abrechnungs-/Wirtschaftsplan-/Jahresabrechnungs-Finalisierung, Fälligstellen von Mieten und
-  Hausgeld, Buchhaltungs-Kontoauszug-Import inkl. Buchung gegen Konten/Sollstellungen
-  (`bank_transactions_import`/`_allocate`), Dokumenten-Up-/Download als Base64, Nutzerfreigaben,
-  Kalender-Gesamtansicht).
+  Hausgeld, Buchhaltungs-Kontoauszug-Import inkl. Buchung gegen Konten/Miet-Sollstellungen/
+  Hausgeld-Sollstellungen beider Buchungskreise (`bank_transactions_import`/`_allocate`,
+  Ziel je Zeile genau eines von accountId/transactionId/housingChargeId), Banking-Import in
+  Abrechnungsperioden UND WEG-Jahresabrechnungen
+  (`annual_statements_import_cost_items_from_banking`), Plausibilitätsprüfung der
+  Jahresabrechnung (`annual_statements_consistency_check`), Notizen jederzeit
+  (`billing_periods_set_notes`/`annual_statements_set_notes`), Dokumenten-Up-/Download als
+  Base64, Nutzerfreigaben, Kalender-Gesamtansicht).
   Authentifizierung
   ausschließlich über Bearer-Token (`Authorization`-Header oder `access_token`-Query-Param;
   **kein** Session-Cookie – `src/proxy.ts` lässt `/api/mcp` daher passieren, die Token-Prüfung im
@@ -470,11 +475,13 @@ src/
     email/imap.ts           # IMAP-Konfiguration (optionales Ticket-Postfach; isImapConfigured)
     email/imap-sync.ts      # IMAP-Abruf (imapflow+mailparser), Threading-Zuordnung, Scheduler
     ticket-mailer.ts        # E-Mail-Antworten aus Tickets (SMTP; geteilt von Action + MCP)
-    pdf/                    # document.ts (Briefe), billing-statement.ts (Abrechnungen)
+    pdf/                    # document.ts (Briefe), statement-pdf.ts (geteiltes Abrechnungs-Layout),
+                            # Hüllen billing-statement.ts (Miete) + hoa-annual-statement.ts (WEG)
     storage.ts              # Dateisystem-Ablage (files/)
     data-key.ts             # Master-Schlüssel (Env aus Electron / Schlüsseldatei-Fallback)
     file-crypto.ts          # AES-256-GCM-Dateiverschlüsselung at rest + Bestandsmigration
     letterxpress.ts         # LetterXpress-API (optionaler Postversand)
+    bank-allocations.ts     # Geteilte Fachvalidierung der Buchungszeilen (Server Action + MCP)
     postal-shipments.ts     # Postversand-Orchestrierung (Quelle -> PDF -> LetterXpress -> DB)
     dropbox.ts              # Dropbox-API-Client (OAuth-PKCE, Chunked-Upload, List/Delete)
     dropbox-backup.ts       # Cloud-Sicherung: Verbindung, Scheduler, Upload, Aufbewahrung
@@ -560,12 +567,17 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Buchhaltung:** `accounts` (Kontenrahmen je Liegenschaft, z. B. „Gebäudeversicherung"),
   `bank_transactions` (tatsächliche Bewegungen auf dem Bankkonto einer Liegenschaft, Betrag
   signed: positiv = Eingang, negativ = Ausgang), `bank_transaction_allocations` (Buchungs-
-  zeilen: ordnen einen Teilbetrag entweder einem Konto oder einer fälligen Sollstellung zu –
-  genau eines von accountId/transactionId je Zeile; vollständige Zuordnung markiert die
-  Sollstellung automatisch als bezahlt, Status PAID inkl. paid_date aus dem Buchungsdatum,
-  gepflegt im Repository `src/data/bank-transactions.ts`). Der abgeleitete Zuordnungsstatus
-  einer Banktransaktion (OPEN/PARTIAL/RECONCILED) wird nicht gespeichert, sondern per
-  Teilbetrags-Summe berechnet.
+  zeilen: ordnen einen Teilbetrag genau EINEM Ziel zu – einem Konto (accountId), einer
+  fälligen Miet-Sollstellung (transactionId, Buchungskreis Mietverwaltung) oder einer
+  Hausgeld-Sollstellung (housingChargeId, Buchungskreis WEG); vollständige Zuordnung
+  markiert die Sollstellung beider Kreise automatisch als bezahlt, Status PAID inkl.
+  paid_date aus dem Buchungsdatum, gepflegt generisch im Repository
+  `src/data/bank-transactions.ts` – die Kreise trennen sich: Miete-Buchungen berühren nie
+  den Hausgeld-Status und umgekehrt). Die Fachvalidierung der Zuordnungen liegt geteilt in
+  `src/lib/bank-allocations.ts` (Server Action + MCP identisch). Der abgeleitete
+  Zuordnungsstatus einer Banktransaktion (OPEN/PARTIAL/RECONCILED) wird nicht gespeichert,
+  sondern per Teilbetrags-Summe berechnet. UI: /buchhaltung (Mietverwaltung) und
+  /weg/buchhaltung (WEG-Sicht mit Hausgeld-Buchungszielen) teilen sich die Dialoge.
 - **Nebenkostenabrechnung:** `billing_periods`, `cost_items` (Umlageschlüssel inkl. „CUSTOM"
   über `custom_allocation_key_id`; die Kostenart-Kategorie wurde entfernt, die Bezeichnung
   trägt die fachliche Information selbst), `consumption_values`, `tenant_statements`,
@@ -621,10 +633,13 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `hoa_custom_allocation_key_weights`
 - **Wirtschaftsplan:** `economic_plans`, `economic_plan_unit_shares` (eingefroren nach Finalisierung)
 - **Jahresabrechnung:** `annual_statements`, `annual_statement_unit_results` (inkl.
-  Abrechnungsspitze), `annual_statement_unit_result_lines`
+  Abrechnungsspitze; `pdf_path`/`pdf_file_size`/`pdf_generated_at` = erzeugte Einzelabrechnungs-
+  PDFs je Eigentümer-Zeitanteil), `annual_statement_unit_result_lines`
 - **Kostenpositionen (Plan + Abrechnung gemeinsam):** `hoa_cost_items` (Diskriminator `context` =
-  `"PLAN"`/`"STATEMENT"`), `hoa_cost_item_consumption_values`
-- **Hausgeld:** `housing_charges`
+  `"PLAN"`/`"STATEMENT"`; die Kostenart-Kategorie wurde wie in der Mietverwaltung entfernt,
+  die Bezeichnung trägt die fachliche Information selbst), `hoa_cost_item_consumption_values`
+- **Hausgeld:** `housing_charges` (Bezahl-Status auch automatisch über vollständige Zuordnung
+  von Bankbuchungen, Buchungskreis WEG der Buchhaltung)
 - **Erhaltungsrücklage:** `reserve_fund_bookings` (Vermögensbericht wird berechnet, nicht
   gespeichert)
 - **Eigentümerversammlungen/Beschluss-Sammlung:** `owner_meetings`, `owner_meeting_agenda_items`,
@@ -645,8 +660,28 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 7. Wirtschaftsplan und Jahresabrechnung teilen `hoa_cost_items` mit Diskriminator `context`.
 8. `hoaCostItems.isApportionable` nur für `context = "STATEMENT"` fachlich relevant
    (BetrKV-Brücke, `src/lib/hoa-betrkv-bridge.ts`; Übertrag je Position als `DIRECT`-Position in
-   Höhe des berechneten WEG-Anteils).
+   Höhe des berechneten WEG-Anteils; die Entscheidung trifft ausschließlich das explizite Flag -
+   die frühere Kostenart-Default-Matrix ist mit dem Feld entfallen).
 9. Vermögensbericht (§ 28 Abs. 4 WEG) vereinfacht (Rücklagenstand + offene Hausgeldforderungen).
+10. Jahresabrechnung = Spiegel der Nebenkostenabrechnung der Mietverwaltung: individuelle Periode
+    je WEG, Notizen jederzeit editierbar (`annual_statements_set_notes`), Finalisierung friert die
+    Einzelabrechnungen ein (nur noch löschbar via `deleteAnnualStatementWithArtifacts`, räumt
+    PDFs + Postversand-Protokolle weg), PDF je Eigentümer + „PDF für alle" (geteiltes Layout
+    `src/lib/pdf/statement-pdf.ts`, Hüllen `billing-statement.ts`/`hoa-annual-statement.ts`,
+    Ablage `hoa-annual-statements/`, sichtbar unter /dokumente als vierte Quelle), Postversand
+    über `HOA_ANNUAL_STATEMENT`. Die Vorauszahlungen stammen ausschließlich aus TATSÄCHLICH
+    geleisteten Zahlungen (`calculatePaidPrepaymentsCents`, nur `PAID`-Hausgelder - manuell
+    markiert oder automatisch durch vollständige Bankbuchung; offene Beträge bleiben Rückstand
+    und verfälschen das Ergebnis nicht, `paidPrepaymentCount` = 0 = UI-Warnhinweis). Vor der
+    Finalisierung läuft eine Plausibilitätsprüfung als Hinweis-Karte (keine Sperre):
+    Summe Einzelabrechnungen vs. Kostenpositionen, Plan-/Ist-Abgleich gegen finalisierte
+    Wirtschaftspläne des überlappenden Geschäftsjahrs, offene Hausgeld-Rückstände
+    (`buildAnnualStatementConsistencyCheck`, `src/lib/hoa-annual-statement.ts`). Kostenpositionen
+    können per Dialog „Aus Buchhaltung übernehmen" importiert werden (geteilt mit der
+    Mietverwaltung: `listAccountBookingSumsForPeriod` + `buildCostItemsFromAccountBookingSums`,
+    atomar `createHoaCostItems`). Buchhaltung der WEG = geteilte liegenschaftsbezogene Tabellen
+    (UI /weg/buchhaltung, Konten + Banktransaktionen je WEG-Konto, Zuordnen zu Konten oder
+    offenen Hausgeld-Sollstellungen).
 
 ## 7. Code-Konventionen
 
@@ -692,7 +727,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   `CountLinkBadge` – Muster aus den Listen-Seiten fortführen.
 - **Pagination:** Nur bei fachlich unbegrenzt wachsenden Listen **ohne** eingehende
   Zeilen-Anker (diese würden sonst ab Seite 2 ins Leere laufen): `/finanzen`
-  (Mieteingänge), `/buchhaltung` (Banktransaktionen), `/weg/hausgeld`, `/dokumente`,
+  (Mieteingänge), `/buchhaltung` (Banktransaktionen), `/weg/buchhaltung` (WEG-Sicht der
+  Buchhaltung), `/weg/hausgeld`, `/dokumente`,
   `/weg/beschluesse`, `/admin/logs`. Muster: `?page=`
   (1-basiert) + `resolvePagination()` (`src/lib/pagination.ts`, 50/Seite) + `countX()`/
   `listXPage()` im Repository (SQL mit `LIMIT`/`OFFSET` und deterministischem
@@ -777,7 +813,9 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
 - **Tests:** Vitest für gezielte Unit-/Integrationstests von Server-Code: `src/data/*.test.ts`
   (Migrationen vor/zurück, Backup-Roundtrip inkl. Prüfsummen, Repository-CRUD/Transaktionen
   inkl. Abrechnungs-Finalisierung, frei definierbarer Umlageschlüssel und Buchhaltung –
-  Konten/Banktransaktionen/Buchungszeilen mit abgeleiteter Bezahl-Automation;
+  Konten/Banktransaktionen/Buchungszeilen mit abgeleiteter Bezahl-Automation BEIDER
+  Buchungskreise inkl. Hausgeld-Buchungen und Kreis-Trennung, Löschen finalisierter
+  Perioden/Jahresabrechnungen mit Artefakt-Cleanup;
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
   Threading + IMAP-Sync-Stand,
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
@@ -789,6 +827,10 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   gemockt), `src/lib/auth/bootstrap.test.ts` (Konto-Bootstrapping, Mailer gemockt) und
   `src/lib/billing.test.ts` (reine Abrechnungs-Berechnung: tatsächlich geleistete Vorauszahlungen
   taggenau, CUSTOM-Umlage) und
+  `src/lib/hoa-annual-statement.test.ts` (reine WEG-Abrechnungs-Berechnung: nur tatsächlich
+  geleistete Hausgeld-Zahlungen inkl. paidCount, MEA-Verteilung, taggenauer Eigentümerwechsel,
+  Rücklagen-Zuführung als normale Position, Plausibilitätsprüfung Gesamt-/Einzelabrechnung vs.
+  Wirtschaftsplan/Rückstände) und
   `src/lib/mcp/mcp.test.ts` (MCP: Token/Enabled beider Token-Stufen, JSON-RPC-Protokoll,
   Scope-Filterung ADMIN vs. USER, Werkzeug-Durchstiche inkl.
   Fachregeln, Meta-Werkzeug `batch_execute`: Teilerfolg/Fortsetzung nach Fehlern, `stopOnError`-

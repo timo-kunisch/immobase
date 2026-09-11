@@ -47,6 +47,7 @@ export const SEARCH_PAGE_ENTRIES: SearchPageEntry[] = [
 	{ titleKey: "nav.item.economicPlan", href: "/weg/wirtschaftsplan", keywords: ["wirtschaftsplan", "hausgeldplan", "plan", "budget", "economic plan"] },
 	{ titleKey: "nav.item.annualStatements", href: "/weg/jahresabrechnung", keywords: ["jahresabrechnung", "abrechnung", "abrechnungsspitze", "annual statement"] },
 	{ titleKey: "nav.item.housingCharges", href: "/weg/hausgeld", keywords: ["hausgeld", "hausgeldforderung", "zahlung", "housing charge"] },
+	{ titleKey: "nav.item.hoaBanking", href: "/weg/buchhaltung", keywords: ["weg", "konto", "konten", "bank", "kontoauszug", "buchung", "buchungen", "buchhaltung", "banking"] },
 	{ titleKey: "nav.item.reserveFund", href: "/weg/ruecklage", keywords: ["ruecklage", "rücklage", "erhaltungsrücklage", "instandhaltungsrücklage", "reserve fund"] },
 	{ titleKey: "nav.item.meetings", href: "/weg/versammlungen", keywords: ["versammlung", "eigentümerversammlung", "meeting", "protokoll"] },
 	{ titleKey: "nav.item.resolutions", href: "/weg/beschluesse", keywords: ["beschluss", "beschlüsse", "beschluss-sammlung", "resolution"] },

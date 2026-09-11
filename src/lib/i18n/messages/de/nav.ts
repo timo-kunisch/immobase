@@ -33,6 +33,7 @@ export const nav = {
 	"item.annualStatements": "Jahresabrechnung",
 	"item.housingCharges": "Hausgeld",
 	"item.reserveFund": "Rücklage",
+	"item.hoaBanking": "Buchhaltung",
 	"item.meetings": "Versammlungen",
 	"item.resolutions": "Beschluss-Sammlung",
 	"item.users": "Nutzerverwaltung",

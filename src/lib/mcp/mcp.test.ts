@@ -11,6 +11,7 @@ import { createOwner as createOwnerRepo } from "@/data/owners";
 import { createUnit, getUnit } from "@/data/units";
 import { createUser, getUserById } from "@/data/users";
 import { createBillingPeriod, getBillingPeriod } from "@/data/billing";
+import { getAnnualStatement } from "@/data/annual-statements";
 import { createOwnerMeeting, getOwnerResolution } from "@/data/meetings";
 import { getOpenUnitOwnership, listUnitsWithOwnerships } from "@/data/unit-ownerships";
 import { createLease } from "@/data/leases";
@@ -829,7 +830,6 @@ describe("MCP-Werkzeuge: WEG-Fachregeln", () => {
 
 		await callTool("economic_plan_cost_items_create", {
 			economicPlanId: plan.id,
-			category: "INSURANCE",
 			label: "Gebäudeversicherung",
 			amount: "1200.00",
 			allocationKey: "MEA",
@@ -853,6 +853,119 @@ describe("MCP-Werkzeuge: WEG-Fachregeln", () => {
 		};
 		expect(generated.created).toBe(0);
 		expect(generated.skippedNoOwner).toBeGreaterThan(0);
+	});
+
+	it("jahresabrechnung: Notizen jederzeit, Banking-Import, Hausgeld-Zahlung per Bankbuchung, Konsistenzprüfung, Löschen finalisierter Abrechnungen", async () => {
+		const { hoa, property } = seedHoa();
+		const unit = createUnit({ propertyId: property.id, label: "Whg 1", livingSpace: 60, rooms: 2, floor: null, coOwnershipShare: 1000 });
+		const owner = createOwnerRepo({
+			firstName: "Erika", lastName: "Eigentümer", isCompany: false, companyName: null, street: "S", zipCode: "1", city: "C", country: "D", email: null, phone: null, notes: null,
+		});
+		await callTool("unit_ownerships_create", { unitId: unit.id, ownerId: owner.id, startDate: "2020-01-01" });
+
+		// Konto + Kontobewegung (Versicherungsabbuchung) für den Banking-Import.
+		const insuranceAccount = (await callTool("accounts_create", { propertyId: property.id, label: "Gebäudeversicherung", notes: null })) as { id: string };
+		const insurancePayment = (await callTool("bank_transactions_create", {
+			propertyId: property.id,
+			bookingDate: "2026-03-05",
+			amount: "-120.00",
+			description: "Versicherung Jahresprämie",
+			partner: null,
+			notes: null,
+		})) as { id: string };
+		await callTool("bank_transactions_allocate", {
+			id: insurancePayment.id,
+			allocations: [{ accountId: insuranceAccount.id, transactionId: null, amount: "-120.00" }],
+		});
+
+		const statement = (await callTool("annual_statements_create", {
+			hoaId: hoa.id,
+			periodFrom: "2026-01-01",
+			periodTo: "2026-12-31",
+		})) as { id: string };
+
+		// Notizen sind jederzeit änderbar - auch vor der Finalisierung.
+		await callTool("annual_statements_set_notes", { id: statement.id, notes: "Beschlüsse der Versammlung vom 10.01. berücksichtigt" });
+
+		// Banking-Import: je Konto eine Position (geteilte Logik mit der
+		// Mietverwaltung), einheitlicher Verteilerschlüssel MEA.
+		const imported = (await callTool("annual_statements_import_cost_items_from_banking", {
+			annualStatementId: statement.id,
+			allocationKey: "MEA",
+		})) as { created: number; ids: string[] };
+		expect(imported.created).toBe(1);
+
+		// Hausgeld-Sollstellung + tatsächlicher Zahlungseingang: Die
+		// vollständige Zuordnung per Bankbuchung markiert das Hausgeld als
+		// bezahlt (Grlage: nur geleistete Zahlungen sind Vorauszahlung).
+		const housingCharge = (await callTool("housing_charges_create", {
+			unitId: unit.id,
+			ownerId: owner.id,
+			amount: "300.00",
+			dueDate: "2026-02-01",
+			paidDate: null,
+			purpose: "Hausgeld Februar 2026",
+			status: "OPEN",
+		})) as { id: string; status: string };
+		expect(housingCharge.status).toBe("OPEN");
+
+		const ownerPayment = (await callTool("bank_transactions_create", {
+			propertyId: property.id,
+			bookingDate: "2026-02-05",
+			amount: "300.00",
+			description: "Hausgeldzahlung Februar",
+			partner: "Erika Eigentümer",
+			notes: null,
+		})) as { id: string };
+		await callTool("bank_transactions_allocate", {
+			id: ownerPayment.id,
+			allocations: [{ accountId: null, transactionId: null, housingChargeId: housingCharge.id, amount: "300.00" }],
+		});
+		const paidCharges = (await callTool("housing_charges_list", { unitId: unit.id })) as { id: string; status: string; paidDate: string | null }[];
+		const paidCharge = paidCharges.find((charge) => charge.id === housingCharge.id)!;
+		expect(paidCharge.status).toBe("PAID");
+		expect(paidCharge.paidDate).toBe("2026-02-05T00:00:00.000Z");
+
+		// Konsistenzprüfung vor der Finalisierung: keine unzugeordneten Kosten
+		// (100 % Eigentum erfasst), keine Rückstände (Hausgeld bezahlt) -
+		// nur der Hinweis auf den fehlenden finalisierten Wirtschaftsplan.
+		const issuesBefore = (await callTool("annual_statements_consistency_check", { id: statement.id })) as { type: string }[];
+		expect(issuesBefore.map((issue) => issue.type)).toEqual(["NO_ECONOMIC_PLAN"]);
+
+		// Finalisierung friert die Einzelabrechnung ein (inkl. der tatsächlich
+		// geleisteten Vorauszahlung) und meldet die Konsistenz-Hinweise mit.
+		const finalized = (await callTool("annual_statements_finalize", { id: statement.id })) as {
+			success: boolean;
+			unitResults: number;
+			consistencyIssues: { type: string }[];
+		};
+		expect(finalized.success).toBe(true);
+		expect(finalized.unitResults).toBe(1);
+		expect(finalized.consistencyIssues.map((issue) => issue.type)).toContain("NO_ECONOMIC_PLAN");
+
+		const detail = (await callTool("annual_statements_get", { id: statement.id })) as {
+			unitResults: { totalPrepayments: string; balance: string }[];
+		};
+		expect(detail.unitResults[0].totalPrepayments).toBe("300.00");
+		// 120 € Kosten - 300 € Vorauszahlung = 180 € Guthaben.
+		expect(detail.unitResults[0].balance).toBe("-180.00");
+
+		// Nach der Finalisierung: Notizen bleiben editierbar (interne
+		// Anmerkungen), Kostenpositionen sind gesperrt, Löschen geht weiterhin.
+		await callTool("annual_statements_set_notes", { id: statement.id, notes: "Finalisiert und geprüft." });
+		await expect(
+			callTool("annual_statement_cost_items_create", {
+				annualStatementId: statement.id,
+				label: "Nachträglich",
+				amount: "10.00",
+				allocationKey: "MEA",
+				isApportionable: true,
+			})
+		).rejects.toThrow(/finalisiert/);
+
+		await callTool("annual_statements_delete", { id: statement.id });
+		// Finalisierte Abrechnungen sind über MCP löschbar (inkl. Artefakt-Aufräumlogik).
+		expect(getAnnualStatement(statement.id)).toBeNull();
 	});
 });
 

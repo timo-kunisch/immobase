@@ -13,31 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { initialActionState } from "@/lib/action-state";
 import { useI18n } from "@/lib/i18n/provider";
-import { hoaCostCategoryDefaultApportionable } from "@/lib/hoa-betrkv-bridge";
 
-import type { HoaAllocationKey, HoaCostCategory, HoaCostItem, HoaCustomAllocationKey, Unit } from "@/data/types";
+import type { HoaAllocationKey, HoaCostItem, HoaCustomAllocationKey, Unit } from "@/data/types";
 
 type CustomAllocationKey = HoaCustomAllocationKey;
 type ActionResult = { error?: string; success?: boolean; message?: string };
 
-// Auswahlwerte der Kostenarten/Umlageschlüssel (Beschriftungen kommen aus
-// den i18n-Schlüsseln "hoaPlan.category.*" bzw. "hoaPlan.allocationKey.*").
-const COST_CATEGORY_VALUES: HoaCostCategory[] = [
-	"RESERVE_CONTRIBUTION",
-	"ADMINISTRATOR_FEE",
-	"INSURANCE",
-	"CARETAKER",
-	"MAINTENANCE_REPAIR",
-	"WATER_DRAINAGE",
-	"HEATING",
-	"ELECTRICITY_COMMON",
-	"CLEANING",
-	"GARDEN_MAINTENANCE",
-	"ELEVATOR",
-	"LEGAL_ADVICE",
-	"BANK_FEES",
-	"OTHER",
-];
 const ALLOCATION_KEY_VALUES: HoaAllocationKey[] = ["MEA", "LIVING_SPACE", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"];
 
 /**
@@ -47,7 +28,10 @@ const ALLOCATION_KEY_VALUES: HoaAllocationKey[] = ["MEA", "LIVING_SPACE", "UNITS
  * (saveEconomicPlanCostItemAction/saveAnnualStatementCostItemAction) wird
  * als Prop übergeben. Das Feld "Umlagefähig" wird nur bei
  * context = "STATEMENT" angezeigt (siehe showApportionable), da es im
- * Wirtschaftsplan fachlich nicht relevant ist (Annahme 8 in AGENTS.md).
+ * Wirtschaftsplan fachlich nicht relevant ist (Annahme 8 in AGENTS.md);
+ * es ist beim Neuanlagen bewusst default aktiviert, der Nutzer entscheidet
+ * pro Position (die frühere Vorbelegung über die Kostenart-Kategorie ist
+ * mit dem Feld entfallen).
  * UI-Texte: geteilte Schlüssel im Namespace "hoaPlan" (costItem.*).
  */
 export function HoaCostItemFormDialog({
@@ -73,8 +57,7 @@ export function HoaCostItemFormDialog({
 	const isEdit = Boolean(costItem);
 	const [open, setOpen] = useState(false);
 	const [allocationKey, setAllocationKey] = useState<HoaAllocationKey>(costItem?.allocationKey ?? "MEA");
-	const [category, setCategory] = useState<HoaCostCategory>(costItem?.category ?? "OTHER");
-	const [isApportionable, setIsApportionable] = useState(costItem?.isApportionable ?? hoaCostCategoryDefaultApportionable[category]);
+	const [isApportionable, setIsApportionable] = useState(costItem?.isApportionable ?? true);
 	const [state, formAction, isPending] = useActionState(action, initialActionState);
 
 	useEffect(() => {
@@ -82,16 +65,6 @@ export function HoaCostItemFormDialog({
 			setOpen(false);
 		}
 	}, [state.success]);
-
-	function handleCategoryChange(next: HoaCostCategory) {
-		setCategory(next);
-		if (!isEdit) {
-			// Beim Neuanlegen die Default-Vorbelegung je Kostenart übernehmen
-			// (siehe hoaCostCategoryDefaultApportionable) - beim Bearbeiten
-			// bleibt eine bereits getroffene Nutzerentscheidung unangetastet.
-			setIsApportionable(hoaCostCategoryDefaultApportionable[next]);
-		}
-	}
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
@@ -122,22 +95,6 @@ export function HoaCostItemFormDialog({
 						<div className="grid gap-2">
 							<Label htmlFor="label">{t("hoaPlan.costItem.fieldLabel")} *</Label>
 							<Input id="label" name="label" placeholder={t("hoaPlan.costItem.labelPlaceholder")} defaultValue={costItem?.label} required />
-						</div>
-
-						<div className="grid gap-2">
-							<Label htmlFor="category">{t("hoaPlan.costItem.fieldCategory")} *</Label>
-							<Select name="category" value={category} onValueChange={(value) => handleCategoryChange(value as HoaCostCategory)} required>
-								<SelectTrigger id="category" className="w-full">
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{COST_CATEGORY_VALUES.map((value) => (
-										<SelectItem key={value} value={value}>
-											{t(`hoaPlan.category.${value}`)}
-										</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
 						</div>
 
 						<div className="grid grid-cols-2 gap-4">

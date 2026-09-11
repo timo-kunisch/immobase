@@ -85,9 +85,18 @@ export default async function JahresabrechnungListPage({ searchParams }: { searc
 															<ChevronRight className="size-4" />
 														</Link>
 													</Button>
-													{statement.status === "DRAFT" ? (
-														<ConfirmDeleteButton action={deleteAnnualStatementAction.bind(null, statement.id, statement.hoaId)} confirmMessage={t("hoaStatement.confirm.delete")} />
-													) : null}
+													{/* Finalisierte Abrechnungen sind ebenfalls löschbar - die Action räumt
+													    erzeugte PDFs und Postversand-Protokolle mit weg
+													    (deleteAnnualStatementWithArtifacts), deshalb eine eigene,
+													    deutlich warnende Bestätigung. */}
+													<ConfirmDeleteButton
+														action={deleteAnnualStatementAction.bind(null, statement.id, statement.hoaId)}
+														confirmMessage={
+															statement.status === "DRAFT"
+																? t("hoaStatement.confirm.delete")
+																: t("hoaStatement.confirm.deleteFinalized")
+														}
+													/>
 												</div>
 											</TableCell>
 										</TableRow>

@@ -161,10 +161,10 @@ describe("WEG-Durchstich: Wirtschaftsplan -> Hausgeld -> Jahresabrechnung", () =
 
 		// ---------- BetrKV-Brücke: unit-1 ist vermietet, nur umlagefähige Positionen werden übernommen ----------
 		const unit1Lines = [
-			{ costItemId: "stmt-verwaltung", label: "Verwaltervergütung", category: "ADMINISTRATOR_FEE" as const, isApportionable: false, amountCents: Math.round(504_000 * (3600 / 12600)) },
-			{ costItemId: "stmt-versicherung", label: "Versicherung", category: "INSURANCE" as const, isApportionable: true, amountCents: Math.round(504_000 * (1200 / 12600)) },
-			{ costItemId: "stmt-ruecklage", label: "Zuführung Rücklage", category: "RESERVE_CONTRIBUTION" as const, isApportionable: false, amountCents: Math.round(504_000 * (4800 / 12600)) },
-			{ costItemId: "stmt-wasser", label: "Wasser/Abwasser", category: "WATER_DRAINAGE" as const, isApportionable: true, amountCents: Math.round(504_000 * (3000 / 12600)) },
+			{ costItemId: "stmt-verwaltung", label: "Verwaltervergütung", isApportionable: false, amountCents: Math.round(504_000 * (3600 / 12600)) },
+			{ costItemId: "stmt-versicherung", label: "Versicherung", isApportionable: true, amountCents: Math.round(504_000 * (1200 / 12600)) },
+			{ costItemId: "stmt-ruecklage", label: "Zuführung Rücklage", isApportionable: false, amountCents: Math.round(504_000 * (4800 / 12600)) },
+			{ costItemId: "stmt-wasser", label: "Wasser/Abwasser", isApportionable: true, amountCents: Math.round(504_000 * (3000 / 12600)) },
 		];
 
 		const bridgedItems = buildBetrKvCostItemsFromHoaStatement(unit1Lines);

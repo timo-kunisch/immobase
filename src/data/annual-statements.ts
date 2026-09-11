@@ -1,5 +1,7 @@
 import { getDb } from "./db";
 import { boolToInt, intToBool, newId, now } from "./helpers";
+import { deletePostalShipmentsForSource } from "./postal-shipments";
+import { deleteUploadedFile } from "@/lib/storage";
 import type {
 	AnnualStatement,
 	AnnualStatementUnitResult,
@@ -43,7 +45,7 @@ const ANNUAL_STATEMENT_COLUMNS = `
 
 const HOA_COST_ITEM_COLUMNS = `
 	id, context, economic_plan_id AS economicPlanId, annual_statement_id AS annualStatementId,
-	category, label, amount, allocation_key AS allocationKey, direct_unit_id AS directUnitId,
+	label, amount, allocation_key AS allocationKey, direct_unit_id AS directUnitId,
 	custom_allocation_key_id AS customAllocationKeyId, is_apportionable AS isApportionable, notes,
 	created_at AS createdAt, updated_at AS updatedAt
 `;
@@ -202,11 +204,47 @@ export function updateAnnualStatement(id: string, input: AnnualStatementInput): 
 /**
  * Löscht eine Jahresabrechnung. Kostenpositionen (context = "STATEMENT"),
  * deren Verbrauchswerte sowie etwaige Einzelabrechnungen (inkl. Zeilen)
- * werden per ON DELETE CASCADE der Datenbank mitentfernt. Löschbar sind
- * ohnehin nur Entwürfe (geprüft in der Server Action).
+ * werden per ON DELETE CASCADE der Datenbank mitentfernt. Finalisierte
+ * Abrechnungen sind ebenfalls löschbar - dann mit Artefakt-Aufräumlogik
+ * (siehe deleteAnnualStatementWithArtifacts), analog zur
+ * Nebenkostenabrechnung der Mietverwaltung.
  */
 export function deleteAnnualStatement(id: string): void {
 	getDb().prepare("DELETE FROM annual_statements WHERE id = ?").run(id);
+}
+
+/** Dateipfade aller erzeugten Einzelabrechnungs-PDFs (null-Werte ausgelassen) - Grundlage der Aufräumlogik beim Löschen. */
+export function listAnnualStatementPdfPaths(annualStatementId: string): string[] {
+	const rows = getDb()
+		.prepare("SELECT pdf_path AS pdfPath FROM annual_statement_unit_results WHERE annual_statement_id = ? AND pdf_path IS NOT NULL")
+		.all(annualStatementId) as { pdfPath: string }[];
+	return rows.map((row) => row.pdfPath);
+}
+
+/** IDs aller eingefrorenen Einzelabrechnungen einer Jahresabrechnung. */
+export function listAnnualStatementUnitResultIds(annualStatementId: string): string[] {
+	const rows = getDb().prepare("SELECT id FROM annual_statement_unit_results WHERE annual_statement_id = ?").all(annualStatementId) as {
+		id: string;
+	}[];
+	return rows.map((row) => row.id);
+}
+
+/**
+ * Löscht eine Jahresabrechnung inkl. aller erzeugten Artefakte: die
+ * erzeugten Einzelabrechnungs-PDFs aus der Dateiablage, die Postversand-
+ * Protokolle (postal_shipments) der Einzelabrechnungen sowie die
+ * Abrechnung selbst (Kostenpositionen/Verbrauchswerte/Einzelabrechnungen
+ * per ON DELETE CASCADE). Wird von Server Action und MCP identisch genutzt
+ * - Muster: deleteBillingPeriodWithArtifacts in src/data/billing.ts.
+ */
+export async function deleteAnnualStatementWithArtifacts(id: string): Promise<void> {
+	const pdfPaths = listAnnualStatementPdfPaths(id);
+	const unitResultIds = listAnnualStatementUnitResultIds(id);
+	deletePostalShipmentsForSource("HOA_ANNUAL_STATEMENT", unitResultIds);
+	deleteAnnualStatement(id);
+	for (const pdfPath of pdfPaths) {
+		await deleteUploadedFile(pdfPath);
+	}
 }
 
 /**
@@ -226,7 +264,6 @@ export interface HoaCostItemInput {
 	context: HoaCostItem["context"];
 	economicPlanId: string | null;
 	annualStatementId: string | null;
-	category: HoaCostItem["category"];
 	label: string;
 	amount: string;
 	allocationKey: HoaCostItem["allocationKey"];
@@ -249,17 +286,16 @@ export function createHoaCostItem(input: HoaCostItemInput): HoaCostItem {
 	getDb()
 		.prepare(
 			`INSERT INTO hoa_cost_items
-			 (id, context, economic_plan_id, annual_statement_id, category, label, amount,
+			 (id, context, economic_plan_id, annual_statement_id, label, amount,
 			  allocation_key, direct_unit_id, custom_allocation_key_id, is_apportionable, notes,
 			  created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.run(
 			id,
 			input.context,
 			input.economicPlanId,
 			input.annualStatementId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
@@ -273,11 +309,50 @@ export function createHoaCostItem(input: HoaCostItemInput): HoaCostItem {
 	return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
 }
 
+/**
+ * Legt MEHRERE Kostenpositionen in EINER better-sqlite3-Transaktion an
+ * (atomar - bei einem Fehler wird nichts angelegt): Grundlage des Imports
+ * "Aus Buchhaltung übernehmen" in der Jahresabrechnung (Muster:
+ * createCostItems in src/data/billing.ts).
+ */
+export function createHoaCostItems(inputs: HoaCostItemInput[]): HoaCostItem[] {
+	const db = getDb();
+	const timestamp = now();
+	const insert = db.prepare(
+		`INSERT INTO hoa_cost_items
+		 (id, context, economic_plan_id, annual_statement_id, label, amount,
+		  allocation_key, direct_unit_id, custom_allocation_key_id, is_apportionable, notes,
+		  created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	);
+	return db.transaction(() =>
+		inputs.map((input) => {
+			const id = newId();
+			insert.run(
+				id,
+				input.context,
+				input.economicPlanId,
+				input.annualStatementId,
+				input.label,
+				input.amount,
+				input.allocationKey,
+				input.directUnitId,
+				input.customAllocationKeyId,
+				boolToInt(input.isApportionable),
+				input.notes,
+				timestamp,
+				timestamp
+			);
+			return { id, ...input, createdAt: timestamp, updatedAt: timestamp };
+		})
+	)();
+}
+
 export function updateHoaCostItem(id: string, input: HoaCostItemInput): void {
 	getDb()
 		.prepare(
 			`UPDATE hoa_cost_items
-			 SET context = ?, economic_plan_id = ?, annual_statement_id = ?, category = ?, label = ?, amount = ?,
+			 SET context = ?, economic_plan_id = ?, annual_statement_id = ?, label = ?, amount = ?,
 			     allocation_key = ?, direct_unit_id = ?, custom_allocation_key_id = ?, is_apportionable = ?,
 			     notes = ?, updated_at = ?
 			 WHERE id = ?`
@@ -286,7 +361,6 @@ export function updateHoaCostItem(id: string, input: HoaCostItemInput): void {
 			input.context,
 			input.economicPlanId,
 			input.annualStatementId,
-			input.category,
 			input.label,
 			input.amount,
 			input.allocationKey,
@@ -569,6 +643,64 @@ export function getAnnualStatementUnitResultForBridge(unitResultId: string): Ann
 	// unit_id ist eine restrict-FK - die Einheit existiert garantiert.
 	const unit = getUnitRow(unitResultRow.unitId)!;
 	return { unitResult: unitResultRow, unit, lines: listUnitResultLines(unitResultRow.id) };
+}
+
+// ============================================================
+// PDF-Erzeugung (versandfertige Einzelabrechnungen je Eigentümer)
+// ============================================================
+
+/** Alle Daten, die die PDF-Erzeugung einer WEG-Einzelabrechnung benötigt. */
+export interface AnnualStatementUnitResultPdfData {
+	unitResult: AnnualStatementUnitResult;
+	statement: AnnualStatement;
+	/** WEG der Abrechnung (Betreffzeile des PDFs). */
+	hoa: Hoa;
+	owner: Owner;
+	unit: Unit;
+	lines: AnnualStatementUnitResultLineWithCostItem[];
+}
+
+/**
+ * Lädt eine eingefrorene Einzelabrechnung mit allem, was das PDF braucht
+ * (Abrechnung, WEG, Eigentümer, Einheit, Positionen inkl.
+ * Kostenpositionen) - Muster: getTenantStatementForPdf in
+ * src/data/billing.ts. Die Werte werden ausschließlich aus den
+ * eingefrorenen Datensätzen gelesen, nichts neu berechnet.
+ */
+export function getAnnualStatementUnitResultForPdf(id: string): AnnualStatementUnitResultPdfData | null {
+	const unitResultRow = getDb().prepare(`SELECT ${UNIT_RESULT_COLUMNS} FROM annual_statement_unit_results WHERE id = ?`).get(id) as
+		| AnnualStatementUnitResult
+		| undefined;
+	if (!unitResultRow) return null;
+
+	// Sämtliche Folge-Zeilen sind über restrict-FKs verbunden und
+	// existieren garantiert (Abrechnung -> WEG, Eigentümer, Einheit).
+	const statement = getAnnualStatement(unitResultRow.annualStatementId)!;
+	const hoa = getHoaRow(statement.hoaId)!;
+	const owner = getOwnerRow(unitResultRow.ownerId)!;
+	const unit = getUnitRow(unitResultRow.unitId)!;
+
+	return {
+		unitResult: unitResultRow,
+		statement,
+		hoa,
+		owner,
+		unit,
+		lines: listUnitResultLines(unitResultRow.id),
+	};
+}
+
+export interface AnnualStatementPdfUpdate {
+	pdfPath: string;
+	pdfFileSize: number;
+	pdfGeneratedAt: string;
+}
+
+/** Hinterlegt Dateipfad/-größe/-zeitpunkt eines frisch erzeugten Einzelabrechnungs-PDFs. */
+export function updateAnnualStatementUnitResultPdf(id: string, pdf: AnnualStatementPdfUpdate): void {
+	getDb()
+		.prepare("UPDATE annual_statement_unit_results SET pdf_path = ?, pdf_file_size = ?, pdf_generated_at = ?, updated_at = ? WHERE id = ?")
+		.run(pdf.pdfPath, pdf.pdfFileSize, pdf.pdfGeneratedAt, now(), id);
 }
 
 /** Entwurfs-Abrechnungsperiode der Mietverwaltung (Auswahloption im Brücken-Dialog). */

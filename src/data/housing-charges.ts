@@ -249,6 +249,27 @@ export function listOpenHousingChargeArrearAmounts(unitIds: string[], date: Date
 	return rows.map((row) => row.amount);
 }
 
+/** Einzelne Hausgeld-Sollstellung inkl. Einheit, Eigentümer und zugehöriger WEG. */
+export function getHousingCharge(id: string): HousingChargeWithRelations | null {
+	const row = getDb().prepare(`${HOUSING_CHARGE_SELECT} WHERE c.id = ?`).get(id) as HousingChargeJoinRow | undefined;
+	return row ? mapHousingChargeRow(row) : null;
+}
+
+/**
+ * Offene (OPEN/OVERDUE) Hausgeld-Sollstellungen einer Liegenschaft, nach
+ * Fälligkeit aufsteigend (älteste zuerst) - Buchungsziel für eingehende
+ * Banktransaktionen in der WEG-Buchhaltung (/weg/buchhaltung) und im
+ * Zuordnen-Dialog. IN (.status)-Filter bewusst als SQL-Bedingung, da hier
+ * keine paginierte Anzeige, sondern die vollständige Auswahlmenge gebraucht
+ * wird.
+ */
+export function listOpenHousingChargesForProperty(propertyId: string): HousingChargeWithRelations[] {
+	const rows = getDb()
+		.prepare(`${HOUSING_CHARGE_SELECT} WHERE u.property_id = ? AND c.status IN ('OPEN', 'OVERDUE') ORDER BY c.due_date ASC, c.id ASC`)
+		.all(propertyId) as HousingChargeJoinRow[];
+	return rows.map(mapHousingChargeRow);
+}
+
 export function createHousingCharge(input: HousingChargeInput): HousingCharge {
 	const id = newId();
 	const timestamp = now();

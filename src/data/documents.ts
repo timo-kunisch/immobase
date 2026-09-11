@@ -5,9 +5,10 @@ import type { DocumentRecord, DocumentType, Tenant, Unit } from "./types";
 /**
  * Repository für das Dokumentenmanagement (DMS, Tabelle `documents`) sowie
  * die SQL-Abfragen für die vereinheitlichte Datei-Übersicht unter /dokumente
- * (hochgeladene Dokumente, generierte Vorlagen-Schreiben und versandfertige
- * Nebenkostenabrechnungs-PDFs - das Mapping auf das gemeinsame
- * Anzeigeformat inkl. Volltextsuche liegt in src/lib/documents-overview.ts).
+ * (hochgeladene Dokumente, generierte Vorlagen-Schreiben, versandfertige
+ * Nebenkostenabrechnungs-PDFs und versandfertige WEG-Einzelabrechnungs-PDFs
+ * - das Mapping auf das gemeinsame Anzeigeformat inkl. Volltextsuche liegt
+ * in src/lib/documents-overview.ts).
  *
  * Enthält außerdem die für Auswahl/Filter benötigten Lesezugriffe auf die
  * verknüpften Stammdaten (units/tenants haben noch kein eigenes Repository,
@@ -164,6 +165,18 @@ export interface TenantStatementOverviewRow extends OverviewLinkedColumns {
 	periodTo: string | null;
 }
 
+/** Übersichts-Zeile eines versandfertigen WEG-Einzelabrechnungs-PDFs (Quelle `annual_statement_unit_results.pdf_path`). */
+export interface HoaAnnualStatementOverviewRow extends OverviewLinkedColumns {
+	id: string;
+	pdfPath: string;
+	pdfFileSize: number | null;
+	pdfGeneratedAt: string | null;
+	periodTo: string | null;
+	/** Anzeige-Name des Eigentümers (Eigentümer statt Mieter als Bezugsperson). */
+	ownerFirstName: string | null;
+	ownerLastName: string | null;
+}
+
 function buildOverviewWhere(conditions: string[]): string {
 	return conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 }
@@ -283,4 +296,45 @@ export function listTenantStatementOverviewRows(filters: DocumentOverviewFilters
 			 ${buildOverviewWhere(conditions)}`
 		)
 		.all(...params) as TenantStatementOverviewRow[];
+}
+
+/**
+ * Versandfertige WEG-Einzelabrechnungs-PDFs (nur Einzelabrechnungen mit
+ * bereits erzeugtem PDF - daher pdf_path IS NOT NULL).
+ */
+export function listHoaAnnualStatementOverviewRows(filters: DocumentOverviewFilters): HoaAnnualStatementOverviewRow[] {
+	const conditions: string[] = ["ur.pdf_path IS NOT NULL"];
+	const params: string[] = [];
+	if (filters.propertyId) {
+		conditions.push("p.id = ?");
+		params.push(filters.propertyId);
+	}
+	if (filters.unitId) {
+		conditions.push("u.id = ?");
+		params.push(filters.unitId);
+	}
+	if (filters.tenantId) {
+		// WEG-Abrechnungen haben keinen Mieter-Bezug - ein Mieter-Filter
+		// liefert bewusst keine Treffer.
+		conditions.push("1 = 0");
+	}
+
+	return getDb()
+		.prepare(
+			`SELECT
+				ur.id AS id, ur.pdf_path AS pdfPath, ur.pdf_file_size AS pdfFileSize,
+				ur.pdf_generated_at AS pdfGeneratedAt, s.period_to AS periodTo,
+				p.id AS propertyId, p.name AS propertyName,
+				u.id AS unitId, u.label AS unitLabel,
+				NULL AS tenantId,
+				o.first_name AS ownerFirstName, o.last_name AS ownerLastName
+			 FROM annual_statement_unit_results ur
+			 INNER JOIN annual_statements s ON s.id = ur.annual_statement_id
+			 INNER JOIN hoas h ON h.id = s.hoa_id
+			 INNER JOIN properties p ON p.id = h.property_id
+			 INNER JOIN units u ON u.id = ur.unit_id
+			 INNER JOIN owners o ON o.id = ur.owner_id
+			 ${buildOverviewWhere(conditions)}`
+		)
+		.all(...params) as HoaAnnualStatementOverviewRow[];
 }

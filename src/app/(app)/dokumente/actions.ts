@@ -14,6 +14,7 @@ import type { DocumentSourceType } from "@/lib/documents-overview";
 import { ALLOWED_DOCUMENT_TYPES_LABEL, isAllowedDocumentFile } from "@/app/(app)/dokumente/upload-constraints";
 import { deleteGeneratedDocumentAction, sendGeneratedDocumentByPostAction } from "@/app/(app)/vorlagen/actions";
 import { sendStatementByPostAction } from "@/app/(app)/abrechnung/actions";
+import { sendHoaAnnualStatementByPostAction } from "@/app/(app)/weg/jahresabrechnung/actions";
 
 const DOCUMENT_TYPES: DocumentType[] = ["CONTRACT", "INVOICE", "FLOORPLAN", "OTHER"];
 
@@ -138,11 +139,12 @@ export async function sendDocumentByPostAction(documentId: string): Promise<Post
 // ============================================================
 
 /**
- * Für versandfertige Nebenkostenabrechnungs-PDFs (TENANT_STATEMENT) gibt es
- * bewusst keine eigenständige "PDF löschen"-Action ohne das zugehörige
- * TenantStatement selbst zu löschen (das PDF ist nur eine abgeleitete
- * Momentaufnahme, siehe abrechnung/actions.ts) - Löschen ist für diese
- * Quelle in der Gesamtübersicht daher nicht möglich.
+ * Für versandfertige Abrechnungs-PDFs (TENANT_STATEMENT und
+ * HOA_ANNUAL_STATEMENT) gibt es bewusst keine eigenständige "PDF löschen"-
+ * Action ohne die zugehörige Abrechnung selbst zu löschen (das PDF ist nur
+ * eine abgeleitete Momentaufnahme, siehe abrechnung/actions.ts bzw.
+ * weg/jahresabrechnung/actions.ts) - Löschen ist für diese Quellen in der
+ * Gesamtübersicht daher nicht möglich.
  */
 export async function deleteAnyDocumentAction(sourceType: DocumentSourceType, id: string): Promise<ActionState> {
 	if (sourceType === "DOCUMENT") return deleteDocumentAction(id);
@@ -154,5 +156,6 @@ export async function deleteAnyDocumentAction(sourceType: DocumentSourceType, id
 export async function sendAnyDocumentByPostAction(sourceType: DocumentSourceType, id: string): Promise<PostalShipmentActionState> {
 	if (sourceType === "DOCUMENT") return sendDocumentByPostAction(id);
 	if (sourceType === "GENERATED_DOCUMENT") return sendGeneratedDocumentByPostAction(id);
+	if (sourceType === "HOA_ANNUAL_STATEMENT") return sendHoaAnnualStatementByPostAction(id);
 	return sendStatementByPostAction(id);
 }

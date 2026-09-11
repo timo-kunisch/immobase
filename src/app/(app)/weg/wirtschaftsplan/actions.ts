@@ -26,25 +26,9 @@ import { getString, getDecimalString } from "@/lib/form-data";
 import { calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
 import { findOwnershipForDate } from "@/lib/hoa-ownership";
 import { getT } from "@/lib/i18n/server";
-import type { HoaAllocationKey, HoaCostCategory } from "@/data/types";
+import type { HoaAllocationKey } from "@/data/types";
 
 const HOA_ALLOCATION_KEYS: HoaAllocationKey[] = ["MEA", "LIVING_SPACE", "UNITS", "DIRECT", "CUSTOM"];
-const HOA_COST_CATEGORIES: HoaCostCategory[] = [
-	"RESERVE_CONTRIBUTION",
-	"ADMINISTRATOR_FEE",
-	"INSURANCE",
-	"CARETAKER",
-	"MAINTENANCE_REPAIR",
-	"WATER_DRAINAGE",
-	"HEATING",
-	"ELECTRICITY_COMMON",
-	"CLEANING",
-	"GARDEN_MAINTENANCE",
-	"ELEVATOR",
-	"LEGAL_ADVICE",
-	"BANK_FEES",
-	"OTHER",
-];
 
 /** Lädt einen Wirtschaftsplan und prüft, dass er noch im Entwurf ist. */
 async function requireDraftEconomicPlan(economicPlanId: string) {
@@ -150,7 +134,6 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 	const t = await getT();
 	const id = getString(formData, "id");
 	const economicPlanId = getString(formData, "economicPlanId");
-	const categoryRaw = getString(formData, "category") as HoaCostCategory;
 	const label = getString(formData, "label");
 	const amount = getDecimalString(formData, "amount");
 	const allocationKeyRaw = getString(formData, "allocationKey") as HoaAllocationKey;
@@ -162,7 +145,6 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 		return { error: t("hoaPlan.errors.costItemRequired") };
 	}
 
-	const category: HoaCostCategory = HOA_COST_CATEGORIES.includes(categoryRaw) ? categoryRaw : "OTHER";
 	if (!HOA_ALLOCATION_KEYS.includes(allocationKeyRaw)) {
 		return { error: t("hoaPlan.errors.invalidAllocationKey") };
 	}
@@ -177,7 +159,6 @@ export async function saveEconomicPlanCostItemAction(_prevState: ActionState, fo
 	if ("error" in existing) return { error: existing.error };
 
 	const data = {
-		category,
 		label,
 		amount,
 		allocationKey: allocationKeyRaw,

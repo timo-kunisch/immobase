@@ -17,14 +17,16 @@ import type { Account } from "@/data/types";
 
 /**
  * Auswahl-Ziel einer Buchungszeile im Zuordnen-Dialog: ein Konto
- * ("account:<id>") oder eine offene Sollstellung ("transaction:<id>").
+ * ("account:<id>"), eine offene Miet-Sollstellung ("transaction:<id>") oder
+ * eine offene Hausgeld-Sollstellung der WEG-Verwaltung
+ * ("housingcharge:<id>").
  */
-type AllocationTarget = { accountId: string | null; transactionId: string | null };
+type AllocationTarget = { accountId: string | null; transactionId: string | null; housingChargeId: string | null };
 
 interface TargetOption {
 	value: string;
 	label: string;
-	group: "account" | "transaction";
+	group: "account" | "transaction" | "housingcharge";
 }
 
 export interface OpenTransactionOption {
@@ -35,36 +37,49 @@ export interface OpenTransactionOption {
 	dueDate: string;
 }
 
+export interface OpenHousingChargeOption {
+	id: string;
+	/** Anzeige-Bezeichnung der offenen Hausgeld-Sollstellung (Verwendungszweck + Eigentümer). */
+	label: string;
+	amount: string;
+	dueDate: string;
+}
+
 /** Bestehende Buchungszeile (für die Vorbelegung beim Öffnen des Dialogs). */
 export interface AllocationPreset {
 	accountId: string | null;
 	transactionId: string | null;
+	housingChargeId: string | null;
 	amount: string;
 }
 
 function parseTarget(value: string): AllocationTarget {
-	if (value.startsWith("account:")) return { accountId: value.slice("account:".length) || null, transactionId: null };
-	if (value.startsWith("transaction:")) return { accountId: null, transactionId: value.slice("transaction:".length) || null };
-	return { accountId: null, transactionId: null };
+	if (value.startsWith("account:")) return { accountId: value.slice("account:".length) || null, transactionId: null, housingChargeId: null };
+	if (value.startsWith("transaction:")) return { accountId: null, transactionId: value.slice("transaction:".length) || null, housingChargeId: null };
+	if (value.startsWith("housingcharge:")) return { accountId: null, transactionId: null, housingChargeId: value.slice("housingcharge:".length) || null };
+	return { accountId: null, transactionId: null, housingChargeId: null };
 }
 
 /**
- * Zuordnen-Dialog einer Banktransaktion: Die Buchungszeilen (Ziel = Konto
- * oder offene Sollstellung + Teilbetrag) werden hier vollständig ersetzt -
- * gespeichert wird immer der komplette Satz Zeilen (Split-Buchungen sind
- * ausdrücklich erlaubt, die Teilbeträge dürfen die Transaktion insgesamt
- * nicht übersteigen).
+ * Zuordnen-Dialog einer Banktransaktion: Die Buchungszeilen (Ziel = Konto,
+ * offene Miet-Sollstellung, offene Hausgeld-Sollstellung + Teilbetrag)
+ * werden hier vollständig ersetzt - gespeichert wird immer der komplette
+ * Satz Zeilen (Split-Buchungen sind ausdrücklich erlaubt, die Teilbeträge
+ * dürfen die Transaktion insgesamt nicht übersteigen).
  */
 export function BankTransactionAllocateDialog({
 	bankTransaction,
 	accounts,
 	openTransactions,
+	housingCharges = [],
 }: {
 	bankTransaction: { id: string; description: string; amount: string; bookingDate: string; allocations?: AllocationPreset[] };
 	/** Konten der Liegenschaft. */
 	accounts: Account[];
-	/** Offene Sollstellungen der Liegenschaft (aus /finanzen bzw. der Buchhaltung). */
+	/** Offene Miet-Sollstellungen der Liegenschaft (Buchungskreis Mietverwaltung). */
 	openTransactions: OpenTransactionOption[];
+	/** Offene Hausgeld-Sollstellungen der Liegenschaft (Buchungskreis WEG, /weg/buchhaltung). */
+	housingCharges?: OpenHousingChargeOption[];
 }) {
 	const { t } = useI18n();
 	const [open, setOpen] = useState(false);
@@ -75,15 +90,22 @@ export function BankTransactionAllocateDialog({
 	const [rows, setRows] = useState<{ target: string; amount: string }[]>([]);
 	const [initialized, setInitialized] = useState(false);
 
-	// Beim Öffnen: bestehende Buchungszeilen (account/transaction + Betrag)
-	// als Zeilen vorbelegen, sonst eine leere Zeile mit dem Rest-Betrag.
+	// Beim Öffnen: bestehende Buchungszeilen (Konto/Miet-/Hausgeld-Sollstellung
+	// + Betrag) als Zeilen vorbelegen, sonst eine leere Zeile mit dem Rest-Betrag.
 	useEffect(() => {
 		if (!open || initialized) return;
 		const options = buildOptions();
 		const initialRows =
 			bankTransaction.allocations && bankTransaction.allocations.length > 0
 				? bankTransaction.allocations.map((allocation) => ({
-						target: allocation.accountId ? `account:${allocation.accountId}` : allocation.transactionId ? `transaction:${allocation.transactionId}` : "",
+						target:
+							allocation.accountId ?
+							`account:${allocation.accountId}`
+						: allocation.transactionId ?
+							`transaction:${allocation.transactionId}`
+						: allocation.housingChargeId ?
+							`housingcharge:${allocation.housingChargeId}`
+						:	"",
 						amount: String(Math.abs(Number(allocation.amount))),
 					}))
 				: [];
@@ -107,10 +129,15 @@ export function BankTransactionAllocateDialog({
 				label: `${transaction.label} (${transaction.amount} €, fällig ${transaction.dueDate.slice(0, 10)})`,
 				group: "transaction" as const,
 			})),
+			...housingCharges.map((housingCharge) => ({
+				value: `housingcharge:${housingCharge.id}`,
+				label: `${housingCharge.label} (${housingCharge.amount} €, fällig ${housingCharge.dueDate.slice(0, 10)})`,
+				group: "housingcharge" as const,
+			})),
 		];
 	}
 
-	const options = useMemo(buildOptions, [accounts, openTransactions]);
+	const options = useMemo(buildOptions, [accounts, openTransactions, housingCharges]);
 
 	const allocatedCents = rows.reduce((sum, row) => sum + Math.round(Number(row.amount.replace(",", ".")) * 100) || 0, 0);
 	const remainingCents = amountCents - allocatedCents;
@@ -137,6 +164,7 @@ export function BankTransactionAllocateDialog({
 						{rows.map((row, index) => {
 							const target = parseTarget(row.target);
 							const transactionOption = openTransactions.find((transaction) => transaction.id === target.transactionId);
+							const housingChargeOption = housingCharges.find((housingCharge) => housingCharge.id === target.housingChargeId);
 							// Vorschlag: beim Wechsel auf eine Sollstellung deren offenen Betrag übernehmen.
 							return (
 								<div key={index} className="grid gap-2 rounded-md border p-3">
@@ -149,8 +177,13 @@ export function BankTransactionAllocateDialog({
 												onValueChange={(next) => {
 													const nextTarget = parseTarget(next);
 													const nextTransaction = openTransactions.find((transaction) => transaction.id === nextTarget.transactionId);
-													const suggested = nextTransaction ? Math.abs(Number(nextTransaction.amount)) : Math.abs(Number(row.amount.replace(",", ".")) || 0);
-													setRows((current) => current.map((r, i) => (i === index ? { target: next, amount: suggested.toFixed(2) } : r)));
+													const nextHousingCharge = housingCharges.find((housingCharge) => housingCharge.id === nextTarget.housingChargeId);
+													const suggestedAmount = nextTransaction
+														? Math.abs(Number(nextTransaction.amount))
+														: nextHousingCharge
+															? Math.abs(Number(nextHousingCharge.amount))
+															: Math.abs(Number(row.amount.replace(",", ".")) || 0);
+													setRows((current) => current.map((r, i) => (i === index ? { target: next, amount: suggestedAmount.toFixed(2) } : r)));
 												}}
 											>
 												<SelectTrigger id={`target-${index}`} className="w-full">
@@ -171,6 +204,14 @@ export function BankTransactionAllocateDialog({
 													{openTransactions.map((transaction) => (
 														<SelectItem key={`transaction:${transaction.id}`} value={`transaction:${transaction.id}`}>
 															{transaction.label}
+														</SelectItem>
+													))}
+													{housingCharges.length > 0 ? (
+														<div className="px-2 py-1 text-xs font-semibold text-muted-foreground">{t("banking.allocate.groupHousingCharges")}</div>
+													) : null}
+													{housingCharges.map((housingCharge) => (
+														<SelectItem key={`housingcharge:${housingCharge.id}`} value={`housingcharge:${housingCharge.id}`}>
+															{housingCharge.label}
 														</SelectItem>
 													))}
 												</SelectContent>
@@ -202,6 +243,7 @@ export function BankTransactionAllocateDialog({
 										/>
 									</div>
 									{transactionOption ? <p className="text-xs text-muted-foreground">{transactionOption.label}</p> : null}
+									{housingChargeOption ? <p className="text-xs text-muted-foreground">{housingChargeOption.label}</p> : null}
 								</div>
 							);
 						})}

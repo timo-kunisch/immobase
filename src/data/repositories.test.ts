@@ -40,6 +40,17 @@ import { createTransaction, generateDueTransactions, listOpenTransactionArrearAm
 import { createUnit } from "@/data/units";
 import { countUsers, createUser, getUserByEmail, listAdminEmails, updateUserApproval } from "@/data/users";
 import { buildCostItemsFromAccountBookingSums } from "@/lib/billing";
+import {
+	createAnnualStatement,
+	createHoaCostItem,
+	deleteAnnualStatementWithArtifacts,
+	finalizeAnnualStatement,
+	getAnnualStatement,
+	updateAnnualStatementUnitResultPdf,
+} from "@/data/annual-statements";
+import { createHoa } from "@/data/hoas";
+import { createHousingCharge, getHousingCharge, listOpenHousingChargesForProperty, markHousingChargePaid } from "@/data/housing-charges";
+import { createOwner } from "@/data/owners";
 
 /**
  * Repository-Layer-Tests gegen eine echte (temporäre) better-sqlite3-
@@ -351,8 +362,8 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 
 		// Split: 950 € gegen die Sollstellung (Miete), 50 € auf das Konto.
 		setBankTransactionAllocations(bankTransaction.id, [
-			{ accountId: null, transactionId: transaction.id, amount: "950.00" },
-			{ accountId: account.id, transactionId: null, amount: "50.00" },
+			{ accountId: null, transactionId: transaction.id, housingChargeId: null, amount: "950.00" },
+			{ accountId: account.id, transactionId: null, housingChargeId: null, amount: "50.00" },
 		]);
 
 		const paid = listTransactions({ leaseId: lease.id })[0];
@@ -409,7 +420,7 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 			partner: null,
 			notes: null,
 		});
-		setBankTransactionAllocations(bankTransaction.id, [{ accountId: null, transactionId: transaction.id, amount: "500.00" }]);
+		setBankTransactionAllocations(bankTransaction.id, [{ accountId: null, transactionId: transaction.id, housingChargeId: null, amount: "500.00" }]);
 
 		expect(getBankTransaction(bankTransaction.id)?.status).toBe("PARTIAL");
 		const transactionAfter = listTransactions({ leaseId: lease.id })[0];
@@ -453,13 +464,13 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 		// ... und eine Buchung AUSSERHALB des Abrechnungszeitraums.
 		const nextYearPayment = booking("2027-02-05T00:00:00.000Z", "-480.00", "Versicherung Folgejahr");
 
-		setBankTransactionAllocations(insurancePayment.id, [{ accountId: insurance.id, transactionId: null, amount: "-480.00" }]);
-		setBankTransactionAllocations(insuranceRefund.id, [{ accountId: insurance.id, transactionId: null, amount: "80.00" }]);
-		setBankTransactionAllocations(waterPayment.id, [{ accountId: water.id, transactionId: null, amount: "-250.50" }]);
-		setBankTransactionAllocations(heatingPayment.id, [{ accountId: heating.id, transactionId: null, amount: "-100.00" }]);
-		setBankTransactionAllocations(heatingRefund.id, [{ accountId: heating.id, transactionId: null, amount: "100.00" }]);
-		setBankTransactionAllocations(rentPayment.id, [{ accountId: null, transactionId: rent.id, amount: "950.00" }]);
-		setBankTransactionAllocations(nextYearPayment.id, [{ accountId: insurance.id, transactionId: null, amount: "-480.00" }]);
+		setBankTransactionAllocations(insurancePayment.id, [{ accountId: insurance.id, transactionId: null, housingChargeId: null, amount: "-480.00" }]);
+		setBankTransactionAllocations(insuranceRefund.id, [{ accountId: insurance.id, transactionId: null, housingChargeId: null, amount: "80.00" }]);
+		setBankTransactionAllocations(waterPayment.id, [{ accountId: water.id, transactionId: null, housingChargeId: null, amount: "-250.50" }]);
+		setBankTransactionAllocations(heatingPayment.id, [{ accountId: heating.id, transactionId: null, housingChargeId: null, amount: "-100.00" }]);
+		setBankTransactionAllocations(heatingRefund.id, [{ accountId: heating.id, transactionId: null, housingChargeId: null, amount: "100.00" }]);
+		setBankTransactionAllocations(rentPayment.id, [{ accountId: null, transactionId: rent.id, housingChargeId: null, amount: "950.00" }]);
+		setBankTransactionAllocations(nextYearPayment.id, [{ accountId: insurance.id, transactionId: null, housingChargeId: null, amount: "-480.00" }]);
 
 		const period = createBillingPeriod({
 			propertyId: property.id,
@@ -583,8 +594,217 @@ describe("buchhaltung (Konten, Banktransaktionen, Zuordnung)", () => {
 			partner: null,
 			notes: null,
 		});
-		setBankTransactionAllocations(bankTransaction.id, [{ accountId: account2.id, transactionId: null, amount: "-120.00" }]);
+		setBankTransactionAllocations(bankTransaction.id, [{ accountId: account2.id, transactionId: null, housingChargeId: null, amount: "-120.00" }]);
 		expect(countAllocationsForAccount(account2.id)).toBe(1);
 		expect(transaction.status).toBe("OPEN");
+	});
+});
+
+describe("WEG-Buchhaltung und Jahresabrechnung", () => {
+	function seedHoaWithHousingCharge() {
+		const { property, unit, tenant, lease } = seedPropertyUnitTenantLease();
+		const hoa = createHoa({ propertyId: property.id, name: "WEG Testhaus", totalShares: 1000, bankIban: null, bankBic: null, notes: null });
+		const owner = createOwner({
+			firstName: "Erika",
+			lastName: "Eigentümer",
+			isCompany: false,
+			companyName: null,
+			street: "Weg 2",
+			zipCode: "12345",
+			city: "Berlin",
+			country: "Deutschland",
+			email: null,
+			phone: null,
+			notes: null,
+		});
+		const housingCharge = createHousingCharge({
+			unitId: unit.id,
+			ownerId: owner.id,
+			amount: "300.00",
+			dueDate: "2026-02-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Hausgeld Februar 2026",
+			status: "OPEN",
+		});
+		return { property, unit, tenant, lease, hoa, owner, housingCharge };
+	}
+
+	it("bucht Zahlungseingänge von Eigentümern gegen Hausgeld-Sollstellungen: vollständige Zuordnung = bezahlt", () => {
+		const { property, lease, housingCharge } = seedHoaWithHousingCharge();
+		// Miet-Sollstellung derselben Liegenschaft (Buchungskreis Miete).
+		const rent = createTransaction({
+			leaseId: lease.id,
+			amount: "650.00",
+			dueDate: "2026-02-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Miete Februar 2026",
+			status: "OPEN",
+		});
+
+		const bankTransaction = createBankTransaction({
+			propertyId: property.id,
+			bookingDate: "2026-02-05T00:00:00.000Z",
+			amount: "950.00",
+			description: "Sammelüberweisung",
+			partner: null,
+			notes: null,
+		});
+
+		// Split: 300 € gegen das Hausgeld (WEG-Kreis), 650 € gegen die Miete
+		// (Miete-Kreis) - BEIDE Buchungskreise in einer Banktransaktion.
+		setBankTransactionAllocations(bankTransaction.id, [
+			{ accountId: null, transactionId: null, housingChargeId: housingCharge.id, amount: "300.00" },
+			{ accountId: null, transactionId: rent.id, housingChargeId: null, amount: "650.00" },
+		]);
+
+		// Die vollständig zugeordnete HAUSGELD-Sollstellung gilt als bezahlt
+		// (paid_date = Buchungsdatum) - Grundlage der Jahresabrechnung,
+		// die ausschließlich tatsächlich geleistete Zahlungen ansetzt.
+		const paidHousingCharge = getHousingCharge(housingCharge.id)!;
+		expect(paidHousingCharge.status).toBe("PAID");
+		expect(paidHousingCharge.paidDate).toBe("2026-02-05T00:00:00.000Z");
+
+		// Anzeige-Referenz der Buchungszeile (Eigentümer + Verwendungszweck).
+		const view = getBankTransaction(bankTransaction.id);
+		expect(view?.allocations.find((allocation) => allocation.housingChargeId)?.housingChargeLabel).toContain("Hausgeld Februar 2026");
+
+		// Bezahlte Hausgelder verschwinden aus der Auswahl offener Sollstellungen.
+		expect(listOpenHousingChargesForProperty(property.id)).toHaveLength(0);
+
+		// ... und die Miete ist ebenfalls bezahlt - die Kreise stören sich nicht.
+		expect(listTransactions({ leaseId: lease.id })[0].status).toBe("PAID");
+
+		// Löschen der Banktransaktion stellt BEIDE Sollstellungen wieder offen.
+		deleteBankTransaction(bankTransaction.id);
+		expect(getHousingCharge(housingCharge.id)?.status).toBe("OPEN");
+		expect(getHousingCharge(housingCharge.id)?.paidDate).toBeNull();
+		expect(listTransactions({ leaseId: lease.id })[0].status).toBe("OPEN");
+	});
+
+	it("Teilzuordnung lässt die Hausgeld-Sollstellung offen - Miete-Buchungen berühren den Hausgeld-Status nicht", () => {
+		const { property, housingCharge } = seedHoaWithHousingCharge();
+
+		const bankTransaction = createBankTransaction({
+			propertyId: property.id,
+			bookingDate: "2026-02-05T00:00:00.000Z",
+			amount: "100.00",
+			description: "Teilzahlung Hausgeld",
+			partner: null,
+			notes: null,
+		});
+		setBankTransactionAllocations(bankTransaction.id, [{ accountId: null, transactionId: null, housingChargeId: housingCharge.id, amount: "100.00" }]);
+
+		// 100 € von 300 € Soll zugeordnet: Die Banktransaktion ist zwar vollständig
+		// zugeordnet (RECONCILED), aber die Hausgeld-Sollstellung nur teilweise
+		// gedeckt - der Status bleibt daher OPEN (Teilzahlungen werden im
+		// Zahlungsmodell nicht als bezahlt abgebildet).
+		expect(getBankTransaction(bankTransaction.id)?.status).toBe("RECONCILED");
+		expect(getHousingCharge(housingCharge.id)?.status).toBe("OPEN");
+		expect(listOpenHousingChargesForProperty(property.id)).toHaveLength(1);
+
+		// Manuelle Schnellaktion bleibt parallel nutzbar.
+		markHousingChargePaid(housingCharge.id);
+		expect(getHousingCharge(housingCharge.id)?.status).toBe("PAID");
+	});
+
+	it("listOpenHousingChargesForProperty liefert nur offene Sollstellungen der Liegenschaft (älteste zuerst)", () => {
+		const { property, housingCharge } = seedHoaWithHousingCharge();
+		createHousingCharge({
+			unitId: housingCharge.unitId,
+			ownerId: housingCharge.ownerId,
+			amount: "250.00",
+			dueDate: "2026-01-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Hausgeld Januar 2026",
+			status: "OPEN",
+		});
+
+		// Andere Liegenschaft: fließt nicht in die Auswahl ein.
+		const otherProperty = createProperty({ name: "Anderes Haus", street: "S", zipCode: "1", city: "C", country: "D", notes: null });
+		const otherUnit = createUnit({ propertyId: otherProperty.id, label: "Whg X", livingSpace: 40, rooms: 1, floor: null, coOwnershipShare: null });
+		const otherOwner = createOwner({
+			firstName: "X",
+			lastName: "Y",
+			isCompany: false,
+			companyName: null,
+			street: "S",
+			zipCode: "1",
+			city: "C",
+			country: "D",
+			email: null,
+			phone: null,
+			notes: null,
+		});
+		createHousingCharge({
+			unitId: otherUnit.id,
+			ownerId: otherOwner.id,
+			amount: "10.00",
+			dueDate: "2026-01-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Fremd",
+			status: "OPEN",
+		});
+
+		const open = listOpenHousingChargesForProperty(property.id);
+		expect(open).toHaveLength(2);
+		expect(open.map((charge) => charge.purpose)).toEqual(["Hausgeld Januar 2026", "Hausgeld Februar 2026"]);
+	});
+
+	it("deleteAnnualStatementWithArtifacts entfernt auch finalisierte Abrechnungen samt PDF-Protokollen", async () => {
+		const { unit, owner, hoa } = seedHoaWithHousingCharge();
+		const statement = createAnnualStatement({ hoaId: hoa.id, periodFrom: "2026-01-01", periodTo: "2026-12-31", notes: null });
+		const costItem = createHoaCostItem({
+			context: "STATEMENT",
+			economicPlanId: null,
+			annualStatementId: statement.id,
+			label: "Wasser",
+			amount: "100.00",
+			allocationKey: "MEA",
+			directUnitId: null,
+			customAllocationKeyId: null,
+			isApportionable: true,
+			notes: null,
+		});
+
+		finalizeAnnualStatement(statement.id, [
+			{
+				unitId: unit.id,
+				ownerId: owner.id,
+				ownedFrom: "2026-01-01",
+				ownedTo: "2026-12-31",
+				ownedDays: 365,
+				totalAllocatedCosts: "100.00",
+				totalPrepayments: "300.00",
+				balance: "-200.00",
+				lines: [{ costItemId: costItem.id, amount: "100.00" }],
+			},
+		]);
+
+		const unitResultId = getDb().prepare("SELECT id FROM annual_statement_unit_results WHERE annual_statement_id = ?").get(statement.id) as {
+			id: string;
+		};
+		updateAnnualStatementUnitResultPdf(unitResultId.id, { pdfPath: "hoa-annual-statements/fake.pdf", pdfFileSize: 10, pdfGeneratedAt: "2026-03-01T00:00:00.000Z" });
+		createPostalShipment({
+			sourceType: "HOA_ANNUAL_STATEMENT",
+			sourceId: unitResultId.id,
+			externalJobId: "job-1",
+			externalStatus: "done",
+			mode: "test",
+			status: "REGISTERED",
+			errorMessage: null,
+			requestedByUserId: null,
+		});
+
+		// Finalisierte Abrechnungen sind löschbar - inkl. Einzelabrechnungs-
+		// PDFs + Postversand-Protokolle (Muster: deleteBillingPeriodWithArtifacts).
+		await deleteAnnualStatementWithArtifacts(statement.id);
+		expect(getAnnualStatement(statement.id)).toBeNull();
+
+		const resultCount = getDb().prepare("SELECT COUNT(*) AS c FROM annual_statement_unit_results WHERE annual_statement_id = ?").get(statement.id) as {
+			c: number;
+		};
+		const shipmentCount = getDb().prepare("SELECT COUNT(*) AS c FROM postal_shipments WHERE source_id = ?").get(unitResultId.id) as { c: number };
+		expect(resultCount.c).toBe(0);
+		expect(shipmentCount.c).toBe(0);
 	});
 });

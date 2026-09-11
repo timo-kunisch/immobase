@@ -20,6 +20,7 @@ export const documents: typeof deDocuments = {
 	"sourceType.DOCUMENT": "Uploaded document",
 	"sourceType.GENERATED_DOCUMENT": "Template letter",
 	"sourceType.TENANT_STATEMENT": "Service charge statement",
+	"sourceType.HOA_ANNUAL_STATEMENT": "HOA fee statement",
 	"actions.uploadFile": "Upload file",
 	"dialog.uploadTitle": "Upload document",
 	"dialog.uploadDescription": "Upload {types} files and optionally assign them to a property, unit or tenant.",

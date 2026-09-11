@@ -3,8 +3,8 @@
  * Detail-Seite, Formular-Dialog, Finalisierung, Hausgeld-Fälligstellung und
  * Meldungen der Server Actions. Enthält außerdem die Texte des geteilten
  * Kostenpositionen-Dialogs (hoa-cost-item-form-dialog.tsx), der auch von der
- * Jahresabrechnung genutzt wird, sowie die Kostenarten-/Umlageschlüssel-
- * Beschriftungen (identische Werte im Namespace "hoaStatement").
+ * Jahresabrechnung genutzt wird, sowie die Umlageschlüssel-Beschriftungen
+ * (identische Werte im Namespace "hoaStatement").
  */
 export const hoaPlan = {
 	// Listen-Seite
@@ -24,7 +24,6 @@ export const hoaPlan = {
 	"costItems.empty": "Noch keine Kostenpositionen erfasst.",
 	"costItems.fallbackLabel": "Kostenposition",
 	"table.label": "Bezeichnung",
-	"table.category": "Kostenart",
 	"table.allocationKey": "Umlageschlüssel",
 	"confirm.deleteCostItem": "Kostenposition \"{label}\" wirklich löschen?",
 	"warnings.noBasis":
@@ -34,21 +33,6 @@ export const hoaPlan = {
 	"unitShares.emptyFinalized": "Keine Einzelwirtschaftsplan-Ergebnisse vorhanden.",
 	"table.annualAmount": "Jahresbetrag",
 	"table.monthlyAmount": "Monatsbetrag",
-	// Kostenarten (Enum HoaCostCategory)
-	"category.RESERVE_CONTRIBUTION": "Zuführung Erhaltungsrücklage",
-	"category.ADMINISTRATOR_FEE": "Verwaltervergütung",
-	"category.INSURANCE": "Versicherung",
-	"category.CARETAKER": "Hauswart",
-	"category.MAINTENANCE_REPAIR": "Instandhaltung/Reparatur",
-	"category.WATER_DRAINAGE": "Wasser/Abwasser",
-	"category.HEATING": "Heizung",
-	"category.ELECTRICITY_COMMON": "Strom Gemeinschaftsflächen",
-	"category.CLEANING": "Reinigung",
-	"category.GARDEN_MAINTENANCE": "Gartenpflege",
-	"category.ELEVATOR": "Aufzug",
-	"category.LEGAL_ADVICE": "Rechts-/Steuerberatung",
-	"category.BANK_FEES": "Bankgebühren",
-	"category.OTHER": "Sonstige Kosten",
 	// Umlageschlüssel (Enum HoaAllocationKey)
 	"allocationKey.MEA": "Miteigentumsanteile (MEA)",
 	"allocationKey.LIVING_SPACE": "Wohnfläche",
@@ -72,10 +56,9 @@ export const hoaPlan = {
 	"costItem.add": "Kostenposition",
 	"costItem.createTitle": "Neue Kostenposition",
 	"costItem.editTitle": "Kostenposition bearbeiten",
-	"costItem.description": "Kostenart und Umlageschlüssel für die WEG-Verwaltung.",
+	"costItem.description": "Bezeichnung und Umlageschlüssel für die WEG-Verwaltung.",
 	"costItem.fieldLabel": "Bezeichnung",
 	"costItem.labelPlaceholder": "z. B. Gebäudeversicherung",
-	"costItem.fieldCategory": "Kostenart",
 	"costItem.fieldAmount": "Betrag (€)",
 	"costItem.fieldAllocationKey": "Umlageschlüssel",
 	"costItem.fieldDirectUnit": "Einheit (direkte Zuordnung)",

@@ -89,6 +89,7 @@ const wegNavItems: { titleKey: MessageKey; href: string; icon: typeof LayoutDash
 	{ titleKey: "nav.item.economicPlan", href: "/weg/wirtschaftsplan", icon: Calculator },
 	{ titleKey: "nav.item.annualStatements", href: "/weg/jahresabrechnung", icon: FileText },
 	{ titleKey: "nav.item.housingCharges", href: "/weg/hausgeld", icon: Wallet },
+	{ titleKey: "nav.item.hoaBanking", href: "/weg/buchhaltung", icon: Landmark },
 	{ titleKey: "nav.item.reserveFund", href: "/weg/ruecklage", icon: PiggyBank },
 	{ titleKey: "nav.item.meetings", href: "/weg/versammlungen", icon: CalendarDays },
 	{ titleKey: "nav.item.resolutions", href: "/weg/beschluesse", icon: Gavel },

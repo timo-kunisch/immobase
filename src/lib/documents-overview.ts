@@ -1,27 +1,29 @@
 import {
 	listGeneratedDocumentOverviewRows,
+	listHoaAnnualStatementOverviewRows,
 	listTenantStatementOverviewRows,
 	listUploadedDocumentOverviewRows,
 } from "@/data/documents";
 import type { DocumentType } from "@/data/types";
 
 /**
- * Vereinheitlichte Sicht auf ALLE drei Datei-Quellen der App - hochgeladene
+ * Vereinheitlichte Sicht auf ALLE Datei-Quellen der App - hochgeladene
  * DMS-Dokumente (`documents`), generierte Vorlagen-Schreiben
- * (`generated_documents`) und versandfertige Nebenkostenabrechnungs-PDFs
- * (`tenant_statements.pdfPath`) - für die zentrale Übersicht unter
- * /dokumente. Analog zum polymorphen Muster von
+ * (`generated_documents`), versandfertige Nebenkostenabrechnungs-PDFs
+ * (`tenant_statements.pdfPath`) und versandfertige WEG-Einzelabrechnungs-
+ * PDFs (`annual_statement_unit_results.pdfPath`) - für die zentrale
+ * Übersicht unter /dokumente. Analog zum polymorphen Muster von
  * src/lib/postal-shipments.ts (sourceType/sourceId), hier aber für die
  * *Anzeige* aller Dateien statt für den Postversand-Log.
  *
  * Der Datenzugriff (Joins + strukturelle Filter) liegt vollständig im
- * Repository src/data/documents.ts; hier werden die drei Ergebnismengen nur
+ * Repository src/data/documents.ts; hier werden die vier Ergebnismengen nur
  * noch auf ein gemeinsames Anzeigeformat gemappt, per Volltextsuche
  * gefiltert und gemeinsam sortiert - für dieses kleine, interne Tool
  * unproblematisch (keine paginierten Massenmengen zu erwarten).
  */
 
-export type DocumentSourceType = "DOCUMENT" | "GENERATED_DOCUMENT" | "TENANT_STATEMENT";
+export type DocumentSourceType = "DOCUMENT" | "GENERATED_DOCUMENT" | "TENANT_STATEMENT" | "HOA_ANNUAL_STATEMENT";
 
 type LinkedEntity = { id: string; label: string };
 
@@ -73,10 +75,11 @@ export async function loadUnifiedDocuments(filters: DocumentOverviewFilters = {}
 	const { propertyId, unitId, tenantId, search } = filters;
 	const structuralFilters = { propertyId, unitId, tenantId };
 
-	// Alle drei Quellen vollständig laden (strukturelle Filter bereits auf DB-Ebene).
+	// Alle Quellen vollständig laden (strukturelle Filter bereits auf DB-Ebene).
 	const uploadedDocumentRows = listUploadedDocumentOverviewRows(structuralFilters);
 	const generatedDocumentRows = listGeneratedDocumentOverviewRows(structuralFilters);
 	const tenantStatementRows = listTenantStatementOverviewRows(structuralFilters);
+	const hoaAnnualStatementRows = listHoaAnnualStatementOverviewRows(structuralFilters);
 
 	let unified: (UnifiedDocument & { searchHaystack: string })[] = [
 		...uploadedDocumentRows.map((row) => {
@@ -129,6 +132,27 @@ export async function loadUnifiedDocuments(filters: DocumentOverviewFilters = {}
 				property: toLinkedEntity(row.propertyId, row.propertyName),
 				unit: toLinkedEntity(row.unitId, row.unitLabel),
 				tenant: toTenantEntity(row),
+				searchHaystack: haystack,
+			};
+		}),
+		...hoaAnnualStatementRows.map((row) => {
+			const ownerName = row.ownerFirstName !== null && row.ownerLastName !== null ? `${row.ownerFirstName} ${row.ownerLastName}` : null;
+			const fileName = `Hausgeldabrechnung ${row.propertyName ?? ""} ${row.unitLabel ?? ""} ${ownerName ?? ""}.pdf`.replace(/\s+/g, " ").trim();
+			const haystack = [fileName, row.propertyName, row.unitLabel, ownerName].filter(Boolean).join(" ").toLowerCase();
+			return {
+				id: row.id,
+				sourceType: "HOA_ANNUAL_STATEMENT" as const,
+				fileName,
+				filePath: row.pdfPath,
+				mimeType: "application/pdf",
+				fileSize: row.pdfFileSize,
+				createdAt: row.pdfGeneratedAt ?? row.periodTo ?? "",
+				documentType: null,
+				property: toLinkedEntity(row.propertyId, row.propertyName),
+				unit: toLinkedEntity(row.unitId, row.unitLabel),
+				// WEG-Abrechnungen beziehen sich auf Eigentümer, nicht auf
+				// Mieter - der Eigentümer ist bewusst KEIN tenant-Bezug.
+				tenant: null,
 				searchHaystack: haystack,
 			};
 		}),

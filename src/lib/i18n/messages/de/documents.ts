@@ -22,6 +22,7 @@ export const documents = {
 	"sourceType.DOCUMENT": "Hochgeladenes Dokument",
 	"sourceType.GENERATED_DOCUMENT": "Vorlagen-Schreiben",
 	"sourceType.TENANT_STATEMENT": "Nebenkostenabrechnung",
+	"sourceType.HOA_ANNUAL_STATEMENT": "WEG-Einzelabrechnung",
 	"actions.uploadFile": "Datei hochladen",
 	"dialog.uploadTitle": "Dokument hochladen",
 	"dialog.uploadDescription": "{types}-Dateien hochladen und optional einer Liegenschaft, Einheit oder einem Mieter zuordnen.",

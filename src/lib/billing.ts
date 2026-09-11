@@ -124,10 +124,10 @@ export type AccountBookingSumForImport = {
 };
 
 /** Aus einer Kontobewegungs-Summe erzeugte Kostenposition (vor dem Einfügen via createCostItems). */
-export type BankingImportCostItem = {
+export type BankingImportCostItem<K extends string = AllocationKey> = {
 	label: string;
 	amount: string;
-	allocationKey: AllocationKey;
+	allocationKey: K;
 	notes: string;
 	/** Referenz auf das Quellkonto (Nachvollziehbarkeit; wird nicht persistiert). */
 	sourceAccountId: string;
@@ -150,7 +150,7 @@ export type BankingImportCostItem = {
  * gesetzt (Konten tragen keinen eigenen Schlüssel) und kann je Position
  * nach dem Import bearbeitet werden.
  */
-export function buildCostItemsFromAccountBookingSums(sums: AccountBookingSumForImport[], allocationKey: AllocationKey): BankingImportCostItem[] {
+export function buildCostItemsFromAccountBookingSums<K extends string>(sums: AccountBookingSumForImport[], allocationKey: K): BankingImportCostItem<K>[] {
 	return sums
 		.filter((sum) => sum.totalCents !== 0)
 		.map((sum) => ({

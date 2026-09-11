@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBetrKvCostItemsFromHoaStatement, hoaCostCategoryDefaultApportionable } from "@/lib/hoa-betrkv-bridge";
+import { buildBetrKvCostItemsFromHoaStatement } from "@/lib/hoa-betrkv-bridge";
 
 describe("buildBetrKvCostItemsFromHoaStatement", () => {
 	it("filtert nicht umlagefähige Positionen heraus (z. B. Verwaltervergütung, Rücklage)", () => {
 		const items = buildBetrKvCostItemsFromHoaStatement([
-			{ costItemId: "c1", label: "Wasser/Abwasser", category: "WATER_DRAINAGE", isApportionable: true, amountCents: 12000 },
-			{ costItemId: "c2", label: "Verwaltervergütung", category: "ADMINISTRATOR_FEE", isApportionable: false, amountCents: 5000 },
-			{ costItemId: "c3", label: "Zuführung Rücklage", category: "RESERVE_CONTRIBUTION", isApportionable: false, amountCents: 8000 },
+			{ costItemId: "c1", label: "Wasser/Abwasser", isApportionable: true, amountCents: 12000 },
+			{ costItemId: "c2", label: "Verwaltervergütung", isApportionable: false, amountCents: 5000 },
+			{ costItemId: "c3", label: "Zuführung Rücklage", isApportionable: false, amountCents: 8000 },
 		]);
 
 		expect(items).toHaveLength(1);
@@ -15,14 +15,20 @@ describe("buildBetrKvCostItemsFromHoaStatement", () => {
 	});
 
 	it("filtert Positionen mit Betrag 0 heraus", () => {
-		const items = buildBetrKvCostItemsFromHoaStatement([{ costItemId: "c1", label: "Heizung", category: "HEATING", isApportionable: true, amountCents: 0 }]);
+		const items = buildBetrKvCostItemsFromHoaStatement([{ costItemId: "c1", label: "Heizung", isApportionable: true, amountCents: 0 }]);
 		expect(items).toHaveLength(0);
 	});
 
-	it("hat für jede WEG-Kostenart eine Default-Vorbelegung für isApportionable", () => {
-		expect(hoaCostCategoryDefaultApportionable.RESERVE_CONTRIBUTION).toBe(false);
-		expect(hoaCostCategoryDefaultApportionable.ADMINISTRATOR_FEE).toBe(false);
-		expect(hoaCostCategoryDefaultApportionable.WATER_DRAINAGE).toBe(true);
-		expect(hoaCostCategoryDefaultApportionable.HEATING).toBe(true);
+	it("entscheidet die Umlagefähigkeit ausschließlich über das isApportionable-Flag (keine Kategorie mehr)", () => {
+		// Die frühere Kostenart-Kategorie (inkl. Default-Matrix) ist entfallen -
+		// auch eine position mit klassisch "nicht umlagefähiger" Bezeichnung
+		// wird übernommen, wenn das Flag explizit gesetzt ist (und umgekehrt).
+		const items = buildBetrKvCostItemsFromHoaStatement([
+			{ costItemId: "c1", label: "Rechtsberatung Betriebskostenstreit", isApportionable: true, amountCents: 4000 },
+			{ costItemId: "c2", label: "Wasser/Abwasser", isApportionable: false, amountCents: 12000 },
+		]);
+
+		expect(items).toHaveLength(1);
+		expect(items[0]).toMatchObject({ label: "Rechtsberatung Betriebskostenstreit", amount: "40.00" });
 	});
 });

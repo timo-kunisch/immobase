@@ -81,7 +81,7 @@ CREATE TABLE bank_transaction_allocations (
 	transaction_id text,
 	amount text NOT NULL,
 	created_at text NOT NULL,
-	updated_at text NOT NULL,
+	updated_at text NOT NULL, housing_charge_id text REFERENCES housing_charges(id) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (bank_transaction_id) REFERENCES bank_transactions(id) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (account_id) REFERENCES accounts(id) ON UPDATE no action ON DELETE cascade,
 	FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON UPDATE no action ON DELETE cascade
@@ -289,7 +289,6 @@ CREATE TABLE hoa_cost_items (
 	context text NOT NULL,
 	economic_plan_id text,
 	annual_statement_id text,
-	category text DEFAULT 'OTHER' NOT NULL,
 	label text NOT NULL,
 	amount text NOT NULL,
 	allocation_key text NOT NULL,
@@ -730,6 +729,8 @@ CREATE INDEX audit_log_entries_user_id_idx ON audit_log_entries (user_id);
 CREATE INDEX bank_transaction_allocations_account_id_idx ON bank_transaction_allocations (account_id);
 
 CREATE INDEX bank_transaction_allocations_bank_transaction_id_idx ON bank_transaction_allocations (bank_transaction_id);
+
+CREATE INDEX bank_transaction_allocations_housing_charge_id_idx ON bank_transaction_allocations (housing_charge_id);
 
 CREATE INDEX bank_transaction_allocations_transaction_id_idx ON bank_transaction_allocations (transaction_id);
 

@@ -48,6 +48,7 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 		: null;
 
 	const unitById = new Map(units.map((unit) => [unit.id, unit]));
+	const customKeyById = new Map(customAllocationKeys.map((key) => [key.id, key]));
 
 	return (
 		<div className="flex flex-1 flex-col">
@@ -86,7 +87,6 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 								<TableHeader>
 									<TableRow>
 										<TableHead>{t("hoaPlan.table.label")}</TableHead>
-										<TableHead>{t("hoaPlan.table.category")}</TableHead>
 										<TableHead>{t("hoaPlan.table.allocationKey")}</TableHead>
 										<TableHead className="text-right">{t("common.amount")}</TableHead>
 										<TableHead className="w-[100px] text-right">{t("common.actions")}</TableHead>
@@ -98,8 +98,8 @@ export default async function EconomicPlanDetailPage({ params }: { params: Promi
 											<TableCell className="font-medium">
 												{costItem.label}
 												{costItem.allocationKey === "DIRECT" && costItem.directUnitId ? <span className="block text-xs text-muted-foreground">{unitById.get(costItem.directUnitId)?.label}</span> : null}
+												{costItem.allocationKey === "CUSTOM" && costItem.customAllocationKeyId ? <span className="block text-xs text-muted-foreground">{customKeyById.get(costItem.customAllocationKeyId)?.label}</span> : null}
 											</TableCell>
-											<TableCell className="text-muted-foreground">{t(`hoaPlan.category.${costItem.category}`)}</TableCell>
 											<TableCell className="text-muted-foreground">{t(`hoaPlan.allocationKey.${costItem.allocationKey}`)}</TableCell>
 											<TableCell className="text-right">{formatCurrency(costItem.amount)}</TableCell>
 											<TableCell>

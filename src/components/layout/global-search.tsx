@@ -138,6 +138,7 @@ const PAGE_ICONS: Record<string, typeof LayoutDashboard> = {
 	"/weg/jahresabrechnung": FileText,
 	"/weg/hausgeld": Wallet,
 	"/weg/ruecklage": PiggyBank,
+	"/weg/buchhaltung": Landmark,
 	"/weg/versammlungen": CalendarDays,
 	"/weg/beschluesse": Gavel,
 	"/admin/users": ShieldCheck,

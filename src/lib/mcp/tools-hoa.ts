@@ -1,7 +1,8 @@
 import {
 	createAnnualStatement,
 	createHoaCostItem,
-	deleteAnnualStatement,
+	createHoaCostItems,
+	deleteAnnualStatementWithArtifacts,
 	deleteHoaCostItem,
 	finalizeAnnualStatement,
 	getAnnualStatement,
@@ -16,6 +17,7 @@ import {
 	type AnnualStatementInput,
 	type HoaCostItemInput,
 } from "@/data/annual-statements";
+import { listAccountBookingSumsForPeriod } from "@/data/accounts";
 import {
 	createEconomicPlan,
 	createEconomicPlanCostItem,
@@ -27,6 +29,7 @@ import {
 	getEconomicPlanDetail,
 	listCustomAllocationKeyWeights as listCustomAllocationKeyWeightsForPlan,
 	listEconomicPlans,
+	listEconomicPlanTotalsForHoa,
 	listEconomicPlanUnitShares,
 	listUnitOwnershipsForUnits,
 	updateEconomicPlan,
@@ -97,7 +100,8 @@ import {
 	type UnitOwnershipInput,
 } from "@/data/unit-ownerships";
 import { getUnit } from "@/data/units";
-import { calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
+import { buildCostItemsFromAccountBookingSums } from "@/lib/billing";
+import { buildAnnualStatementConsistencyCheck, calculateAnnualStatementResult } from "@/lib/hoa-annual-statement";
 import { calculateEconomicPlanResult } from "@/lib/hoa-economic-plan";
 import { calculateContestationDeadline } from "@/lib/hoa-meetings";
 import { findOwnershipForDate } from "@/lib/hoa-ownership";
@@ -115,22 +119,6 @@ import { McpToolError, buildInputSchema, coerceArgs, registerCrudTools, register
  */
 
 const HOA_ALLOCATION_KEYS = ["MEA", "LIVING_SPACE", "UNITS", "CONSUMPTION", "DIRECT", "CUSTOM"] as const;
-const HOA_COST_CATEGORIES = [
-	"RESERVE_CONTRIBUTION",
-	"ADMINISTRATOR_FEE",
-	"INSURANCE",
-	"CARETAKER",
-	"MAINTENANCE_REPAIR",
-	"WATER_DRAINAGE",
-	"HEATING",
-	"ELECTRICITY_COMMON",
-	"CLEANING",
-	"GARDEN_MAINTENANCE",
-	"ELEVATOR",
-	"LEGAL_ADVICE",
-	"BANK_FEES",
-	"OTHER",
-] as const;
 const RESERVE_BOOKING_TYPES = ["CONTRIBUTION", "WITHDRAWAL"] as const;
 const HOUSING_CHARGE_STATUS = ["OPEN", "PAID", "OVERDUE", "CANCELLED"] as const;
 const MEETING_TYPES = ["ORDINARY", "EXTRAORDINARY", "CIRCULATION"] as const;
@@ -375,8 +363,7 @@ registerCrudTools<EconomicPlanInput>({
 
 const economicPlanCostItemFields: Record<string, FieldSpec> = {
 	economicPlanId: { type: "string", description: "ID des Wirtschaftsplans" },
-	category: { type: "enum", values: HOA_COST_CATEGORIES },
-	label: { type: "string" },
+	label: { type: "string", description: "Bezeichnung (trägt die fachliche Information selbst, z. B. „Gebäudeversicherung“)" },
 	amount: { type: "decimal", description: "Geplanter Jahresbetrag" },
 	allocationKey: { type: "enum", values: HOA_ALLOCATION_KEYS, description: "Bei CUSTOM: customAllocationKeyId setzen; bei DIRECT: directUnitId" },
 	directUnitId: { type: "string", nullable: true },
@@ -576,20 +563,39 @@ registerCrudTools<AnnualStatementInput>({
 		if (!getHoa(input.hoaId)) return "Die angegebene WEG existiert nicht.";
 		return null;
 	},
-	beforeDelete: (id) => {
-		const statement = getAnnualStatement(id);
-		if (statement && statement.status !== "DRAFT") return "Nur Jahresabrechnungen im Entwurfsstatus können gelöscht werden.";
-		return null;
-	},
+	// Finalisierte Abrechnungen sind ebenfalls löschbar - das Repository
+	// räumt erzeugte PDFs und Postversand-Protokolle mit weg
+	// (deleteAnnualStatementWithArtifacts), Muster: billing_periods.
+	delete: (id) => deleteAnnualStatementWithArtifacts(id),
 	create: (input) => createAnnualStatement(input),
 	update: (id, input) => updateAnnualStatement(id, input),
-	delete: (id) => deleteAnnualStatement(id),
+});
+
+registerTool({
+	name: "annual_statements_set_notes",
+	description:
+		"Speichert NUR die Notizen einer Jahresabrechnung - jederzeit möglich, auch nach der Finalisierung " +
+		"(Notizen sind interne Anmerkungen, keine Abrechnungsdaten).",
+	inputSchema: buildInputSchema({ id: { type: "string", description: "ID der Jahresabrechnung" }, notes: { type: "string", nullable: true } }),
+	handler: (args) => {
+		const input = coerceArgs({ id: { type: "string" }, notes: { type: "string", nullable: true } }, args);
+		const statement = getAnnualStatement(input.id as string);
+		if (!statement) throw new McpToolError(`Jahresabrechnung mit ID "${input.id as string}" wurde nicht gefunden.`);
+		// WEG/Stammfelder aus dem bestehenden Datensatz durchreichen - nur die
+		// Notizen ändern sich (identisch zur Server Action).
+		updateAnnualStatement(input.id as string, {
+			hoaId: statement.hoaId,
+			periodFrom: statement.periodFrom,
+			periodTo: statement.periodTo,
+			notes: (input.notes as string) ?? null,
+		});
+		return { success: true, id: input.id };
+	},
 });
 
 const statementCostItemFields: Record<string, FieldSpec> = {
 	annualStatementId: { type: "string", description: "ID der Jahresabrechnung" },
-	category: { type: "enum", values: HOA_COST_CATEGORIES },
-	label: { type: "string" },
+	label: { type: "string", description: "Bezeichnung (trägt die fachliche Information selbst, z. B. „Gebäudeversicherung“)" },
 	amount: { type: "decimal" },
 	allocationKey: { type: "enum", values: HOA_ALLOCATION_KEYS, description: "Bei CUSTOM: customAllocationKeyId setzen; bei DIRECT: directUnitId" },
 	directUnitId: { type: "string", nullable: true },
@@ -615,7 +621,6 @@ registerTool({
 			context: "STATEMENT",
 			economicPlanId: null,
 			annualStatementId: input.annualStatementId,
-			category: input.category,
 			label: input.label,
 			amount: input.amount,
 			allocationKey: input.allocationKey,
@@ -642,7 +647,6 @@ registerTool({
 			context: existing.context,
 			economicPlanId: existing.economicPlanId,
 			annualStatementId: input.annualStatementId,
-			category: input.category,
 			label: input.label,
 			amount: input.amount,
 			allocationKey: input.allocationKey,
@@ -715,6 +719,66 @@ registerTool({
 });
 
 registerTool({
+	name: "annual_statements_consistency_check",
+	description:
+		"Plausibilitätsprüfung einer Jahresabrechnung VOR der Finalisierung: Summe der Einzelabrechnungen vs. " +
+		"Kostenpositionen, Abgleich gegen finalisierte Wirtschaftspläne des überlappenden Geschäftsjahrs " +
+		"(Soll/Ist) sowie offene Hausgeld-Rückstände im Abrechnungszeitraum. Reine Lese-Operation.",
+	inputSchema: buildInputSchema({ id: { type: "string", description: "ID der Jahresabrechnung (Entwurf)" } }),
+	handler: (args) => {
+		const { id } = coerceArgs({ id: { type: "string" } }, args);
+		const detail = getAnnualStatementDetail(id as string);
+		if (!detail) throw new McpToolError(`Jahresabrechnung mit ID "${id as string}" wurde nicht gefunden.`);
+		if (detail.statement.status !== "DRAFT") throw new McpToolError("Diese Jahresabrechnung wurde bereits finalisiert.");
+
+		const customWeightsByKey = new Map<string, { unitId: string; weight: number }[]>();
+		for (const costItem of detail.costItems) {
+			if (costItem.allocationKey !== "CUSTOM" || !costItem.customAllocationKeyId) continue;
+			if (customWeightsByKey.has(costItem.customAllocationKeyId)) continue;
+			const weights = listCustomAllocationKeyWeightsForStatement(costItem.customAllocationKeyId);
+			customWeightsByKey.set(costItem.customAllocationKeyId, weights.map((weight) => ({ unitId: weight.unitId, weight: weight.weight })));
+		}
+
+		const housingChargeRows = listPlainHousingChargesForUnits(detail.units.map((unit) => unit.id));
+		const result = calculateAnnualStatementResult(
+			{
+				periodFrom: new Date(detail.statement.periodFrom),
+				periodTo: new Date(detail.statement.periodTo),
+				units: detail.units.map((unit) => ({
+					id: unit.id,
+					livingSpace: unit.livingSpace,
+					coOwnershipShare: unit.coOwnershipShare,
+					ownerships: unit.ownerships.map((ownership) => ({
+						id: ownership.id,
+						ownerId: ownership.ownerId,
+						startDate: ownership.startDate,
+						endDate: ownership.endDate,
+					})),
+				})),
+				costItems: detail.costItems.map((costItem) => ({
+					id: costItem.id,
+					amount: costItem.amount,
+					allocationKey: costItem.allocationKey,
+					directUnitId: costItem.directUnitId,
+					consumptionValues: costItem.consumptionValues,
+					customAllocationWeights: costItem.customAllocationKeyId ? customWeightsByKey.get(costItem.customAllocationKeyId) ?? [] : [],
+				})),
+			},
+			housingChargeRows.map((charge) => ({ unitId: charge.unitId, ownerId: charge.ownerId, amount: charge.amount, dueDate: charge.dueDate, status: charge.status }))
+		);
+
+		return buildAnnualStatementConsistencyCheck({
+			periodFrom: new Date(detail.statement.periodFrom),
+			periodTo: new Date(detail.statement.periodTo),
+			costItemsTotalCents: detail.costItems.reduce((sum, costItem) => sum + Math.round(Number(costItem.amount) * 100), 0),
+			result,
+			economicPlans: listEconomicPlanTotalsForHoa(detail.statement.hoaId),
+			housingCharges: housingChargeRows.map((charge) => ({ unitId: charge.unitId, ownerId: charge.ownerId, amount: charge.amount, dueDate: charge.dueDate, status: charge.status })),
+		});
+	},
+});
+
+registerTool({
 	name: "annual_statements_finalize",
 	description:
 		"Berechnet die Einzelabrechnungen je Einheit/Eigentümer (inkl. Hausgeld-Vorauszahlungen) und friert die " +
@@ -770,6 +834,18 @@ registerTool({
 			throw new McpToolError("Für den gewählten Zeitraum wurden keine Eigentumsverhältnisse gefunden, die abgerechnet werden könnten.");
 		}
 
+		// Plausibilitätsprüfung (Gesamtabrechnung vs. Einzelabrechnungen vs.
+		// Wirtschaftsplan, Rückstände) - identisch zur UI der App; offene
+		// Hinweise werden im Ergebnis zurückgegeben (bewusst KEINE Sperre).
+		const consistencyIssues = buildAnnualStatementConsistencyCheck({
+			periodFrom: new Date(detail.statement.periodFrom),
+			periodTo: new Date(detail.statement.periodTo),
+			costItemsTotalCents: detail.costItems.reduce((sum, costItem) => sum + Math.round(Number(costItem.amount) * 100), 0),
+			result,
+			economicPlans: listEconomicPlanTotalsForHoa(detail.statement.hoaId),
+			housingCharges: housingChargeRows.map((charge) => ({ unitId: charge.unitId, ownerId: charge.ownerId, amount: charge.amount, dueDate: charge.dueDate, status: charge.status })),
+		});
+
 		finalizeAnnualStatement(
 			id as string,
 			result.ownerResults.map((ownerResult) => ({
@@ -784,7 +860,62 @@ registerTool({
 				lines: ownerResult.lines.map((line) => ({ costItemId: line.costItemId, amount: centsToDecimalString(line.amountCents) })),
 			}))
 		);
-		return { success: true, id, unitResults: result.ownerResults.length };
+		return { success: true, id, unitResults: result.ownerResults.length, consistencyIssues };
+	},
+});
+
+registerTool({
+	name: "annual_statements_import_cost_items_from_banking",
+	description:
+		"Übernimmt die Kontobuchungen der Buchhaltung als Kostenpositionen der Jahresabrechnung: je KONTO eine Position " +
+		"in Höhe der Nettosumme seiner Buchungen im Abrechnungszeitraum (Erstattungen werden verrechnet, Konten mit " +
+		"Saldo 0 übersprungen, Buchungen gegen Hausgeld-Sollstellungen bleiben ausgenommen). Nur im Entwurfsstatus; " +
+		"DIRECT/CUSTOM sind als einheitlicher Schlüssel bewusst nicht wählbar. Konto-Summen können über accounts_list " +
+		"mit propertyId-Filter eingesehen werden (die WEG hängt an einer Liegenschaft).",
+	inputSchema: buildInputSchema({
+		annualStatementId: { type: "string", description: "ID der Jahresabrechnung" },
+		allocationKey: {
+			type: "enum",
+			values: ["MEA", "LIVING_SPACE", "UNITS", "CONSUMPTION"] as const,
+			description: "Einheitlicher Verteilerschlüssel für alle importierten Positionen (je Position nachträglich änderbar)",
+		},
+	}),
+	handler: (args) => {
+		const input = coerceArgs(
+			{ annualStatementId: { type: "string" }, allocationKey: { type: "enum", values: ["MEA", "LIVING_SPACE", "UNITS", "CONSUMPTION"] as const } },
+			args
+		);
+		const annualStatementId = input.annualStatementId as string;
+		requireAnnualStatementDraft(annualStatementId);
+
+		const detail = getAnnualStatementDetail(annualStatementId);
+		if (!detail) throw new McpToolError(`Jahresabrechnung mit ID "${annualStatementId}" wurde nicht gefunden.`);
+
+		// Konto-Summen serverseitig ermitteln (Bankkonto der Liegenschaft der
+		// WEG) - reine Umwandlung geteilt mit der Mietverwaltung
+		// (buildCostItemsFromAccountBookingSums), atomares Einfügen im
+		// Repository (createHoaCostItems). Identisch zur Server Action.
+		const accountSums = listAccountBookingSumsForPeriod(detail.hoa.propertyId, detail.statement.periodFrom, detail.statement.periodTo);
+		const items = buildCostItemsFromAccountBookingSums(accountSums, input.allocationKey as "MEA" | "LIVING_SPACE" | "UNITS" | "CONSUMPTION");
+		if (items.length === 0) {
+			throw new McpToolError("Im Abrechnungszeitraum wurden keine Kontobuchungen gefunden, die übernommen werden könnten.");
+		}
+
+		const created = createHoaCostItems(
+			items.map((item) => ({
+				context: "STATEMENT" as const,
+				economicPlanId: null,
+				annualStatementId,
+				label: item.label,
+				amount: item.amount,
+				allocationKey: item.allocationKey,
+				directUnitId: null,
+				customAllocationKeyId: null,
+				isApportionable: true,
+				notes: item.notes,
+			}))
+		);
+		return { success: true, annualStatementId, created: created.length, ids: created.map((item) => item.id) };
 	},
 });
 

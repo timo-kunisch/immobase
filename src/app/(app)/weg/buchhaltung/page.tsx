@@ -3,8 +3,7 @@ import { ArrowLeftRight, Landmark, Wallet } from "lucide-react";
 
 import { listAccountsWithStats } from "@/data/accounts";
 import { countBankTransactions, listBankTransactionsPage } from "@/data/bank-transactions";
-import { listOpenTransactionsForProperty } from "@/data/transactions";
-import { listProperties } from "@/data/properties";
+import { listOpenHousingChargesForProperty, listHoasSortedByName } from "@/data/housing-charges";
 import type { BankTransactionStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Button } from "@/components/ui/button";
@@ -16,12 +15,12 @@ import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { AccountFormDialog } from "@/components/buchhaltung/account-form-dialog";
 import { BankTransactionFormDialog, EditBankTransactionDialog } from "@/components/buchhaltung/bank-transaction-form-dialog";
 import { BankTransactionAllocateDialog } from "@/components/buchhaltung/bank-transaction-allocate-dialog";
-import { BuchhaltungPropertyFilter } from "@/components/buchhaltung/buchhaltung-property-filter";
+import { HoaFilter } from "@/components/weg/hoa-filter";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { getT } from "@/lib/i18n/server";
 import { resolvePagination } from "@/lib/pagination";
 
-import { deleteAccountAction, deleteBankTransactionAction } from "./actions";
+import { deleteAccountAction, deleteBankTransactionAction } from "@/app/(app)/buchhaltung/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -34,45 +33,67 @@ const bankTransactionStatusStyles: Record<BankTransactionStatus, string> = {
 	RECONCILED: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
 };
 
-export default async function BuchhaltungPage({
+/**
+ * WEG-Buchhaltung: Reiter "Banktransaktionen" und "Konten" der WEGs -
+ * Sicht auf die geteilte, liegenschaftsbezogene Buchhaltung (eine WEG hängt
+ * 1:1 an einer Liegenschaft, das Bankkonto der Liegenschaft IST das
+ * WEG-Konto). Als Buchungsziel stehen neben Konten die offenen HAUSGELD-
+ * Sollstellungen der WEG bereit (Zahlungseingänge von Eigentümern) -
+ * vollständig zugeordnete Hausgelder gelten automatisch als bezahlt und
+ * fließen so als tatsächlich geleistete Vorauszahlungen in die
+ * Jahresabrechnung ein. Buchungen gegen Miet-Sollstellungen bleiben der
+ * Mietverwaltung (/buchhaltung) vorbehalten - die Kreise trennen sich.
+ */
+export default async function WegBuchhaltungPage({
 	searchParams,
 }: {
-	searchParams: Promise<{ propertyId?: string; status?: string; page?: string }>;
+	searchParams: Promise<{ hoaId?: string; status?: string; page?: string }>;
 }) {
 	const t = await getT();
-	const { propertyId, status: statusParam, page: pageParam } = await searchParams;
+	const { hoaId, status: statusParam, page: pageParam } = await searchParams;
 
-	const propertyList = listProperties();
-	const selectedProperty = propertyId ? propertyList.find((property) => property.id === propertyId) : undefined;
+	const hoaList = listHoasSortedByName();
+
+	if (hoaList.length === 0) {
+		return (
+			<div className="flex flex-1 flex-col">
+				<SiteHeader title={t("hoaFinance.banking.title")} description={t("hoaFinance.banking.description")} />
+				<div className="flex-1 p-4 sm:p-6">
+					<p className="text-sm text-muted-foreground">{t("hoaStatement.empty.noHoa")}</p>
+				</div>
+			</div>
+		);
+	}
+
+	const selectedHoa = hoaId ? hoaList.find((hoa) => hoa.id === hoaId) : undefined;
 
 	// Status-Filter nur akzeptieren, wenn es ein gültiger Status ist.
 	const status = bankTransactionStatuses.find((value) => value === statusParam);
 
-	const bankTransactionFilter = { propertyId, status };
+	// Ohne WEG-Auswahl: Banktransaktionen aller WEGs (der Liegenschaften mit
+	// WEG), mit Auswahl: nur die der gewählten WEG.
+	const hoaPropertyIds = hoaList.map((hoa) => hoa.propertyId);
+	const bankTransactionFilter = selectedHoa ? { propertyId: selectedHoa.propertyId, status } : { propertyIds: hoaPropertyIds, status };
 	const pagination = resolvePagination(pageParam, countBankTransactions(bankTransactionFilter));
 	const bankTransactionList = listBankTransactionsPage(bankTransactionFilter, pagination);
 
-	const accounts = selectedProperty ? listAccountsWithStats(selectedProperty.id) : [];
-	// Offene Sollstellungen der Liegenschaft für den Zuordnen-Dialog
+	const accounts = selectedHoa ? listAccountsWithStats(selectedHoa.propertyId) : [];
+	// Offene Hausgeld-Sollstellungen der Liegenschaft für den Zuordnen-Dialog
 	// (Banktransaktionen werden gegen sie gebucht -> als bezahlt markiert).
-	const openTransactions = selectedProperty ? listOpenTransactionsForProperty(selectedProperty.id) : [];
-	const openTransactionOptions = openTransactions.map((transaction) => ({
-		id: transaction.id,
-		label: `${transaction.purpose ?? "Sollstellung"} · ${transaction.lease.tenant.firstName} ${transaction.lease.tenant.lastName}`,
-		amount: transaction.amount,
-		dueDate: transaction.dueDate,
+	const openHousingCharges = selectedHoa ? listOpenHousingChargesForProperty(selectedHoa.propertyId) : [];
+	const openHousingChargeOptions = openHousingCharges.map((charge) => ({
+		id: charge.id,
+		label: `${charge.purpose ?? "Hausgeld"} · ${charge.owner.isCompany ? charge.owner.companyName ?? `${charge.owner.firstName} ${charge.owner.lastName}` : `${charge.owner.firstName} ${charge.owner.lastName}`} (${charge.unit.label})`,
+		amount: charge.amount,
+		dueDate: charge.dueDate,
 	}));
 
 	return (
 		<div className="flex flex-1 flex-col">
-			<SiteHeader title={t("banking.title")} description={t("banking.description")} />
+			<SiteHeader title={t("hoaFinance.banking.title")} description={t("hoaFinance.banking.description")} />
 
 			<div className="flex-1 space-y-4 p-4 sm:p-6">
-				{propertyList.length === 0 ? (
-					<p className="text-sm text-muted-foreground">{t("banking.empty.noProperties")}</p>
-				) : (
-					<BuchhaltungPropertyFilter properties={propertyList} value={propertyId} />
-				)}
+				<HoaFilter hoas={hoaList} value={hoaId} basePath="/weg/buchhaltung" />
 
 				<Tabs defaultValue="banktransaktionen">
 					<TabsList>
@@ -85,13 +106,13 @@ export default async function BuchhaltungPage({
 					</TabsList>
 
 					<TabsContent value="banktransaktionen" className="space-y-4">
-						<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">{t("banking.info")}</div>
+						<div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">{t("hoaFinance.banking.info")}</div>
 
 						<div className="flex flex-wrap items-end justify-between gap-2">
 							{/* Status-Filter als schlichtes GET-Formular (Server-Navigation,
 							    page wird dadurch automatisch zurückgesetzt). */}
 							<form method="get" className="flex flex-wrap items-end gap-2">
-								{propertyId ? <input type="hidden" name="propertyId" value={propertyId} /> : null}
+								{hoaId ? <input type="hidden" name="hoaId" value={hoaId} /> : null}
 								<div className="flex flex-col gap-1">
 									<label htmlFor="status" className="text-xs text-muted-foreground">
 										{t("common.status")}
@@ -110,20 +131,18 @@ export default async function BuchhaltungPage({
 								</Button>
 								{status ? (
 									<Button asChild variant="ghost" size="sm">
-										<Link href={propertyId ? `/buchhaltung?propertyId=${propertyId}` : "/buchhaltung"}>{t("banking.filter.reset")}</Link>
+										<Link href={hoaId ? `/weg/buchhaltung?hoaId=${hoaId}` : "/weg/buchhaltung"}>{t("banking.filter.reset")}</Link>
 									</Button>
 								) : null}
 							</form>
 							{/* Banktransaktionen werden immer auf dem Konto EINER
-							    Liegenschaft erfasst - ohne Auswahl kein Anlegen. */}
-							{selectedProperty ? <BankTransactionFormDialog propertyId={selectedProperty.id} /> : null}
+							    WEG (Liegenschaft) erfasst - ohne Auswahl kein Anlegen. */}
+							{selectedHoa ? <BankTransactionFormDialog propertyId={selectedHoa.propertyId} /> : null}
 						</div>
 
 						<Card>
 							<CardContent className="p-0">
-								{!propertyId ? (
-									<p className="px-4 py-16 text-center text-sm text-muted-foreground">{t("banking.empty.selectProperty")}</p>
-								) : bankTransactionList.length === 0 ? (
+								{bankTransactionList.length === 0 ? (
 									<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 										<Landmark className="size-8" />
 										<p>{status ? t("banking.empty.transactionsFiltered") : t("banking.empty.transactions")}</p>
@@ -173,22 +192,23 @@ export default async function BuchhaltungPage({
 														</TableCell>
 														<TableCell>
 															<div className="flex items-center justify-end gap-1">
-<BankTransactionAllocateDialog
-																bankTransaction={{
-																	id: bankTransaction.id,
-																	description: bankTransaction.description,
-																	amount: bankTransaction.amount,
-																	bookingDate: bankTransaction.bookingDate,
-																	allocations: bankTransaction.allocations.map((allocation) => ({
-																		accountId: allocation.accountId,
-																		transactionId: allocation.transactionId,
-																		housingChargeId: allocation.housingChargeId,
-																		amount: allocation.amount,
-																	})),
-																}}
-																accounts={accounts}
-																openTransactions={openTransactionOptions}
-															/>
+																<BankTransactionAllocateDialog
+																	bankTransaction={{
+																		id: bankTransaction.id,
+																		description: bankTransaction.description,
+																		amount: bankTransaction.amount,
+																		bookingDate: bankTransaction.bookingDate,
+																		allocations: bankTransaction.allocations.map((allocation) => ({
+																			accountId: allocation.accountId,
+																			transactionId: allocation.transactionId,
+																			housingChargeId: allocation.housingChargeId,
+																			amount: allocation.amount,
+																		})),
+																	}}
+																	accounts={accounts}
+																	openTransactions={[]}
+																	housingCharges={openHousingChargeOptions}
+																/>
 																<EditBankTransactionDialog
 																	transaction={{
 																		id: bankTransaction.id,
@@ -215,21 +235,21 @@ export default async function BuchhaltungPage({
 							</CardContent>
 						</Card>
 
-						<PaginationBar basePath="/buchhaltung" pagination={pagination} params={{ propertyId, status }} />
+						<PaginationBar basePath="/weg/buchhaltung" pagination={pagination} params={{ hoaId, status }} />
 					</TabsContent>
 
 					<TabsContent value="konten" className="space-y-4">
-						{!propertyId ? (
-							<p className="text-sm text-muted-foreground">{t("banking.empty.selectProperty")}</p>
+						{!selectedHoa ? (
+							<p className="text-sm text-muted-foreground">{t("hoaFinance.banking.selectHoa")}</p>
 						) : (
 							<Card>
 								<CardContent className="p-0">
 									<div className="flex items-center justify-between border-b px-4 py-3">
 										<span className="text-sm text-muted-foreground">{t("banking.accounts.management")}</span>
-										<AccountFormDialog propertyId={propertyId} />
+										<AccountFormDialog propertyId={selectedHoa.propertyId} />
 									</div>
 									{accounts.length === 0 ? (
-										<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
+<div className="flex flex-col items-center justify-center gap-2 py-16 text-center text-muted-foreground">
 											<ArrowLeftRight className="size-8" />
 											<p>{t("banking.empty.accounts")}</p>
 										</div>
@@ -257,7 +277,7 @@ export default async function BuchhaltungPage({
 															<TableCell className="text-right text-muted-foreground">{account.bookingCount}</TableCell>
 															<TableCell>
 																<div className="flex items-center justify-end gap-1">
-																	<AccountFormDialog propertyId={propertyId} account={account} />
+																	<AccountFormDialog propertyId={selectedHoa.propertyId} account={account} />
 																	<ConfirmDeleteButton
 																		action={deleteAccountAction.bind(null, account.id)}
 																		confirmMessage={t("banking.confirm.deleteAccount", { label: account.label })}

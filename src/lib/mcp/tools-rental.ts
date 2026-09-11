@@ -72,6 +72,7 @@ import {
 	type DocumentTemplateInput,
 } from "@/data/templates";
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant, type TenantInput } from "@/data/tenants";
+import { bankAllocationErrorToGermanMessage, validateBankAllocations, validateBankAllocationsAgainst } from "@/lib/bank-allocations";
 import { createTicket, deleteTicket, listTickets, updateTicket, updateTicketStatus, type TicketInput } from "@/data/tickets";
 import {
 	convertMessageToTicket,
@@ -1140,63 +1141,13 @@ registerCrudTools<BankTransactionInput>({
 	delete: (id) => deleteBankTransaction(id),
 });
 
-/**
- * Validiert die Buchungszeilen einer Banktransaktion (gleiche Fachregeln
- * wie saveBankTransactionAllocationsAction in
- * src/app/(app)/buchhaltung/actions.ts): genau ein Ziel je Zeile,
- * Teilbeträge im Vorzeichen der Banktransaktion, Referenzen derselben
- * Liegenschaft, keine stornierten Sollstellungen, Summe <= Betrag.
- */
-function validateAllocationArgs(bankTransactionId: string, allocations: { accountId: string | null; transactionId: string | null; amount: string }[]): string | null {
-	const bankTransaction = getBankTransaction(bankTransactionId);
-	if (!bankTransaction) return `Banktransaktion mit ID "${bankTransactionId}" wurde nicht gefunden.`;
-
-	const bankAmountCents = Math.round(Number(bankTransaction.amount) * 100);
-	let allocatedCents = 0;
-
-	for (const [index, allocation] of allocations.entries()) {
-		if (Boolean(allocation.accountId) === Boolean(allocation.transactionId)) {
-			return `Zeile ${index + 1}: Bitte genau ein Ziel (accountId ODER transactionId) angeben.`;
-		}
-		const amountCents = Math.round(Number(allocation.amount) * 100);
-		if (!Number.isFinite(amountCents) || amountCents === 0) {
-			return `Zeile ${index + 1}: Bitte einen von 0 verschiedenen Teilbetrag angeben.`;
-		}
-		if (amountCents < 0 !== bankAmountCents < 0) {
-			return `Zeile ${index + 1}: Der Teilbetrag muss dasselbe Vorzeichen haben wie die Banktransaktion.`;
-		}
-		if (allocation.accountId) {
-			const account = getAccount(allocation.accountId);
-			if (!account) return `Zeile ${index + 1}: Das angegebene Konto existiert nicht.`;
-			if (account.propertyId !== bankTransaction.propertyId) {
-				return `Zeile ${index + 1}: Das Konto gehört zu einer anderen Liegenschaft als die Banktransaktion.`;
-			}
-		}
-		if (allocation.transactionId) {
-			const transaction = getTransaction(allocation.transactionId);
-			if (!transaction) return `Zeile ${index + 1}: Die angegebene Sollstellung existiert nicht.`;
-			if (transaction.lease.unit.propertyId !== bankTransaction.propertyId) {
-				return `Zeile ${index + 1}: Die Sollstellung gehört zu einer anderen Liegenschaft als die Banktransaktion.`;
-			}
-			if (transaction.status === "CANCELLED") {
-				return `Zeile ${index + 1}: Stornierte Sollstellungen können nicht zugeordnet werden.`;
-			}
-		}
-		allocatedCents += amountCents;
-	}
-
-	if (Math.abs(allocatedCents) > Math.abs(bankAmountCents)) {
-		return "Die Teilbeträge übersteigen den Betrag der Banktransaktion.";
-	}
-	return null;
-}
-
 registerTool({
 	name: "bank_transactions_allocate",
 	description:
 		"Ersetzt SÄMTLICHE Buchungszeilen einer Banktransaktion: ordnet Teilbeträge (Split möglich) Konten " +
-		"(accountId, z. B. Gebäudeversicherung) oder fälligen Sollstellungen (transactionId, Mieten) zu. " +
-		"Vollständig zugeordnete Sollstellungen gelten als bezahlt (Status PAID inkl. Zahldatum). " +
+		"(accountId, z. B. Gebäudeversicherung), fälligen Miet-Sollstellungen (transactionId, Mieteingänge) oder " +
+		"Hausgeld-Sollstellungen der WEG-Verwaltung (housingChargeId) zu. Vollständig zugeordnete Sollstellungen " +
+		"beider Buchungskreise gelten als bezahlt (Status PAID inkl. Zahldatum). " +
 		"Der Zuordnungsstatus der Banktransaktion (offen/teilweise/zugeordnet) wird daraus abgeleitet.",
 	inputSchema: {
 		type: "object",
@@ -1207,8 +1158,9 @@ registerTool({
 				items: {
 					type: "object",
 					properties: {
-						accountId: { type: ["string", "null"], description: "Ziel-Konto (genau eines von accountId/transactionId je Zeile)" },
+						accountId: { type: ["string", "null"], description: "Ziel-Konto (genau eines von accountId/transactionId/housingChargeId je Zeile)" },
 						transactionId: { type: ["string", "null"], description: "Ziel-Sollstellung (Mieteingang)" },
+						housingChargeId: { type: ["string", "null"], description: "Ziel-Hausgeld-Sollstellung (WEG-Verwaltung)" },
 						amount: { type: ["string", "number"], description: "Teilbetrag, gleiches Vorzeichen wie die Banktransaktion (Dezimal, Komma erlaubt)" },
 					},
 					required: ["amount"],
@@ -1227,18 +1179,19 @@ registerTool({
 
 		const parsed: BankTransactionAllocationInput[] = ((allocations ?? []) as Record<string, unknown>[]).map((entry) => {
 			const coerced = coerceArgs(
-				{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, amount: { type: "decimal" } },
+				{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, housingChargeId: { type: "string", nullable: true }, amount: { type: "decimal" } },
 				entry ?? {}
 			);
 			return {
 				accountId: (coerced.accountId as string) ?? null,
 				transactionId: (coerced.transactionId as string) ?? null,
+				housingChargeId: (coerced.housingChargeId as string) ?? null,
 				amount: coerced.amount as string,
 			};
 		});
 
-		const validationError = validateAllocationArgs(id, parsed);
-		if (validationError) throw new McpToolError(validationError);
+		const validationError = validateBankAllocations(id, parsed);
+		if (validationError) throw new McpToolError(bankAllocationErrorToGermanMessage(validationError, (line) => `Zeile ${line}`));
 
 		setBankTransactionAllocations(id, parsed);
 		return { success: true, id, allocations: parsed.length };
@@ -1251,7 +1204,8 @@ registerTool({
 		"Importiert eine Liste von Banktransaktionen (z. B. aus einem eingelesenen Kontoauszug) inkl. optionaler " +
 		"Buchungszeilen in einem Zug. Es werden ALLE Einträge vorab geprüft (gleiche Fachregeln wie " +
 		"bank_transactions_allocate) - bei einem Fehler wird nichts angelegt. " +
-		"Offene Sollstellungen der Liegenschaft können über transactions_list mit propertyId-Filter ermittelt werden.",
+		"Offene Miet-Sollstellungen der Liegenschaft können über transactions_list (propertyId-Filter) ermittelt " +
+		"werden, offene Hausgeld-Sollstellungen der WEG-Verwaltung über housing_charges_list (hoaId-Filter).",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -1273,6 +1227,7 @@ registerTool({
 								properties: {
 									accountId: { type: ["string", "null"] },
 									transactionId: { type: ["string", "null"] },
+									housingChargeId: { type: ["string", "null"], description: "Ziel-Hausgeld-Sollstellung (WEG-Verwaltung)" },
 									amount: { type: ["string", "number"] },
 								},
 								required: ["amount"],
@@ -1330,12 +1285,13 @@ registerTool({
 			}
 			const allocations: BankTransactionAllocationInput[] = ((rawAllocations ?? []) as Record<string, unknown>[]).map((allocationEntry) => {
 				const allocationCoerced = coerceArgs(
-					{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, amount: { type: "decimal" } },
+					{ accountId: { type: "string", nullable: true }, transactionId: { type: "string", nullable: true }, housingChargeId: { type: "string", nullable: true }, amount: { type: "decimal" } },
 					allocationEntry ?? {}
 				);
 				return {
 					accountId: (allocationCoerced.accountId as string) ?? null,
 					transactionId: (allocationCoerced.transactionId as string) ?? null,
+					housingChargeId: (allocationCoerced.housingChargeId as string) ?? null,
 					amount: allocationCoerced.amount as string,
 				};
 			});
@@ -1343,41 +1299,14 @@ registerTool({
 			prepared.push({ input, allocations });
 		}
 
-		// Vorab-Validierung der Buchungszeilen: Da die Banktransaktionen noch
-		// nicht existieren, wird die Prüfung gegen die geplanten Werte
-		// ausgeführt - die Ziel-Checks (Liegenschaft, Storno, Summe) gelten
-		// identisch.
+		// Vorab-Validierung der Buchungszeilen gegen die GEPLANTEN Werte
+		// (die Banktransaktionen existieren noch nicht) - geteilte Regeln
+		// aus src/lib/bank-allocations.ts, identisch zum allocate-Werkzeug.
 		for (const [index, { input, allocations }] of prepared.entries()) {
 			if (allocations.length === 0) continue;
-			const bankAmountCents = Math.round(Number(input.amount) * 100);
-			let allocatedCents = 0;
-			for (const [lineIndex, allocation] of allocations.entries()) {
-				const lineLabel = `Eintrag ${index + 1}, Zeile ${lineIndex + 1}`;
-				if (Boolean(allocation.accountId) === Boolean(allocation.transactionId)) {
-					throw new McpToolError(`${lineLabel}: Bitte genau ein Ziel (accountId ODER transactionId) angeben.`);
-				}
-				const amountCents = Math.round(Number(allocation.amount) * 100);
-				if (!Number.isFinite(amountCents) || amountCents === 0) throw new McpToolError(`${lineLabel}: Ungültiger Teilbetrag.`);
-				if (amountCents < 0 !== bankAmountCents < 0) {
-					throw new McpToolError(`${lineLabel}: Der Teilbetrag muss dasselbe Vorzeichen haben wie die Banktransaktion.`);
-				}
-				if (allocation.accountId) {
-					const account = getAccount(allocation.accountId);
-					if (!account) throw new McpToolError(`${lineLabel}: Das angegebene Konto existiert nicht.`);
-					if (account.propertyId !== propertyId) throw new McpToolError(`${lineLabel}: Das Konto gehört zu einer anderen Liegenschaft.`);
-				}
-				if (allocation.transactionId) {
-					const transaction = getTransaction(allocation.transactionId);
-					if (!transaction) throw new McpToolError(`${lineLabel}: Die angegebene Sollstellung existiert nicht.`);
-					if (transaction.lease.unit.propertyId !== propertyId) {
-						throw new McpToolError(`${lineLabel}: Die Sollstellung gehört zu einer anderen Liegenschaft.`);
-					}
-					if (transaction.status === "CANCELLED") throw new McpToolError(`${lineLabel}: Stornierte Sollstellungen können nicht zugeordnet werden.`);
-				}
-				allocatedCents += amountCents;
-			}
-			if (Math.abs(allocatedCents) > Math.abs(bankAmountCents)) {
-				throw new McpToolError(`Eintrag ${index + 1}: Die Teilbeträge übersteigen den Betrag der Banktransaktion.`);
+			const validationError = validateBankAllocationsAgainst(input, allocations);
+			if (validationError) {
+				throw new McpToolError(bankAllocationErrorToGermanMessage(validationError, (line) => `Eintrag ${index + 1}, Zeile ${line}`));
 			}
 		}
 

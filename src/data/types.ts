@@ -279,15 +279,19 @@ export interface BankTransaction {
 }
 
 /**
- * Buchungszeile: ordnet einen Teilbetrag einer Banktransaktion entweder
- * einem Konto (accountId) oder einer fälligen Sollstellung (transactionId)
- * zu. Genau eines von beiden ist gesetzt (anwendungsseitig geprüft).
+ * Buchungszeile: ordnet einen Teilbetrag einer Banktransaktion genau
+ * EINEM Ziel zu - einem Konto (accountId), einer fälligen Miet-Sollstellung
+ * (transactionId, Buchungskreis Mietverwaltung) oder einer Hausgeld-
+ * Sollstellung (housingChargeId, Buchungskreis WEG-Verwaltung). Genau eines
+ * der drei ist gesetzt (anwendungsseitig geprüft); die beiden Buchungskreise
+ * berühren sich nie.
  */
 export interface BankTransactionAllocation {
 	id: string;
 	bankTransactionId: string;
 	accountId: string | null;
 	transactionId: string | null;
+	housingChargeId: string | null;
 	/** Signed wie die zugeordnete Banktransaktion (Teilbetrag). */
 	amount: string;
 	createdAt: string;
@@ -454,21 +458,6 @@ export interface PostalShipment {
 // ============================================================
 
 export type HoaAllocationKey = "MEA" | "LIVING_SPACE" | "UNITS" | "CONSUMPTION" | "DIRECT" | "CUSTOM";
-export type HoaCostCategory =
-	| "RESERVE_CONTRIBUTION"
-	| "ADMINISTRATOR_FEE"
-	| "INSURANCE"
-	| "CARETAKER"
-	| "MAINTENANCE_REPAIR"
-	| "WATER_DRAINAGE"
-	| "HEATING"
-	| "ELECTRICITY_COMMON"
-	| "CLEANING"
-	| "GARDEN_MAINTENANCE"
-	| "ELEVATOR"
-	| "LEGAL_ADVICE"
-	| "BANK_FEES"
-	| "OTHER";
 export type EconomicPlanStatus = "DRAFT" | "FINALIZED";
 export type AnnualStatementStatus = "DRAFT" | "FINALIZED";
 export type ReserveFundBookingType = "CONTRIBUTION" | "WITHDRAWAL";
@@ -576,7 +565,6 @@ export interface HoaCostItem {
 	context: HoaCostItemContext;
 	economicPlanId: string | null;
 	annualStatementId: string | null;
-	category: HoaCostCategory;
 	label: string;
 	amount: string;
 	allocationKey: HoaAllocationKey;

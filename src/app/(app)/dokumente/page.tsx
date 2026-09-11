@@ -35,12 +35,14 @@ const sourceTypeLabelKeys: Record<string, MessageKey> = {
 	DOCUMENT: "documents.sourceType.DOCUMENT",
 	GENERATED_DOCUMENT: "documents.sourceType.GENERATED_DOCUMENT",
 	TENANT_STATEMENT: "documents.sourceType.TENANT_STATEMENT",
+	HOA_ANNUAL_STATEMENT: "documents.sourceType.HOA_ANNUAL_STATEMENT",
 };
 
 const sourceTypeStyles: Record<string, string> = {
 	DOCUMENT: "bg-muted text-muted-foreground",
 	GENERATED_DOCUMENT: "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400",
 	TENANT_STATEMENT: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400",
+	HOA_ANNUAL_STATEMENT: "bg-teal-100 text-teal-700 dark:bg-teal-500/10 dark:text-teal-400",
 };
 
 export default async function DokumentePage({
@@ -61,7 +63,7 @@ export default async function DokumentePage({
 
 	const documentRows = await loadUnifiedDocuments({ propertyId, unitId, tenantId, search: query });
 
-	// Paginierung der gemergten Übersicht (die drei Quellen werden in
+	// Paginierung der gemergten Übersicht (die vier Quellen werden in
 	// src/lib/documents-overview.ts im Speicher zusammengeführt - der Slice
 	// erfolgt daher hier statt auf SQL-Ebene, eine Seite = 50 Einträge).
 	const documentPagination = resolvePagination(pageParam, documentRows.length);
@@ -163,7 +165,7 @@ export default async function DokumentePage({
 													disabled={!postalConfigured || document.mimeType !== "application/pdf"}
 													disabledReason={!postalConfigured ? t("postal.notConfiguredShort") : t("documents.errors.onlyPdf")}
 												/>
-												{document.sourceType !== "TENANT_STATEMENT" ? (
+												{document.sourceType !== "TENANT_STATEMENT" && document.sourceType !== "HOA_ANNUAL_STATEMENT" ? (
 													<ConfirmDeleteButton
 														action={deleteAnyDocumentAction.bind(null, document.sourceType, document.id)}
 														confirmMessage={t("documents.confirm.delete", { name: document.fileName })}

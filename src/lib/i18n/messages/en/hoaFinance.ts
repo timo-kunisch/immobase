@@ -90,4 +90,14 @@ export const hoaFinance: typeof deHoaFinance = {
 	"reserve.errors.amountPositive": "The amount must be greater than 0 (the booking type determines the sign).",
 	"reserve.errors.saveFailed": "The booking could not be saved.",
 	"reserve.errors.deleteFailed": "The booking could not be deleted.",
+
+	// ============================================================
+	// HOA bookkeeping (/weg/buchhaltung, property-scoped tables shared with
+	// the rental management - HOA view with housing charge targets)
+	// ============================================================
+	"banking.title": "HOA bookkeeping",
+	"banking.description": "Bank transactions and accounts per HOA - book owners' incoming payments against housing charges.",
+	"banking.info":
+		"Record the movements of the HOA's community account and allocate them to accounts (e.g. building insurance) or open housing charges. Fully allocated housing charges automatically count as paid and thus flow into the annual statement as actually paid advance payments.",
+	"banking.selectHoa": "Select an HOA above to view or manage accounts.",
 };

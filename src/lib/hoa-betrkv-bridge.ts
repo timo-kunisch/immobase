@@ -1,4 +1,4 @@
-import type { AllocationKey, HoaCostCategory } from "@/data/types";
+import type { AllocationKey } from "@/data/types";
 import { centsToDecimalString } from "@/lib/money";
 
 /**
@@ -15,6 +15,13 @@ import { centsToDecimalString } from "@/lib/money";
  * Rechtsberatung, Bankgebühren - das sind reine Verwaltungskosten des
  * Eigentümers, § 1 Abs. 2 Nr. 1 BetrKV/BGH-Rechtsprechung).
  *
+ * Welche Positionen umlagefähig sind, entscheidet ALLEIN das explizite
+ * Nutzer-Flag `hoaCostItems.isApportionable` je Kostenposition (siehe
+ * Annahme 8 in AGENTS.md Abschnitt 6.1). Die frühere Kostenart-Kategorie
+ * (inkl. Default-Matrix) ist entfallen - die Bezeichnung (label) trägt die
+ * fachliche Information selbst (gleiche Bereinigung wie cost_items.category
+ * in der Mietverwaltung, Migration 0010/0013).
+ *
  * Diese Datei kapselt ausschließlich die REINE Umwandlungslogik (Filterung
  * nach isApportionable, Betragsübernahme) - der eigentliche "Import"
  * (Anlegen von costItems/consumptionValues in einer bestehenden Nebenkosten-
@@ -29,35 +36,9 @@ import { centsToDecimalString } from "@/lib/money";
  * WEG-Anteil bereits exakt auf die jeweilige Eigentumswohnung entfällt.
  */
 
-/**
- * Default-Vorbelegung für `hoaCostItems.isApportionable` beim Anlegen einer
- * neuen Kostenposition in der Jahresabrechnung, je nach Kostenart (siehe
- * Annahme 8 in AGENTS.md Abschnitt 6.1). Bewusst nur ein
- * Vorschlag (vom Nutzer pro Position änderbar), da im Einzelfall auch z. B.
- * eine Rechtsberatung umlagefähig sein könnte (z. B. Rechtsstreit über eine
- * Betriebskostenposition).
- */
-export const hoaCostCategoryDefaultApportionable: Record<HoaCostCategory, boolean> = {
-	RESERVE_CONTRIBUTION: false,
-	ADMINISTRATOR_FEE: false,
-	LEGAL_ADVICE: false,
-	BANK_FEES: false,
-	INSURANCE: true,
-	CARETAKER: true,
-	MAINTENANCE_REPAIR: false,
-	WATER_DRAINAGE: true,
-	HEATING: true,
-	ELECTRICITY_COMMON: true,
-	CLEANING: true,
-	GARDEN_MAINTENANCE: true,
-	ELEVATOR: true,
-	OTHER: false,
-};
-
 export type HoaAnnualStatementLineForBridge = {
 	costItemId: string;
 	label: string;
-	category: HoaCostCategory;
 	isApportionable: boolean;
 	amountCents: number;
 };
