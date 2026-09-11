@@ -613,6 +613,20 @@ CREATE TABLE tenants (
 	updated_at text NOT NULL
 );
 
+CREATE TABLE ticket_activity_log (
+	id text PRIMARY KEY NOT NULL,
+	ticket_id text NOT NULL,
+	action text NOT NULL,
+	from_value text,
+	to_value text,
+	detail text,
+	actor_user_id text,
+	actor_email text,
+	created_at text NOT NULL,
+	FOREIGN KEY (ticket_id) REFERENCES tickets(id) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (actor_user_id) REFERENCES users(id) ON UPDATE no action ON DELETE set null
+);
+
 CREATE TABLE "ticket_messages" (
 	id text PRIMARY KEY NOT NULL,
 	ticket_id text,
@@ -851,6 +865,8 @@ CREATE INDEX tenant_statement_lines_tenant_statement_id_idx ON tenant_statement_
 CREATE UNIQUE INDEX tenant_statements_billing_period_id_lease_id_key ON tenant_statements (billing_period_id, lease_id);
 
 CREATE INDEX tenant_statements_lease_id_idx ON tenant_statements (lease_id);
+
+CREATE INDEX ticket_activity_log_ticket_idx ON ticket_activity_log (ticket_id, created_at);
 
 CREATE UNIQUE INDEX ticket_messages_imap_uq ON ticket_messages (imap_folder, imap_uid) WHERE imap_uid IS NOT NULL;
 

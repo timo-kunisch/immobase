@@ -196,6 +196,49 @@ export interface TicketMessage {
 	createdAt: string;
 }
 
+// ------------------------------------------------------------
+// Ticket-Aktivitätsverlauf (Tabelle ticket_activity_log)
+// ------------------------------------------------------------
+
+/**
+ * Art der protokollierten Ticket-Aktion:
+ * - CREATED: Ticket angelegt (detail = E-Mail-Betreff bei Anlage aus Postfach)
+ * - UPDATED: Ticket-Daten bearbeitet (Dialog)
+ * - STATUS_CHANGED: Statuswechsel (fromValue/toValue = Status-Enum)
+ * - NOTE_EDITED/NOTE_DELETED: interne Notiz bearbeitet/gelöscht (die Notiz
+ *   selbst erscheint als Verlauf-Eintrag - Anlegen ist dort sichtbar)
+ * - EMAIL_LINKED: eingehende E-Mail dem Ticket zugeordnet (detail = Betreff)
+ * - EMAIL_UNLINKED: E-Mail-Zuordnung gelöst - zurück ins Postfach
+ * - EMAIL_REASSIGNED: E-Mail einem anderen Ticket zugeordnet (Eintrag im
+ *   Quell-Ticket; der Ziel-Ticket erhält zusätzlich EMAIL_LINKED)
+ */
+export type TicketActivityAction =
+	| "CREATED"
+	| "UPDATED"
+	| "STATUS_CHANGED"
+	| "NOTE_EDITED"
+	| "NOTE_DELETED"
+	| "EMAIL_LINKED"
+	| "EMAIL_UNLINKED"
+	| "EMAIL_REASSIGNED";
+
+/** Protokollierte Aktion auf einem Ticket („Wer hat wann was getan"). */
+export interface TicketActivity {
+	id: string;
+	ticketId: string;
+	action: TicketActivityAction;
+	/** Alter Wert bei Wertänderungen (Status-Enum), sonst null. */
+	fromValue: string | null;
+	/** Neuer Wert bei Wertänderungen (Status-Enum), sonst null. */
+	toValue: string | null;
+	/** Freier Kontext (z. B. E-Mail-Betreff), sonst null. */
+	detail: string | null;
+	/** Handelnder Nutzer (E-Mail denormalisiert); beides null = System. */
+	actorUserId: string | null;
+	actorEmail: string | null;
+	createdAt: string;
+}
+
 /** Abgleichstand eines IMAP-Ordners (Tabelle imap_sync_state). */
 export interface ImapSyncState {
 	folder: string;

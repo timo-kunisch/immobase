@@ -14,6 +14,7 @@ import { migration0013 } from "./0013_hoa_statement_banking.ts";
 import { migration0014 } from "./0014_remove_lease_occupants.ts";
 import { migration0015 } from "./0015_tickets_optional_property.ts";
 import { migration0016 } from "./0016_remove_ticket_contractor_notes.ts";
+import { migration0017 } from "./0017_ticket_activity_log.ts";
 import type { Migration } from "../migrate.ts";
 
 /**
@@ -39,4 +40,5 @@ export const migrations: Migration[] = [
 	migration0014,
 	migration0015,
 	migration0016,
+	migration0017,
 ];

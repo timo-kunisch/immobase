@@ -113,8 +113,15 @@ sich nur über die explizite, opt-in nutzbare BetrKV-Brücke für vermietete Eig
   Scheduler (Start in `src/app/(app)/layout.tsx` wie der Dropbox-Scheduler; 5-Minuten-Intervall,
   `unref`'d, parallele Läufe abgelehnt) ruft automatisch ab; zusätzlich manueller „Jetzt abrufen"-
   Button. Der komplette Verlauf (E-Mails eingehend/ausgehend + interne Notizen, eine Tabelle
-  `ticket_messages` mit Diskriminator `direction`) ist auf der Ticket-Detailseite `/tickets/[id]`
-sichtbar. **Eingehende E-Mails lassen sich im Verlauf wieder entknüpfen** (zurück ins
+   `ticket_messages` mit Diskriminator `direction`) ist auf der Ticket-Detailseite `/tickets/[id]`
+sichtbar. **Aktivitätsprotokoll je Ticket** (Tabelle `ticket_activity_log`, Repository
+   `src/data/ticket-activity.ts`, Migration 0017): Jede fachliche Aktion auf einem Ticket -
+   Anlegen (inkl. initialer Status), Bearbeiten, Statuswechsel (alt/neu), Notiz bearbeiten/
+   löschen, E-Mail zuordnen/lösen/neu zuordnen - wird mit Akteur und Zeitpunkt protokolliert
+   (append-only, verschwindet mit dem Ticket) und auf der Detailseite in die Chronologie
+   gemischt; MCP-Werkzeuge schreiben ohne Nutzerkontext als „System". Bewusst getrennt vom
+   globalen Admin-Audit-Log: Hier sieht jeder berechtigte Nutzer die Geschichte des einzelnen
+   Tickets. **Eingehende E-Mails lassen sich im Verlauf wieder entknüpfen** (zurück ins
    Postfach) **oder einem anderen Ticket neu zuordnen** (`unlinkMessageFromTicket()`/
    `linkMessageToTicket()` + Actions auf der Ticket-Detailseite). **Interne Notizen lassen
    sich im Verlauf bearbeiten und löschen** (`updateTicketNote()`/`deleteTicketNote()`,
@@ -565,7 +572,9 @@ Gegliedert in folgende fachliche Bereiche (siehe `src/data/migrations/0001_init.
 - **Übergabeprotokolle:** `protocols` (Datenmodell vorhanden, **noch keine eigene UI**)
 - **Tickets:** `tickets`, `ticket_messages` (Kommunikationsverlauf: `direction` = `INBOUND`/
   `OUTBOUND`/`NOTE`; `ticket_id IS NULL` = unzugeordnete E-Mail im Postfach), `imap_sync_state`
-  (IMAP-Abgleichstand je Ordner: UIDVALIDITY, letzte UID, letzter Sync-Status)
+  (IMAP-Abgleichstand je Ordner: UIDVALIDITY, letzte UID, letzter Sync-Status),
+  `ticket_activity_log` (Aktivitätsprotokoll je Ticket: Aktion + alt/neu + Kontext + Akteur +
+  Zeitpunkt, append-only)
 - **Dokumente (DMS):** `documents`
 - **Finanzen:** `transactions` (Sollstellungen/Mieteingänge)
 - **Buchhaltung:** `accounts` (Kontenrahmen je Liegenschaft, z. B. „Gebäudeversicherung"),
@@ -844,6 +853,8 @@ Naming-Konvention: `hoa`/`Hoa` im Code, UI deutsch.
   Perioden/Jahresabrechnungen mit Artefakt-Cleanup;
   `ticket-messages.test.ts` = Postfach/Verknüpfung/Umwandlung/Entknüpfen/Neu-Zuordnung/Dedup/
   Threading + Notiz-Bearbeitung/-Löschung (nur Richtung NOTE) + IMAP-Sync-Stand,
+  `ticket-activity.test.ts` = Ticket-Aktivitätsverlauf: Protokollierung/Reihenfolge/
+  Ticket-Trennung/Fremdschlüssel/Kaskade/Akteur-Referenz (ON DELETE SET NULL),
   `chat-messages.test.ts` = persistenter KI-Chat-Verlauf: Reihenfolge/Nutzer-Trennung/Löschen/
   Fehler-Rolle/Anhang-Metadaten, `prompt-templates.test.ts` = eigene Prompt-Vorlagen: CRUD/Nutzer-Trennung/
   Kaskade),  `src/lib/ticket-mailer.test.ts` (Ticket-E-Mail-Versand: SMTP-Sperre, Threading, Betreff-Kennung,

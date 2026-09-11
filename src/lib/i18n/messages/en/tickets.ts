@@ -29,6 +29,19 @@ export const tickets: typeof deTickets = {
 	"history.subjectTagHint":
 		"When sending, the ticket reference {tag} is automatically appended to the subject - replies from the recipient will then be automatically assigned to this ticket on the next mailbox fetch.",
 	"history.smtpDisabled": "Email replies are disabled as long as no SMTP server is configured (Settings → Integrations & AI).",
+	// Activity history (logged actions in the ticket history,
+	// one key per action = enum TicketActivityAction)
+	"activity.CREATED": "Ticket created",
+	"activity.UPDATED": "Ticket details edited",
+	"activity.STATUS_CHANGED": "Status changed:",
+	"activity.NOTE_EDITED": "Internal note edited",
+	"activity.NOTE_DELETED": "Internal note deleted",
+	"activity.EMAIL_LINKED": "Email assigned",
+	"activity.EMAIL_UNLINKED": "Email assignment removed (back to mailbox)",
+	"activity.EMAIL_REASSIGNED": "Email assigned to another ticket",
+	"activity.createdFromEmail": "from email \"{subject}\"",
+	"activity.email": "email \"{subject}\"",
+	"activity.system": "System",
 	// Internal note (history entry and form)
 	"note.label": "Internal note",
 	"note.placeholder": "Only visible internally - will not be sent…",

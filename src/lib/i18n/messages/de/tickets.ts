@@ -34,6 +34,19 @@ export const tickets = {
 		"Dem Betreff wird beim Versand automatisch die Ticket-Kennung {tag} angehängt - Antworten des Empfängers werden so beim nächsten Postfach-Abruf automatisch diesem Ticket zugeordnet.",
 	"history.smtpDisabled":
 		"E-Mail-Antworten sind deaktiviert, solange kein SMTP-Server konfiguriert ist (Einstellungen → Integrationen & KI).",
+	// Aktivitätsverlauf (protokollierte Aktionen im Ticket-Verlauf,
+	// Schlüssel je Aktion = Enum TicketActivityAction)
+	"activity.CREATED": "Ticket angelegt",
+	"activity.UPDATED": "Ticket-Daten bearbeitet",
+	"activity.STATUS_CHANGED": "Status geändert:",
+	"activity.NOTE_EDITED": "Interne Notiz bearbeitet",
+	"activity.NOTE_DELETED": "Interne Notiz gelöscht",
+	"activity.EMAIL_LINKED": "E-Mail zugeordnet",
+	"activity.EMAIL_UNLINKED": "E-Mail-Zuordnung gelöst (zurück ins Postfach)",
+	"activity.EMAIL_REASSIGNED": "E-Mail einem anderen Ticket zugeordnet",
+	"activity.createdFromEmail": "aus E-Mail „{subject}“",
+	"activity.email": "E-Mail „{subject}“",
+	"activity.system": "System",
 	// Interne Notiz (Verlauf-Eintrag und Formular)
 	"note.label": "Interne Notiz",
 	"note.placeholder": "Nur intern sichtbar - wird nicht versendet…",

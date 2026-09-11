@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { logTicketActivity } from "@/data/ticket-activity";
 import { getTicketMessage, convertMessageToTicket, deleteMailboxMessage, linkMessageToTicket } from "@/data/ticket-messages";
 import { getTicket } from "@/data/tickets";
 import { requireUser } from "@/lib/auth/dal";
@@ -74,6 +75,16 @@ export async function convertMessageToTicketAction(_prevState: ActionState, form
 			status: "OPEN",
 			resolvedAt: null,
 		});
+		// Herkunft im Ticket-Verlauf festhalten („aus E-Mail …"), die E-Mail
+		// selbst wird als erster Verlaufs-Eintrag sichtbar.
+		logTicketActivity({
+			ticketId: ticket.id,
+			action: "CREATED",
+			toValue: "OPEN",
+			detail: message.subject,
+			actorUserId: user.id,
+			actorEmail: user.email,
+		});
 		logActivity(user, "CREATE", "tickets", `Ticket „${title}“ aus E-Mail „${message.subject ?? "(ohne Betreff)"}“ angelegt`, ticket.id);
 	} catch (error) {
 		console.error("convertMessageToTicketAction failed", error);
@@ -109,6 +120,15 @@ export async function linkMessageToTicketAction(_prevState: ActionState, formDat
 
 	try {
 		linkMessageToTicket(messageId, ticketId);
+		// Die E-Mail erscheint im Verlauf - der Eintrag hält zusätzlich fest,
+		// dass (und von wem) sie gezielt diesem Ticket zugeordnet wurde.
+		logTicketActivity({
+			ticketId,
+			action: "EMAIL_LINKED",
+			detail: message.subject,
+			actorUserId: user.id,
+			actorEmail: user.email,
+		});
 		logActivity(user, "UPDATE", "tickets", `E-Mail „${message.subject ?? "(ohne Betreff)"}“ dem Ticket „${ticket.title}“ zugeordnet`, ticketId);
 	} catch (error) {
 		console.error("linkMessageToTicketAction failed", error);

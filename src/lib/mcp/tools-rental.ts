@@ -73,6 +73,7 @@ import {
 } from "@/data/templates";
 import { createTenant, deleteTenant, getTenant, listTenants, updateTenant, type TenantInput } from "@/data/tenants";
 import { bankAllocationErrorToGermanMessage, validateBankAllocations, validateBankAllocationsAgainst } from "@/lib/bank-allocations";
+import { logTicketActivity } from "@/data/ticket-activity";
 import { createTicket, deleteTicket, listTickets, updateTicket, updateTicketStatus, type TicketInput } from "@/data/tickets";
 import {
 	convertMessageToTicket,
@@ -342,17 +343,26 @@ registerCrudTools<TicketInput>({
 		if (input.unitId && !getUnit(input.unitId)) return "Die angegebene Einheit existiert nicht.";
 		return null;
 	},
-	create: (input) =>
-		createTicket({
+	create: (input) => {
+		const ticket = createTicket({
 			...input,
 			// Eine Einheit ist nur mit Liegenschaft sinnvoll.
 			unitId: input.propertyId ? input.unitId : null,
 			resolvedAt: input.status === "DONE" ? new Date().toISOString() : null,
-		}),
+		});
+		// MCP läuft ohne Nutzerkontext (Token) - Akteur bleibt daher leer und
+		// wird im Ticket-Verlauf als „System" angezeigt.
+		logTicketActivity({ ticketId: ticket.id, action: "CREATED", toValue: input.status });
+		return ticket;
+	},
 	update: (id, input) => {
 		const existing = findTicket(id);
 		const resolvedAt = input.status === "DONE" ? (existing?.resolvedAt ?? new Date().toISOString()) : null;
 		updateTicket(id, { ...input, resolvedAt });
+		logTicketActivity({ ticketId: id, action: "UPDATED" });
+		if (existing && existing.status !== input.status) {
+			logTicketActivity({ ticketId: id, action: "STATUS_CHANGED", fromValue: existing.status, toValue: input.status });
+		}
 	},
 	delete: (id) => deleteTicket(id),
 });
@@ -367,9 +377,13 @@ registerTool({
 	handler: (args) => {
 		const input = coerceArgs({ id: { type: "string" }, status: { type: "enum", values: TICKET_STATUS } }, args);
 		const id = input.id as string;
-		if (!findTicket(id)) throw new McpToolError(`Ticket mit ID "${id}" wurde nicht gefunden.`);
+		const ticket = findTicket(id);
+		if (!ticket) throw new McpToolError(`Ticket mit ID "${id}" wurde nicht gefunden.`);
 		const status = input.status as "OPEN" | "IN_PROGRESS" | "DONE";
 		updateTicketStatus(id, status, status === "DONE" ? new Date().toISOString() : null);
+		if (ticket.status !== status) {
+			logTicketActivity({ ticketId: id, action: "STATUS_CHANGED", fromValue: ticket.status, toValue: status });
+		}
 		return { success: true, id, status };
 	},
 });
@@ -489,7 +503,7 @@ registerTool({
 		if (input.propertyId && !getProperty(input.propertyId as string)) throw new McpToolError("Die angegebene Liegenschaft existiert nicht.");
 		if (input.unitId && !getUnit(input.unitId as string)) throw new McpToolError("Die angegebene Einheit existiert nicht.");
 		const propertyId = (input.propertyId as string) ?? null;
-		return convertMessageToTicket(message.id, {
+		const created = convertMessageToTicket(message.id, {
 			propertyId,
 			// Eine Einheit ist nur mit Liegenschaft sinnvoll.
 			unitId: propertyId ? ((input.unitId as string) ?? null) : null,
@@ -498,6 +512,8 @@ registerTool({
 			status: "OPEN",
 			resolvedAt: null,
 		});
+		logTicketActivity({ ticketId: created.id, action: "CREATED", toValue: "OPEN", detail: message.subject });
+		return created;
 	},
 });
 
@@ -516,6 +532,7 @@ registerTool({
 		const ticketId = input.ticketId as string;
 		if (!findTicket(ticketId)) throw new McpToolError(`Ticket mit ID "${ticketId}" wurde nicht gefunden.`);
 		linkMessageToTicket(message.id, ticketId);
+		logTicketActivity({ ticketId, action: "EMAIL_LINKED", detail: message.subject });
 		return { success: true, id: message.id, ticketId };
 	},
 });

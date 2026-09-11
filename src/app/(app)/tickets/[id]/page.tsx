@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Mail, MailPlus, StickyNote } from "lucide-react";
+import { ArrowLeft, ArrowLeftRight, CirclePlus, FileX, Forward, Mail, MailCheck, MailPlus, MailX, Pencil, PenLine, StickyNote } from "lucide-react";
 
 import { listOwners } from "@/data/owners";
 import { listProperties } from "@/data/properties";
 import { listTenants } from "@/data/tenants";
+import { listTicketActivity } from "@/data/ticket-activity";
 import { listTicketMessages } from "@/data/ticket-messages";
 import { getTicket, listTickets, listUnitsByLabel } from "@/data/tickets";
-import type { TicketMessage, TicketStatus } from "@/data/types";
+import type { TicketActivity, TicketActivityAction, TicketMessage, TicketStatus } from "@/data/types";
 import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,24 @@ const statusVariants: Record<TicketStatus, "default" | "secondary" | "outline"> 
 	IN_PROGRESS: "secondary",
 	DONE: "outline",
 };
+
+/** Icon je protokollierter Aktion (TicketActivityAction). */
+const activityIcons: Record<TicketActivityAction, typeof CirclePlus> = {
+	CREATED: CirclePlus,
+	UPDATED: Pencil,
+	STATUS_CHANGED: ArrowLeftRight,
+	NOTE_EDITED: PenLine,
+	NOTE_DELETED: FileX,
+	EMAIL_LINKED: MailCheck,
+	EMAIL_UNLINKED: MailX,
+	EMAIL_REASSIGNED: Forward,
+};
+
+/**
+ * Gemischte Chronologie der Detailseite: Kommunikations-Einträge und
+ * protokollierte Aktionen in einer zeitlich sortierten Liste.
+ */
+type TimelineItem = { kind: "message"; message: TicketMessage } | { kind: "activity"; activity: TicketActivity };
 
 /** Ein Verlauf-Eintrag (eingehende/ausgehende E-Mail oder interne Notiz). */
 function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage; reassignTickets: ReassignableTicket[]; t: TranslateFn }) {
@@ -80,12 +99,54 @@ function TimelineEntry({ message, reassignTickets, t }: { message: TicketMessage
 					{!isNote && message.subject ? ` · ${message.subject}` : ""}
 				</p>
 			</CardHeader>
-			{message.bodyText ? (
-				<CardContent>
-					<p className="text-sm whitespace-pre-wrap">{message.bodyText}</p>
-				</CardContent>
-			) : null}
+{message.bodyText ? (
+			<CardContent>
+				<p className="text-sm whitespace-pre-wrap">{message.bodyText}</p>
+			</CardContent>
+		) : null}
 		</Card>
+	);
+}
+
+/**
+ * Protokollierte Aktion im Ticket-Verlauf (z. B. Statuswechsel): kompakte
+ * Zeile mit Aktion, Akteur und Zeitpunkt. Akteur leer = System-Aktion
+ * ohne Nutzerkontext (MCP-Werkzeuge).
+ */
+function ActivityEntry({ activity, t }: { activity: TicketActivity; t: TranslateFn }) {
+	const Icon = activityIcons[activity.action];
+	return (
+		<div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+			<Icon className="size-4 shrink-0 text-muted-foreground" />
+			<span className="inline-flex flex-wrap items-center gap-1 text-muted-foreground">
+				{t(`tickets.activity.${activity.action}`)}
+				{/* Anlage: initialer Status (z. B. direkt „Erledigt" angelegt). */}
+				{activity.action === "CREATED" && activity.toValue ? (
+					<Badge variant="outline">{t(`tickets.status.${activity.toValue as TicketStatus}`)}</Badge>
+				) : null}
+				{/* Statuswechsel: alter -> neuer Status als Badges. */}
+				{activity.action === "STATUS_CHANGED" && activity.fromValue && activity.toValue ? (
+					<>
+						<Badge variant="outline">{t(`tickets.status.${activity.fromValue as TicketStatus}`)}</Badge>
+						<span aria-hidden>→</span>
+						<Badge variant="secondary">{t(`tickets.status.${activity.toValue as TicketStatus}`)}</Badge>
+					</>
+				) : null}
+				{/* Kontext: Herkunfts-/betroffene E-Mail. */}
+				{activity.detail ? (
+					<span>
+						{" · "}
+						{t(
+							activity.action === "CREATED" ? "tickets.activity.createdFromEmail" : "tickets.activity.email",
+							{ subject: activity.detail }
+						)}
+					</span>
+				) : null}
+			</span>
+			<span className="ml-auto text-xs text-muted-foreground">
+				{activity.actorEmail ?? t("tickets.activity.system")} · {formatDateTime(activity.createdAt)}
+			</span>
+		</div>
 	);
 }
 
@@ -98,6 +159,21 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	}
 
 	const messages = listTicketMessages(ticket.id);
+	const activities = listTicketActivity(ticket.id);
+	// Gemeinsame Chronologie aus Kommunikation und protokollierten Aktionen;
+	// bei exakt gleichem Zeitpunkt zuerst die Nachricht (sie war bereits da,
+	// die Aktion beschreibt die Änderung danach). Der Sort ist stabil -
+	// innerhalb einer Gruppe bleibt die jeweilige Listen-Reihenfolge.
+	const timeline: TimelineItem[] = [
+		...messages.map((message) => ({ kind: "message" as const, message })),
+		...activities.map((activity) => ({ kind: "activity" as const, activity })),
+	].sort((a, b) => {
+		const timeA = a.kind === "message" ? a.message.createdAt : a.activity.createdAt;
+		const timeB = b.kind === "message" ? b.message.createdAt : b.activity.createdAt;
+		if (timeA !== timeB) return timeA < timeB ? -1 : 1;
+		if (a.kind === b.kind) return 0;
+		return a.kind === "message" ? -1 : 1;
+	});
 	const propertyList = listProperties().sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
 	const unitList = listUnitsByLabel();
 	const smtpConfigured = isSmtpConfigured();
@@ -190,16 +266,22 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 				</CardContent>
 				</Card>
 
-				<div className="flex flex-col gap-3">
-					<h2 className="text-sm font-semibold text-muted-foreground">{t("tickets.history.title", { count: messages.length })}</h2>
-					{messages.length === 0 ? (
-						<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-							{t("tickets.history.empty")}
-						</div>
-					) : (
-						messages.map((message) => <TimelineEntry key={message.id} message={message} reassignTickets={reassignTickets} t={t} />)
-					)}
-				</div>
+<div className="flex flex-col gap-3">
+				<h2 className="text-sm font-semibold text-muted-foreground">{t("tickets.history.title", { count: timeline.length })}</h2>
+				{timeline.length === 0 ? (
+					<div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
+						{t("tickets.history.empty")}
+					</div>
+				) : (
+					timeline.map((item) =>
+						item.kind === "message" ? (
+							<TimelineEntry key={`message-${item.message.id}`} message={item.message} reassignTickets={reassignTickets} t={t} />
+						) : (
+							<ActivityEntry key={`activity-${item.activity.id}`} activity={item.activity} t={t} />
+						)
+					)
+				)}
+			</div>
 
 				<Card>
 					<CardHeader>

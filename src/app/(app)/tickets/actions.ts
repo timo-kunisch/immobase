@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { logTicketActivity } from "@/data/ticket-activity";
 import { createTicket, deleteTicket, getTicket, listTickets, updateTicket, updateTicketStatus } from "@/data/tickets";
 import {
 	createTicketMessage,
@@ -69,12 +70,35 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 		resolvedAt: status === "DONE" ? new Date().toISOString() : null,
 	};
 
+	// Vor der Bearbeitung geladen: alter Status für den Statuswechsel-Eintrag.
+	const existing = id ? getTicket(id) : null;
+
 	try {
 		if (id) {
 			updateTicket(id, data);
+			logTicketActivity({ ticketId: id, action: "UPDATED", actorUserId: user.id, actorEmail: user.email });
+			// Statuswechsel im Bearbeitungs-Dialog als eigener Eintrag - der
+			// zentrale Fall ist der Schnellwechsel (updateTicketStatusAction).
+			if (existing && existing.status !== status) {
+				logTicketActivity({
+					ticketId: id,
+					action: "STATUS_CHANGED",
+					fromValue: existing.status,
+					toValue: status,
+					actorUserId: user.id,
+					actorEmail: user.email,
+				});
+			}
 			logActivity(user, "UPDATE", "tickets", `Ticket „${title}“ bearbeitet`, id);
 		} else {
 			const ticket = createTicket(data);
+			logTicketActivity({
+				ticketId: ticket.id,
+				action: "CREATED",
+				toValue: status,
+				actorUserId: user.id,
+				actorEmail: user.email,
+			});
 			logActivity(user, "CREATE", "tickets", `Ticket „${title}“ angelegt`, ticket.id);
 		}
 	} catch (error) {
@@ -92,10 +116,21 @@ export async function saveTicketAction(_prevState: ActionState, formData: FormDa
 export async function updateTicketStatusAction(id: string, status: TicketStatus): Promise<ActionState> {
 	const user = await requireUser();
 	const t = await getT();
-	// Bezeichnung für den Log-Eintrag ermitteln.
+	// Vor dem Wechsel geladen: Bezeichnung + alter Status für die Protokolle.
 	const ticket = findTicket(id);
 	try {
 		updateTicketStatus(id, status, status === "DONE" ? new Date().toISOString() : null);
+		// Nur echte Wechsel landen im Ticket-Verlauf (gleicher Status = keine Aktion).
+		if (ticket && ticket.status !== status) {
+			logTicketActivity({
+				ticketId: id,
+				action: "STATUS_CHANGED",
+				fromValue: ticket.status,
+				toValue: status,
+				actorUserId: user.id,
+				actorEmail: user.email,
+			});
+		}
 	} catch (error) {
 		console.error("updateTicketStatusAction failed", error);
 		return { error: t("tickets.errors.statusFailed") };
@@ -189,6 +224,9 @@ export async function updateTicketNoteAction(_prevState: ActionState, formData: 
 
 	try {
 		updateTicketNote(messageId, body);
+		// Die bearbeitete Notiz selbst bleibt unverändert sichtbar - die
+		// Bearbeitung als solche wäre sonst nicht nachvollziehbar.
+		logTicketActivity({ ticketId: ticket.id, action: "NOTE_EDITED", actorUserId: user.id, actorEmail: user.email });
 		logActivity(user, "UPDATE", "tickets", `Interne Notiz zum Ticket „${ticket.title}“ bearbeitet`, ticket.id);
 	} catch (error) {
 		console.error("updateTicketNoteAction failed", error);
@@ -212,6 +250,9 @@ export async function deleteTicketNoteAction(messageId: string): Promise<ActionS
 
 	try {
 		deleteTicketNote(messageId);
+		// Die gelöschte Notiz verschwindet aus dem Verlauf - der Aktivitäts-
+		// eintrag hält fest, dass (und von wem) eine gelöscht wurde.
+		logTicketActivity({ ticketId: message.ticketId, action: "NOTE_DELETED", actorUserId: user.id, actorEmail: user.email });
 		logActivity(user, "DELETE", "tickets", `Interne Notiz zum Ticket „${ticket ? ticket.title : message.ticketId}“ gelöscht`, message.ticketId);
 	} catch (error) {
 		console.error("deleteTicketNoteAction failed", error);
@@ -277,6 +318,15 @@ export async function unlinkTicketMessageAction(messageId: string): Promise<Acti
 
 	try {
 		unlinkMessageFromTicket(messageId);
+		// Die E-Mail verschwindet aus diesem Verlauf (zurück ins Postfach) -
+		// der Eintrag hält fest, welche E-Mail wann von wem gelöst wurde.
+		logTicketActivity({
+			ticketId: message.ticketId,
+			action: "EMAIL_UNLINKED",
+			detail: message.subject,
+			actorUserId: user.id,
+			actorEmail: user.email,
+		});
 		logActivity(
 			user,
 			"UPDATE",
@@ -321,6 +371,22 @@ export async function reassignTicketMessageAction(_prevState: ActionState, formD
 
 	try {
 		linkMessageToTicket(messageId, ticketId);
+		// Quelle notiert die Abgabe, das Ziel die Aufnahme der E-Mail - so ist
+		// der Vorgang in BEIDEN Verläufen nachvollziehbar.
+		logTicketActivity({
+			ticketId: sourceTicketId,
+			action: "EMAIL_REASSIGNED",
+			detail: message.subject,
+			actorUserId: user.id,
+			actorEmail: user.email,
+		});
+		logTicketActivity({
+			ticketId,
+			action: "EMAIL_LINKED",
+			detail: message.subject,
+			actorUserId: user.id,
+			actorEmail: user.email,
+		});
 		logActivity(
 			user,
 			"UPDATE",
