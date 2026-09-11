@@ -33,7 +33,7 @@ export function TicketFormDialog({
 	const { t } = useI18n();
 	const isEdit = Boolean(ticket);
 	const [open, setOpen] = useState(false);
-	const [propertyId, setPropertyId] = useState(ticket ? (ticket.propertyId ?? "none") : (defaultPropertyId ?? properties[0]?.id ?? "none"));
+	const [propertyId, setPropertyId] = useState(ticket ? (ticket.propertyId ?? "none") : (defaultPropertyId ?? "none"));
 	const [state, formAction, isPending] = useActionState(saveTicketAction, initialActionState);
 
 	useEffect(() => {
