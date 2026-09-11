@@ -37,6 +37,9 @@ export const tickets: typeof deTickets = {
 	// Email reply form
 	"reply.toLabel": "Email reply to",
 	"reply.toPlaceholder": "recipient@example.com",
+	"reply.toContactsTenant": "Tenant",
+	"reply.toContactsOwner": "Owner",
+	"reply.toContactsEmpty": "No contact found.",
 	"reply.subjectLabel": "Subject",
 	"reply.messageLabel": "Message",
 	"reply.messagePlaceholder": "Reply text…",

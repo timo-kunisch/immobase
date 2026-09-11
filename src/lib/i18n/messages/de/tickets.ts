@@ -42,6 +42,9 @@ export const tickets = {
 	// E-Mail-Antwort-Formular
 	"reply.toLabel": "E-Mail-Antwort an",
 	"reply.toPlaceholder": "empfaenger@example.com",
+	"reply.toContactsTenant": "Mieter",
+	"reply.toContactsOwner": "Eigentümer",
+	"reply.toContactsEmpty": "Kein Kontakt gefunden.",
 	"reply.subjectLabel": "Betreff",
 	"reply.messageLabel": "Nachricht",
 	"reply.messagePlaceholder": "Antworttext…",

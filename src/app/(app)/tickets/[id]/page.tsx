@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Mail, MailPlus, StickyNote } from "lucide-react";
 
+import { listOwners } from "@/data/owners";
 import { listProperties } from "@/data/properties";
+import { listTenants } from "@/data/tenants";
 import { listTicketMessages } from "@/data/ticket-messages";
 import { getTicket, listTickets, listUnitsByLabel } from "@/data/tickets";
 import type { TicketMessage, TicketStatus } from "@/data/types";
@@ -10,6 +12,7 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import type { EmailContact } from "@/components/tickets/email-recipient-input";
 import { MessageUnlinkButton } from "@/components/tickets/message-unlink-button";
 import { ReassignMessageDialog, type ReassignableTicket } from "@/components/tickets/reassign-message-dialog";
 import { TicketFormDialog } from "@/components/tickets/ticket-form-dialog";
@@ -98,6 +101,31 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	const baseSubject = lastInbound?.subject ?? ticket.title;
 	const defaultSubject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
 
+	// Kontakte für die Empfänger-Vervollständigung: Mieter und Eigentümer mit
+	// hinterlegter E-Mail-Adresse, dedupliziert (E-Mail) und alphabetisch.
+	const contactsByEmail = new Map<string, EmailContact>();
+	for (const tenant of listTenants()) {
+		if (!tenant.email) {
+			continue;
+		}
+		contactsByEmail.set(tenant.email.toLowerCase(), {
+			name: `${tenant.firstName} ${tenant.lastName}`.trim(),
+			email: tenant.email,
+			kind: "tenant",
+		});
+	}
+	for (const owner of listOwners()) {
+		if (!owner.email) {
+			continue;
+		}
+		contactsByEmail.set(owner.email.toLowerCase(), {
+			name: (owner.companyName ?? `${owner.firstName} ${owner.lastName}`).trim(),
+			email: owner.email,
+			kind: "owner",
+		});
+	}
+	const emailContacts = [...contactsByEmail.values()].sort((a, b) => a.name.localeCompare(b.name, "de"));
+
 	return (
 		<div className="flex flex-1 flex-col">
 			<SiteHeader
@@ -175,7 +203,7 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 						<TicketNoteForm ticketId={ticket.id} />
 						{smtpConfigured ? (
 							<div className="border-t pt-4">
-								<TicketReplyForm ticketId={ticket.id} defaultTo={defaultTo} defaultSubject={defaultSubject} />
+								<TicketReplyForm ticketId={ticket.id} defaultTo={defaultTo} defaultSubject={defaultSubject} contacts={emailContacts} />
 								<p className="mt-2 text-xs text-muted-foreground">
 									{t("tickets.history.subjectTagHint", { tag: buildTicketSubjectTag(ticket.id) })}
 								</p>
