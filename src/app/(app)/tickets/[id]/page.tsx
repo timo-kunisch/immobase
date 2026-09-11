@@ -109,8 +109,9 @@ export default async function TicketDetailPage({ params }: { params: Promise<{ i
 	// Vorbefüllung der Antwort aus der letzten eingehenden E-Mail.
 	const lastInbound = [...messages].reverse().find((message) => message.direction === "INBOUND");
 	const defaultTo = lastInbound?.fromAddress ?? "";
-	const baseSubject = lastInbound?.subject ?? ticket.title;
-	const defaultSubject = baseSubject.toLowerCase().startsWith("re:") ? baseSubject : `Re: ${baseSubject}`;
+	// Betreff-Standard = Ticketname; die Ticket-Kennung hängt der Versand
+	// automatisch an (ensureTicketSubjectTag, src/lib/ticket-mailer.ts).
+	const defaultSubject = ticket.title;
 
 	// Kontakte für die Empfänger-Vervollständigung: Mieter und Eigentümer mit
 	// hinterlegter E-Mail-Adresse, dedupliziert (E-Mail) und alphabetisch.

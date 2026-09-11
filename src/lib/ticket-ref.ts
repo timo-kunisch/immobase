@@ -2,7 +2,7 @@
  * Ticket-Kennung im E-Mail-Betreff („Ticket-Referenz").
  *
  * Ausgehende Ticket-E-Mails erhalten automatisch ein Tag im Betreff
- * (z. B. „Re: Heizung defekt [#a3f8b2c1]"). E-Mail-Clients übernehmen den
+ * (z. B. „Heizung defekt [#a3f8b2c1]"). E-Mail-Clients übernehmen den
  * Betreff bei Antworten in der Regel unverändert, sodass der IMAP-Import
  * die Antwort auch dann dem richtigen Ticket zuordnen kann, wenn die
  * Threading-Header (In-Reply-To/References) fehlen oder vom Provider
