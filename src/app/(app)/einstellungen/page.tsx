@@ -33,7 +33,9 @@ export default async function EinstellungenPage() {
 	const smtpSettings = {
 		smtpHost: getSetting("smtp.host") ?? "",
 		smtpPort: getSetting("smtp.port") ?? "",
-		smtpSecure: getSetting("smtp.secure") === "true",
+		// Verschlüsselung standardmäßig angehakt (Muster wie imap.secure):
+		// Nur ein explizit gespeichertes "false" zeigt die Checkbox leer.
+		smtpSecure: getSetting("smtp.secure") !== "false",
 		smtpUser: getSetting("smtp.user") ?? "",
 		smtpPassSet: Boolean(getSetting("smtp.pass")),
 		smtpFrom: getSetting("smtp.from") ?? "",

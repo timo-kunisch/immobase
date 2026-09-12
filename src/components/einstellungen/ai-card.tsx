@@ -11,6 +11,7 @@ import {
 	ServerCog,
 	ShieldAlert,
 	Sparkles,
+	Star,
 	TriangleAlert,
 	Zap,
 } from "lucide-react";
@@ -20,15 +21,12 @@ import {
 	saveAiPartnerSettingsAction,
 	saveAiSettingsAction,
 } from "@/app/(app)/einstellungen/actions";
-import { isTestedAiModel, RECOMMENDED_AI_MODEL, RECOMMENDED_LOCAL_AI_MODEL } from "@/lib/ai/tested-models";
+import { RECOMMENDED_LOCAL_AI_MODEL } from "@/lib/ai/tested-models";
 import {
-	AI_PARTNER_BASE_URL,
-	AI_PARTNER_MODEL,
 	AI_PARTNER_NAME,
 	AI_PARTNER_URL,
 	type AiProvider,
 } from "@/lib/ai/partner";
-import { Guide, GuideStep } from "@/components/einstellungen/guide";
 import { ActionErrorToast } from "@/components/action-error-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,8 +69,10 @@ function SubmitButton() {
  *   KI-Rechenkraft bereit - die Einrichtung verlangt NUR den API-Schlüssel,
  *   Endpunkt und Modell stehen fest (src/lib/ai/partner.ts).
  * - Benutzerdefinierter Endpunkt (bewusst in den Hintergrund gestellt,
- *   aufklappbarer Bereich): beliebiger OpenAI-kompatibler Endpunkt mit
- *   Basis-URL + Modell wie bisher.
+ *   aufklappbarer Bereich mit vorgeschalteter Warnung): beliebiger
+ *   OpenAI-kompatibler Endpunkt mit Basis-URL + Modell wie bisher - die
+ *   Eingabefelder erscheinen erst, nachdem die Warnung bestätigt wurde,
+ *   dass von benutzerdefinierten Endpunkten abgeraten wird.
  *
  * Der gespeicherte API-Schlüssel wird NICHT vorausgefüllt (Muster wie bei
  * den übrigen Geheimnissen) - leeres Feld = unverändert lassen.
@@ -89,10 +89,11 @@ export function AiCard({ state }: { state: AiCardState }) {
 	// Deaktivieren läuft außerhalb der Formulare (keine Eingabefelder),
 	// Muster wie der Enable/Disable-Toggle in mcp-card.tsx.
 	const [deactivateBusy, setDeactivateBusy] = useState(false);
-	// Live-Prüfung des eingetragenen Modells gegen die intern getestete Liste:
-	// Nicht getestete Modelle erhalten eine dezente Warnung (keine Sperre).
-	const [model, setModel] = useState(state.model);
-	const showUntestedModelWarning = model.trim() !== "" && !isTestedAiModel(model);
+	// Warn-Gate vor dem benutzerdefinierten Endpunkt: Die Eingabefelder werden
+	// erst nach ausdrücklicher Bestätigung der Warnung freigegeben (Nutzer
+	// sollen stattdessen die Partner-Empfehlung nutzen). Beim Zuklappen des
+	// Bereichs wird die Bestätigung zurückgesetzt.
+	const [customConfirmed, setCustomConfirmed] = useState(false);
 
 	useEffect(() => {
 		if ((partnerState.success || customState.success) && !reloadTimer.current) {
@@ -154,7 +155,10 @@ export function AiCard({ state }: { state: AiCardState }) {
 						<div className="flex items-center gap-2">
 							<Zap className="size-5 text-primary" />
 							<p className="font-semibold">{AI_PARTNER_NAME}</p>
-							<Badge variant="secondary">{t("settings.cards.ai.partner.badge")}</Badge>
+							<Badge>
+								<Star />
+								{t("settings.cards.ai.partner.badge")}
+							</Badge>
 						</div>
 						{partnerActive ? (
 							<Badge
@@ -209,134 +213,80 @@ export function AiCard({ state }: { state: AiCardState }) {
 							) : null}
 						</div>
 					</form>
-					<p className="text-xs text-muted-foreground">
-						{t("settings.cards.ai.partner.autoConfig.part1")}{" "}
-						<code className="rounded bg-muted px-1 py-0.5">{AI_PARTNER_BASE_URL}</code>{" "}
-						{t("settings.cards.ai.partner.autoConfig.part2")}{" "}
-						<code className="rounded bg-muted px-1 py-0.5">{AI_PARTNER_MODEL}</code>.
-					</p>
 				</div>
 
 				{/*
 					Benutzerdefinierter Endpunkt - bewusst im Hintergrund (eingeklappt),
-					geöffnet dargestellt, wenn er die aktive Konfiguration ist.
+					geöffnet dargestellt, wenn er die aktive Konfiguration ist. Vor
+					den Eingabefeldern muss die Warnung bestätigt werden, dass von
+					benutzerdefinierten Endpunkten abgeraten wird (bewusste Hürde -
+					beim Zuklappen wird die Bestätigung zurückgesetzt).
 				*/}
-				<details className="group rounded-md border bg-muted/30 text-sm" open={state.provider === "custom"}>
+				<details
+					className="group rounded-md border bg-muted/30 text-sm"
+					open={state.provider === "custom"}
+					onToggle={(event) => {
+						if (!event.currentTarget.open) setCustomConfirmed(false);
+					}}
+				>
 					<summary className="flex cursor-pointer list-none items-center gap-2 rounded-md p-3 font-medium hover:bg-muted/50 [&::-webkit-details-marker]:hidden">
 						<ServerCog className="size-4 shrink-0 text-muted-foreground" />
 						{t("settings.cards.ai.custom.toggle")}
 						<ChevronDown className="ml-auto size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
 					</summary>
 					<div className="space-y-4 border-t p-4">
-						<p className="text-xs text-muted-foreground">
-							{t("settings.cards.ai.custom.hint")}
-						</p>
+						{customConfirmed ? (
+							<form action={customAction} className="space-y-4">
+								<div className="grid gap-2">
+									<Label htmlFor="aiBaseUrl">{t("settings.cards.ai.baseUrl")}</Label>
+									<Input
+										id="aiBaseUrl"
+										name="aiBaseUrl"
+										defaultValue={state.baseUrl}
+										placeholder="http://localhost:9931/v1"
+										autoComplete="off"
+									/>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="aiModel">{t("settings.cards.ai.model")}</Label>
+									<Input
+										id="aiModel"
+										name="aiModel"
+										defaultValue={state.model}
+										placeholder={RECOMMENDED_LOCAL_AI_MODEL}
+										autoComplete="off"
+									/>
+								</div>
+								<div className="grid gap-2">
+									<Label htmlFor="aiApiKey">{t("settings.cards.ai.apiKey")}</Label>
+									<Input
+										id="aiApiKey"
+										name="aiApiKey"
+										type="password"
+										placeholder={state.apiKeySet ? t("settings.cards.ai.apiKeyPlaceholderSet") : "sk-..."}
+										autoComplete="new-password"
+									/>
+								</div>
 
-						<Guide title={t("settings.cards.ai.guide.title")}>
-							<GuideStep step={1} title={t("settings.cards.ai.guide.step1.title")}>
-								<p>
-									{t("settings.cards.ai.guide.step1.body")}
+								<div className="flex items-center gap-3">
+									<SubmitButton />
+									<ActionErrorToast state={customState} />
+									{customState.success ? (
+										<p className="text-sm text-emerald-600">{t("settings.cards.ai.savedReload")}</p>
+									) : null}
+								</div>
+							</form>
+						) : (
+							<div className="space-y-3">
+								<p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+									<TriangleAlert className="mt-0.5 size-4 shrink-0" />
+									<span>{t("settings.cards.ai.custom.discouraged")}</span>
 								</p>
-							</GuideStep>
-							<GuideStep step={2} title={t("settings.cards.ai.guide.step2.title")}>
-								<p>
-									<strong>OpenAI:</strong> {t("settings.cards.ai.guide.step2.openai.part1")}{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">platform.openai.com</code>{" "}
-									{t("settings.cards.ai.guide.step2.openai.part2")}
-								</p>
-								<p>
-									<strong>LM Studio:</strong> {t("settings.cards.ai.guide.step2.lmStudio.part1")}{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>
-									{t("settings.cards.ai.guide.step2.lmStudio.part2")}
-								</p>
-							</GuideStep>
-							<GuideStep step={3} title={t("settings.cards.ai.guide.step3.title")}>
-								<p>
-									OpenAI: <code className="rounded bg-muted px-1 py-0.5 text-xs">https://api.openai.com/v1</code>{" "}
-									{t("settings.cards.ai.guide.step3.andExample")}{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">gpt-4o-mini</code>
-									{t("settings.cards.ai.guide.step3.lmStudio")}{" "}
-									<code className="rounded bg-muted px-1 py-0.5 text-xs">http://localhost:1234/v1</code>{" "}
-									{t("settings.cards.ai.guide.step3.modelName")}
-								</p>
-								<p>
-									{t("settings.cards.ai.guide.step3.toolCalling")}
-								</p>
-							</GuideStep>
-							<GuideStep step={4} title={t("settings.cards.ai.guide.step4.title")}>
-								<p>
-									{t("settings.cards.ai.guide.step4.body")}
-								</p>
-							</GuideStep>
-							<GuideStep step={5} title={t("settings.cards.ai.guide.step5.title")}>
-								<p>
-									{t("settings.cards.ai.guide.step5.body")}
-								</p>
-							</GuideStep>
-						</Guide>
-
-						<form action={customAction} className="space-y-4">
-							<div className="grid gap-2">
-								<Label htmlFor="aiBaseUrl">{t("settings.cards.ai.baseUrl")}</Label>
-								<Input
-									id="aiBaseUrl"
-									name="aiBaseUrl"
-									defaultValue={state.baseUrl}
-									placeholder="https://api.openai.com/v1"
-									autoComplete="off"
-								/>
-								<p className="text-xs text-muted-foreground">
-									{t("settings.cards.ai.baseUrlHint")}
-								</p>
+								<Button type="button" variant="outline" onClick={() => setCustomConfirmed(true)}>
+									{t("settings.cards.ai.custom.proceed")}
+								</Button>
 							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="aiModel">{t("settings.cards.ai.model")}</Label>
-								<Input
-									id="aiModel"
-									name="aiModel"
-									value={model}
-									onChange={(event) => setModel(event.target.value)}
-									placeholder={RECOMMENDED_AI_MODEL}
-									autoComplete="off"
-								/>
-								<p className="text-xs text-muted-foreground">
-									{t("settings.cards.ai.modelHint")}
-								</p>
-								<p className="text-xs text-muted-foreground">
-									{t("settings.cards.ai.modelRecommendation", {
-										cloudModel: RECOMMENDED_AI_MODEL,
-										localModel: RECOMMENDED_LOCAL_AI_MODEL,
-									})}
-								</p>
-								{showUntestedModelWarning ? (
-									<p className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-										<TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-										<span>{t("settings.cards.ai.modelUntested")}</span>
-									</p>
-								) : null}
-							</div>
-							<div className="grid gap-2">
-								<Label htmlFor="aiApiKey">{t("settings.cards.ai.apiKey")}</Label>
-								<Input
-									id="aiApiKey"
-									name="aiApiKey"
-									type="password"
-									placeholder={state.apiKeySet ? t("settings.cards.ai.apiKeyPlaceholderSet") : "sk-..."}
-									autoComplete="new-password"
-								/>
-								<p className="text-xs text-muted-foreground">
-									{t("settings.cards.ai.apiKeyHint")}
-								</p>
-							</div>
-
-							<div className="flex items-center gap-3">
-								<SubmitButton />
-								<ActionErrorToast state={customState} />
-								{customState.success ? (
-									<p className="text-sm text-emerald-600">{t("settings.cards.ai.savedReload")}</p>
-								) : null}
-							</div>
-						</form>
+						)}
 					</div>
 				</details>
 

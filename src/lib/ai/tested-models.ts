@@ -2,10 +2,11 @@
  * Interne Liste der mit dem KI-Assistenten erfolgreich getesteten Modelle
  * (jeweils inkl. Werkzeug-Aufrufe über die MCP-Registry geprüft).
  *
- * Die Liste dient ausschließlich dem Komfort-Hinweis in den Einstellungen
- * (components/einstellungen/ai-card.tsx): Konfiguriert ein Admin ein nicht
- * gelistetes Modell, erscheint dort eine dezente Warnung - die Nutzung ist
- * trotzdem möglich, es gibt keine Sperre.
+ * Die Liste dient als interne Referenz; die Empfehlungen unten stammen aus
+ * ihr (Partner-Modell in src/lib/ai/partner.ts, Modell-Platzhalter des
+ * benutzerdefinierten Endpunkts in der Einstellungs-Karte). Der frühere
+ * Komfort-Hinweis zu ungetesteten Modellen in den Einstellungen ist
+ * entfallen.
  *
  * Diese Datei muss client-sicher bleiben (keine Node-/Server-Imports), weil
  * sie direkt von der Client Component der Einstellungs-Karte importiert wird.
