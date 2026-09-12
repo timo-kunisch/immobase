@@ -206,10 +206,22 @@ sichtbar. **Aktivitätsprotokoll je Ticket** (Tabelle `ticket_activity_log`, Rep
 - **KI-Assistent (In-App-Chatbot)** (`src/lib/ai/` + `src/app/api/chat/route.ts` +
   `src/components/layout/chatbot-dialog.tsx`) – **optionale Online-Funktion**: Die Sprechblase im
   Sidebar-Footer (früher „Administrator kontaktieren", entfernt) öffnet einen Chat gegen einen
-  frei konfigurierbaren **OpenAI-kompatiblen Chat-Completions-Endpunkt** (Einstellungen →
-  KI-Assistent; `ai.base_url` + `ai.model` Klartext, `ai.apikey` FELD-verschlüsselt in
-  `SECRET_SETTING_KEYS`, optional leer für lokale Server wie LM Studio/Ollama; Env-Fallbacks
-  `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY`). Ohne vollständige Konfiguration ist die Sprechblase
+  **OpenAI-kompatiblen Chat-Completions-Endpunkt**. Zwei Wege zur Einrichtung
+  (Einstellungen → Integrationen & KI → KI-Assistent, siehe `src/lib/ai/config.ts`):
+  - **Partner-Modus (Standard, prominent in der UI):** Unser Partner **arbeitskraft.app**
+    (Konstanten client-sicher in `src/lib/ai/partner.ts`) stellt die KI-Rechenkraft bereit –
+    die Einrichtung verlangt NUR den API-Schlüssel; Endpunkt (`https://arbeitskraft.app/v1`)
+    und Modell (unsere Cloud-Empfehlung `AI_PARTNER_MODEL`) stehen fest und werden erst zur
+    Laufzeit gebildet, nicht gespeichert (`ai.provider = "arbeitskraft"`; ohne hinterlegten
+    Schlüssel gilt der Modus als nicht konfiguriert, fail-closed).
+  - **Benutzerdefinierter Endpunkt (bewusst in den Hintergrund gestellt, aufklappbarer
+    „Benutzerdefinierter KI-Endpunkt (erweitert)"-Bereich der Einstellungs-Karte):** beliebiger
+    OpenAI-kompatibler Endpunkt wie bisher (`ai.provider = "custom"`, `ai.base_url` +
+    `ai.model` Klartext; Bestände ohne provider-Eintrag gelten als custom – Abwärtskompatibilität;
+    Env-Fallbacks `AI_BASE_URL`/`AI_MODEL`/`AI_API_KEY`/`AI_PROVIDER`).
+  Der API-Schlüssel ist in beiden Modi derselbe Speicher: `ai.apikey` FELD-verschlüsselt in
+  `SECRET_SETTING_KEYS`, optional leer für lokale Server wie LM Studio/Ollama im Custom-Modus.
+  Ohne vollständige Konfiguration ist die Sprechblase
   deaktiviert und die Route gesperrt (`isAiConfigured()`). Der Chat steht **allen angemeldeten
    Nutzern** offen (Route prüft `getCurrentUser()` mit JSON-401 statt Redirect); die **Rolle aus
    der Session bestimmt den Werkzeug-Scope** (`userRole` → `McpToolScope`): Administratoren
@@ -505,7 +517,9 @@ src/
                             # (JSON-RPC), registry.ts (Tool-Definition, Werkzeug-Scope, CRUD-Generator),
                             # tools-rental/-hoa/-system.ts (Werkzeuge), tools-batch.ts (Meta-
                             # Werkzeug batch_execute), tools.ts (Sammel-Import)
-    ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration),
+    ai/                     # KI-Assistent (In-App-Chatbot): config.ts (Endpunkt-Konfiguration,
+                            # Partner-Modus arbeitskraft.app vs. benutzerdefinierter Endpunkt),
+                            # partner.ts (Partner-Konstanten: Name/URLs/festes Modell, client-sicher),
                             # client.ts (OpenAI-kompatibler fetch-Client), attachments.ts +
                             # attachment-types.ts (Anhang-Aufbereitung: PDF/Office/Bilder/Excel/Text),
                             # ocr.ts (automatische OCR für PDF-Seiten ohne Textebene:

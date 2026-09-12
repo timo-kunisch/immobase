@@ -8,7 +8,7 @@ export const chat = {
 	description:
 		"Beantwortet Fragen zu Ihren Daten und kann auf Wunsch Änderungen vornehmen (über die Werkzeuge des MCP-Servers). Dateien (PDF, Office-Dokumente, Excel, Bilder, Text/Code) können angehängt werden.",
 	disabledHint:
-		"Der KI-Assistent ist deaktiviert - ein Administrator kann unter Einstellungen → KI-Assistent einen Endpunkt konfigurieren",
+		"Der KI-Assistent ist deaktiviert - ein Administrator kann ihn unter Einstellungen → Integrationen & KI → KI-Assistent einrichten (Standard: unser Partner arbeitskraft.app, nur API-Schlüssel nötig)",
 	loadingHistory: "Der gespeicherte Chatverlauf wird geladen…",
 	emptyGreeting:
 		"Stellen Sie eine Frage zu Ihren Daten oder bitten Sie um Änderungen,\nz. B. „Welche Mietverträge laufen 2026 aus?“ oder „Lege die Mieter aus der angehängten Excel-Tabelle an“.",
@@ -52,7 +52,7 @@ export const chat = {
 	closeNotice: "Benachrichtigung schließen",
 	// Route /api/chat (+ /api/chat/history): Fehlermeldungen an den Client
 	"route.unauthorized": "Nicht angemeldet.",
-	"route.notConfigured": "Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → KI-Assistent.",
+	"route.notConfigured": "Es ist kein KI-Endpunkt konfiguriert. Einrichtung: Einstellungen → Integrationen & KI → KI-Assistent.",
 	"route.invalidJson": "Der Request-Body ist kein gültiges JSON.",
 	"route.bodyNotObject": "Der Request-Body muss ein JSON-Objekt sein.",
 	"route.messageInvalid": "Erwartet wird eine nicht-leere Nachricht mit höchstens {max} Zeichen.",

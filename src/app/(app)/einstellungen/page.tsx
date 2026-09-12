@@ -15,7 +15,7 @@ import { SmtpCard } from "@/components/einstellungen/smtp-card";
 import { getCompanySettings } from "@/data/company-settings";
 import { getSecretSettingsStatus, getSetting } from "@/data/app-settings";
 import { getDatabaseFilePath } from "@/data/paths";
-import { isAiConfigured } from "@/lib/ai/config";
+import { getAiProvider, isAiConfigured } from "@/lib/ai/config";
 import { getDataKeySource } from "@/lib/data-key";
 import { getDropboxUiState } from "@/lib/dropbox-backup";
 import { getTreeEncryptionStatus } from "@/lib/file-crypto";
@@ -111,6 +111,7 @@ export default async function EinstellungenPage() {
 									<LetterXpressCard settings={letterXpressSettings} />
 									<AiCard
 										state={{
+											provider: getAiProvider(),
 											baseUrl: getSetting("ai.base_url") ?? "",
 											model: getSetting("ai.model") ?? "",
 											apiKeySet: Boolean(getSetting("ai.apikey")),

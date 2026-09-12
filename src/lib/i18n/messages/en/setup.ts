@@ -61,7 +61,7 @@ export const setup: typeof deSetup = {
 	"integrations.itemSmtp": "Email sending (SMTP) – e.g. for verification and ticket emails",
 	"integrations.itemImap": "Email mailbox (IMAP) – incoming emails in the ticket system",
 	"integrations.itemLetterxpress": "Postal delivery (LetterXpress) – PDFs (e.g. statements) as physical letters",
-	"integrations.itemAi": "AI assistant – chatbot in the sidebar via an OpenAI-compatible endpoint",
+	"integrations.itemAi": "AI assistant – chatbot in the sidebar, AI compute via our partner arbeitskraft.app (setup with API key only)",
 	"integrations.itemMcp": "MCP server – read and write access for external AI clients to the domain data",
 	"integrations.groupBackup": "Settings → “Backup”",
 	"integrations.itemDropbox": "Dropbox backup – automatic, optionally password-protected cloud backup",

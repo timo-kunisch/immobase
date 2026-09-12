@@ -293,17 +293,31 @@ export const settings = {
 	"cards.security.databaseNote":
 		"Hinweis: Die Datenbank liegt nur im beendeten Zustand als verschlüsselter Container vor - während die App läuft (und nach einem Absturz ohne sauberes Beenden) ist sie entsperrt. Für vollständigen Schutz in diesen Zuständen wird zusätzlich die Festplattenverschlüsselung des Betriebssystems (FileVault/BitLocker/LUKS) empfohlen.",
 
-	// Karte: KI-Assistent (OpenAI-kompatibel)
-	"cards.ai.title": "KI-Assistent (OpenAI-kompatibel)",
+	// Karte: KI-Assistent (Partner arbeitskraft.app ODER OpenAI-kompatibler Endpunkt)
+	"cards.ai.title": "KI-Assistent",
 	"cards.ai.description":
-		"Verbindet den KI-Assistenten (Sprechblase in der Sidebar) mit einem OpenAI-kompatiblen Chat-Endpunkt - z. B. OpenAI, ein kompatibles Gateway oder ein lokaler Server (LM Studio, Ollama). Der Assistent kann über die Werkzeuge des MCP-Servers Daten der Anwendung lesen und ändern. Ohne Konfiguration ist die Sprechblase deaktiviert.",
+		"Verbindet den KI-Assistenten (Sprechblase in der Sidebar) mit einem KI-Endpunkt: Standardmäßig über unseren Partner arbeitskraft.app - die Einrichtung erfordert nur einen API-Schlüssel. Alternativ bleibt ein beliebiger OpenAI-kompatibler Endpunkt möglich (erweiterter Bereich unten). Der Assistent kann über die Werkzeuge des MCP-Servers Daten der Anwendung lesen und ändern. Ohne Konfiguration ist die Sprechblase deaktiviert.",
 	"cards.ai.statusLabel": "Status",
 	"cards.ai.status.configured": "Konfiguriert - Assistent freigegeben",
 	"cards.ai.status.notConfigured": "Nicht konfiguriert - Assistent deaktiviert",
 	"cards.ai.apiKeyStatus": "API-Schlüssel",
 	"cards.ai.apiKeyStatus.set": "hinterlegt",
 	"cards.ai.apiKeyStatus.notSet": "nicht hinterlegt (optional)",
-	"cards.ai.guide.title": "Anleitung: KI-Assistenten einrichten",
+	"cards.ai.apiKeyStatus.notSetPlain": "nicht hinterlegt",
+	"cards.ai.partner.badge": "Partner",
+	"cards.ai.partner.active": "Aktiv",
+	"cards.ai.partner.description":
+		"Unser Partner für die KI-Rechenkraft des Assistenten: API-Schlüssel eintragen und speichern - fertig. Endpunkt und Modell werden automatisch eingerichtet.",
+	"cards.ai.partner.apiKey": "API-Schlüssel (arbeitskraft.app)",
+	"cards.ai.partner.apiKeyPlaceholder": "API-Schlüssel einfügen",
+	"cards.ai.partner.apiKeyHint": "Im Konto auf arbeitskraft.app erstellen. Wird verschlüsselt gespeichert.",
+	"cards.ai.partner.autoConfig.part1": "Automatisch hinterlegt - Endpunkt:",
+	"cards.ai.partner.autoConfig.part2": "· Modell:",
+	"cards.ai.partner.deactivate": "Deaktivieren",
+	"cards.ai.custom.toggle": "Benutzerdefinierter KI-Endpunkt (erweitert)",
+	"cards.ai.custom.hint":
+		"Für alle anderen OpenAI-kompatiblen Endpunkte - z. B. OpenAI, ein kompatibles Gateway oder ein lokaler Server (LM Studio, Ollama). Ein gespeicherter benutzerdefinierter Endpunkt ersetzt die Partner-Konfiguration.",
+	"cards.ai.guide.title": "Anleitung: Benutzerdefinierten Endpunkt einrichten",
 	"cards.ai.guide.step1.title": "Anbieter wählen",
 	"cards.ai.guide.step1.body":
 		"Entweder ein KI-Anbieter in der Cloud (z. B. OpenAI - kostenpflichtig nach Verbrauch) oder ein lokales Modell auf diesem Rechner (z. B. mit LM Studio oder Ollama - kostenlos, die Daten bleiben auf dem eigenen Gerät).",
@@ -323,7 +337,7 @@ export const settings = {
 	"cards.ai.guide.step5.title": "Speichern und ausprobieren",
 	"cards.ai.guide.step5.body": "Nach dem Speichern wird die Sprechblase unten in der Seitenleiste aktiv. Ein erster Test: „Welche Liegenschaften sind angelegt?“",
 	"cards.ai.baseUrl": "Basis-URL des Endpunkts",
-	"cards.ai.baseUrlHint": "Ohne Pfad „/chat/completions“ - dieser wird automatisch angehängt. Basis-URL und Modell gemeinsam leeren, um den Assistenten zu deaktivieren.",
+	"cards.ai.baseUrlHint": "Ohne Pfad „/chat/completions“ - dieser wird automatisch angehängt. Basis-URL und Modell gemeinsam leeren, um den Assistenten komplett zu deaktivieren (auch den Partner-Endpunkt).",
 	"cards.ai.model": "Modell",
 	"cards.ai.modelHint":
 		"Das Modell muss Werkzeug-Aufrufe (Function/Tool-Calling) unterstützen, damit der Assistent auf die App-Daten zugreifen kann. Für angehängte Bilder ist zusätzlich ein multimodales („vision“-fähiges) Modell nötig.",
@@ -340,6 +354,7 @@ export const settings = {
 	"cards.ai.errors.invalidBaseUrl": "Die Basis-URL muss mit http:// oder https:// beginnen (z. B. https://api.openai.com/v1).",
 	"cards.ai.errors.modelRequired": "Bitte geben Sie auch ein Modell an (z. B. gpt-4o-mini).",
 	"cards.ai.errors.baseUrlRequired": "Bitte geben Sie auch die Basis-URL an (oder beide Felder leeren, um den KI-Assistenten zu deaktivieren).",
+	"cards.ai.errors.partnerApiKeyRequired": "Bitte geben Sie den API-Schlüssel von arbeitskraft.app ein.",
 	"cards.ai.errors.saveFailed": "Die KI-Einstellungen konnten nicht gespeichert werden.",
 
 	// Backup-API-Routen (/api/backup/*)

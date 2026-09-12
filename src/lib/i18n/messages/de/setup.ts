@@ -64,7 +64,7 @@ export const setup = {
 	"integrations.itemSmtp": "E-Mail-Versand (SMTP) – z. B. für Verifizierungs- und Ticket-E-Mails",
 	"integrations.itemImap": "E-Mail-Postfach (IMAP) – eingehende E-Mails im Ticket-System",
 	"integrations.itemLetterxpress": "Postversand (LetterXpress) – PDFs (z. B. Abrechnungen) als physische Briefe",
-	"integrations.itemAi": "KI-Assistent – Chatbot in der Sidebar über einen OpenAI-kompatiblen Endpunkt",
+	"integrations.itemAi": "KI-Assistent – Chatbot in der Sidebar, KI-Rechenkraft über unseren Partner arbeitskraft.app (Einrichtung nur mit API-Schlüssel)",
 	"integrations.itemMcp": "MCP-Server – lesender und schreibender Zugriff externer KI-Clients auf die Fachdaten",
 	"integrations.groupBackup": "Einstellungen → „Datensicherung“",
 	"integrations.itemDropbox": "Dropbox-Backup – automatische, optional passwortgeschützte Cloud-Sicherung",

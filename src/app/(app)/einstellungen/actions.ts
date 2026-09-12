@@ -7,7 +7,8 @@ import { requireAdmin } from "@/lib/auth/dal";
 import { logActivity } from "@/lib/audit";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session-cookie";
 import { saveCompanySettings } from "@/data/company-settings";
-import { setSetting } from "@/data/app-settings";
+import { getSetting, setSetting } from "@/data/app-settings";
+import { AI_PARTNER_PROVIDER } from "@/lib/ai/partner";
 import { getFilesDir } from "@/data/paths";
 import { resetApplicationContent, resetApplicationData } from "@/data/reset";
 import { ActionState } from "@/lib/action-state";
@@ -282,16 +283,76 @@ export async function resetApplicationContentAction(_prevState: ActionState, for
 }
 
 // ============================================================
-// KI-Assistent (OpenAI-kompatibler Endpunkt, optional)
+// KI-Assistent (Partner arbeitskraft.app ODER OpenAI-kompatibler Endpunkt)
 // ============================================================
 
 /**
- * Speichert die Konfiguration des KI-Assistenten (Basis-URL + Modell eines
- * OpenAI-kompatiblen Chat-Completions-Endpunkts, optionaler API-Schlüssel)
- * in app_settings (siehe src/lib/ai/config.ts). Leeres Schlüssel-Feld =
- * unverändert lassen (Muster wie beim SMTP-Passwort). Leere Basis-URL +
- * leeres Modell deaktivieren den Assistenten (Sprechblase wird gesperrt,
- * Chat-Route antwortet mit Hinweis). Nur für Admins.
+ * Aktiviert den KI-Assistenten über unseren Partner arbeitskraft.app
+ * (Standard-Weg, prominent in der Einstellungs-Karte): Es genügt die Eingabe
+ * des API-Schlüssels - Endpunkt (https://arbeitskraft.app/v1) und Modell
+ * (unsere Cloud-Empfehlung) stehen fest und werden erst zur Laufzeit aus
+ * src/lib/ai/partner.ts gebildet, nicht gespeichert (siehe
+ * src/lib/ai/config.ts). Der Schlüssel ist die eigentliche Konfiguration:
+ * Ohne ihn gilt der Partner-Modus als nicht konfiguriert. Leeres Feld =
+ * vorhandenen Schlüssel unverändert lassen (Muster wie beim SMTP-Passwort).
+ * Nur für Admins.
+ */
+export async function saveAiPartnerSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+	const admin = await requireAdmin();
+	const t = await getT();
+
+	const apiKey = getString(formData, "aiApiKey");
+	if (!apiKey && !getSetting("ai.apikey")) {
+		return { error: t("settings.cards.ai.errors.partnerApiKeyRequired") };
+	}
+
+	try {
+		setSetting("ai.provider", AI_PARTNER_PROVIDER);
+		if (apiKey) setSetting("ai.apikey", apiKey);
+		logActivity(admin, "UPDATE", "einstellungen", "KI-Assistent: Partner-Endpunkt arbeitskraft.app aktiviert");
+	} catch (error) {
+		console.error("saveAiPartnerSettingsAction failed", error);
+		return { error: t("settings.cards.ai.errors.saveFailed") };
+	}
+
+	revalidatePath("/einstellungen");
+	revalidatePath("/", "layout");
+	return { success: true };
+}
+
+/**
+ * Deaktiviert den KI-Assistenten vollständig: Löscht die Provider-Wahl und
+ * einen evtl. gespeicherten benutzerdefinierten Endpunkt (Basis-URL + Modell).
+ * Der API-Schlüssel bleibt bewusst hinterlegt (wie bei den übrigen Geheimnissen
+ * ist ein Leeren über die UI nicht vorgesehen). Nur für Admins.
+ */
+export async function deactivateAiAction(): Promise<ActionState> {
+	const admin = await requireAdmin();
+	const t = await getT();
+
+	try {
+		setSetting("ai.provider", "");
+		setSetting("ai.base_url", "");
+		setSetting("ai.model", "");
+		logActivity(admin, "UPDATE", "einstellungen", "KI-Assistent deaktiviert");
+	} catch (error) {
+		console.error("deactivateAiAction failed", error);
+		return { error: t("settings.cards.ai.errors.saveFailed") };
+	}
+
+	revalidatePath("/einstellungen");
+	revalidatePath("/", "layout");
+	return { success: true };
+}
+
+/**
+ * Speichert einen benutzerdefinierten OpenAI-kompatiblen Endpunkt (Basis-URL
+ * + Modell, optionaler API-Schlüssel) in app_settings und ersetzt damit eine
+ * evtl. aktive Partner-Konfiguration (siehe src/lib/ai/config.ts). Leeres
+ * Schlüssel-Feld = unverändert lassen (Muster wie beim SMTP-Passwort). Leere
+ * Basis-URL + leeres Modell deaktivieren den Assistenten komplett
+ * (Sprechblase wird gesperrt, Chat-Route antwortet mit Hinweis). Nur für
+ * Admins.
  */
 export async function saveAiSettingsAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
 	const admin = await requireAdmin();
@@ -312,10 +373,18 @@ export async function saveAiSettingsAction(_prevState: ActionState, formData: Fo
 	}
 
 	try {
+		setSetting("ai.provider", baseUrl ? "custom" : "");
 		setSetting("ai.base_url", baseUrl);
 		setSetting("ai.model", model);
 		if (apiKey) setSetting("ai.apikey", apiKey);
-		logActivity(admin, "UPDATE", "einstellungen", "KI-Einstellungen aktualisiert");
+		logActivity(
+			admin,
+			"UPDATE",
+			"einstellungen",
+			baseUrl
+				? "KI-Assistent: Benutzerdefinierter KI-Endpunkt gespeichert"
+				: "KI-Assistent deaktiviert"
+		);
 	} catch (error) {
 		console.error("saveAiSettingsAction failed", error);
 		return { error: t("settings.cards.ai.errors.saveFailed") };

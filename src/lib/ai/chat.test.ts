@@ -11,7 +11,8 @@ import { closeDb, getDb } from "@/data/db";
 import { getSetting, setSetting } from "@/data/app-settings";
 import { AttachmentError, processAttachment } from "@/lib/ai/attachments";
 import { ChatError, runChat } from "@/lib/ai/chat";
-import { getAiConfig, isAiConfigured } from "@/lib/ai/config";
+import { getAiConfig, getAiProvider, isAiConfigured } from "@/lib/ai/config";
+import { AI_PARTNER_BASE_URL, AI_PARTNER_MODEL } from "@/lib/ai/partner";
 import { registerTool } from "@/lib/mcp/registry";
 import { OcrEngineError, ocrPdfPages } from "@/lib/ai/ocr";
 
@@ -120,6 +121,40 @@ describe("KI-Konfiguration (src/lib/ai/config.ts)", () => {
 		const raw = getDb().prepare("SELECT value FROM app_settings WHERE key = 'ai.apikey'").get() as { value: string };
 		expect(raw.value.startsWith("enc:v1:")).toBe(true);
 		expect(getSetting("ai.apikey")).toBe("sk-test-123");
+	});
+
+	it("Partner-Modus: nur API-Schlüssel nötig, ohne Schlüssel nicht konfiguriert", () => {
+		setSetting("ai.provider", "arbeitskraft");
+		expect(isAiConfigured()).toBe(false);
+		expect(getAiConfig()).toBeNull();
+		setSetting("ai.apikey", "partner-schluessel");
+		expect(isAiConfigured()).toBe(true);
+		expect(getAiConfig()).toEqual({
+			baseUrl: AI_PARTNER_BASE_URL,
+			model: AI_PARTNER_MODEL,
+			apiKey: "partner-schluessel",
+		});
+		expect(getAiProvider()).toBe("arbeitskraft");
+	});
+
+	it("Partner-Modus hat Vorrang vor einem gespeicherten benutzerdefinierten Endpunkt", () => {
+		setSetting("ai.base_url", "https://api.openai.com/v1");
+		setSetting("ai.model", "gpt-4o-mini");
+		setSetting("ai.provider", "arbeitskraft");
+		setSetting("ai.apikey", "partner-schluessel");
+		expect(getAiConfig()?.baseUrl).toBe(AI_PARTNER_BASE_URL);
+	});
+
+	it("Legacy-Konfiguration ohne provider-Eintrag gilt als benutzerdefinierter Endpunkt", () => {
+		setSetting("ai.base_url", "https://api.openai.com/v1");
+		setSetting("ai.model", "gpt-4o-mini");
+		expect(getAiProvider()).toBe("custom");
+		expect(isAiConfigured()).toBe(true);
+		expect(getAiConfig()?.baseUrl).toBe("https://api.openai.com/v1");
+	});
+
+	it("getAiProvider meldet leer, wenn nichts konfiguriert ist", () => {
+		expect(getAiProvider()).toBe("");
 	});
 });
 
@@ -333,6 +368,26 @@ describe("Chat-Tool-Loop (src/lib/ai/chat.ts)", () => {
 		await expect(
 			runChat({ messages: [{ role: "user", content: "Hallo" }], attachments: [], userEmail: "a@b.c", userRole: "ADMIN" })
 		).rejects.toThrow(ChatError);
+	});
+
+	it("nutzt im Partner-Modus automatisch den arbeitskraft.app-Endpunkt mit dem Empfehlungsmodell", async () => {
+		setSetting("ai.provider", "arbeitskraft");
+		setSetting("ai.apikey", "partner-schluessel");
+		const fetchMock = mockFetchSequence([{ role: "assistant", content: "Alles klar." }]);
+
+		const result = await runChat({
+			messages: [{ role: "user", content: "Sag alles klar." }],
+			attachments: [],
+			userEmail: "admin@test.de",
+			userRole: "ADMIN",
+		});
+
+		expect(result.reply).toBe("Alles klar.");
+		const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+		expect(url).toBe(`${AI_PARTNER_BASE_URL}/chat/completions`);
+		expect((init.headers as Record<string, string>).Authorization).toBe("Bearer partner-schluessel");
+		const body = JSON.parse(String(init.body)) as { model: string };
+		expect(body.model).toBe(AI_PARTNER_MODEL);
 	});
 
 	it("führt vom Modell angeforderte Werkzeuge aus und liefert die Abschlussantwort", async () => {

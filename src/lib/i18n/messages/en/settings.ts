@@ -287,17 +287,31 @@ export const settings: typeof deSettings = {
 	"cards.security.databaseNote":
 		"Note: The database only exists as an encrypted container while the app is closed - while the app is running (and after a crash without a clean exit) it is unlocked. For full protection in these states, the operating system's disk encryption (FileVault/BitLocker/LUKS) is additionally recommended.",
 
-	// Card: AI assistant (OpenAI-compatible)
-	"cards.ai.title": "AI assistant (OpenAI-compatible)",
+	// Card: AI assistant (partner arbeitskraft.app OR OpenAI-compatible endpoint)
+	"cards.ai.title": "AI assistant",
 	"cards.ai.description":
-		"Connects the AI assistant (speech bubble in the sidebar) to an OpenAI-compatible chat endpoint - e.g. OpenAI, a compatible gateway, or a local server (LM Studio, Ollama). The assistant can read and modify the application's data via the MCP server tools. Without a configuration, the speech bubble is disabled.",
+		"Connects the AI assistant (speech bubble in the sidebar) to an AI endpoint: by default via our partner arbeitskraft.app - setup only requires an API key. Alternatively, any OpenAI-compatible endpoint remains possible (advanced section below). The assistant can read and modify the application's data via the MCP server tools. Without a configuration, the speech bubble is disabled.",
 	"cards.ai.statusLabel": "Status",
 	"cards.ai.status.configured": "Configured - assistant enabled",
 	"cards.ai.status.notConfigured": "Not configured - assistant disabled",
 	"cards.ai.apiKeyStatus": "API key",
 	"cards.ai.apiKeyStatus.set": "stored",
 	"cards.ai.apiKeyStatus.notSet": "not stored (optional)",
-	"cards.ai.guide.title": "Guide: Set up the AI assistant",
+	"cards.ai.apiKeyStatus.notSetPlain": "not stored",
+	"cards.ai.partner.badge": "Partner",
+	"cards.ai.partner.active": "Active",
+	"cards.ai.partner.description":
+		"Our partner for the assistant's AI compute: enter your API key and save - done. Endpoint and model are set up automatically.",
+	"cards.ai.partner.apiKey": "API key (arbeitskraft.app)",
+	"cards.ai.partner.apiKeyPlaceholder": "Paste API key",
+	"cards.ai.partner.apiKeyHint": "Create it in your arbeitskraft.app account. Stored encrypted.",
+	"cards.ai.partner.autoConfig.part1": "Configured automatically - endpoint:",
+	"cards.ai.partner.autoConfig.part2": "· model:",
+	"cards.ai.partner.deactivate": "Deactivate",
+	"cards.ai.custom.toggle": "Custom AI endpoint (advanced)",
+	"cards.ai.custom.hint":
+		"For all other OpenAI-compatible endpoints - e.g. OpenAI, a compatible gateway, or a local server (LM Studio, Ollama). Saving a custom endpoint replaces the partner configuration.",
+	"cards.ai.guide.title": "Guide: Set up a custom endpoint",
 	"cards.ai.guide.step1.title": "Choose a provider",
 	"cards.ai.guide.step1.body":
 		"Either a cloud AI provider (e.g. OpenAI - paid per usage) or a local model on this computer (e.g. with LM Studio or Ollama - free, the data stays on your own device).",
@@ -317,7 +331,7 @@ export const settings: typeof deSettings = {
 	"cards.ai.guide.step5.title": "Save and try it out",
 	"cards.ai.guide.step5.body": "After saving, the speech bubble at the bottom of the sidebar becomes active. A first test: \"Which properties are registered?\"",
 	"cards.ai.baseUrl": "Base URL of the endpoint",
-	"cards.ai.baseUrlHint": "Without the path \"/chat/completions\" - it is appended automatically. Clear the base URL and model together to disable the assistant.",
+	"cards.ai.baseUrlHint": "Without the path \"/chat/completions\" - it is appended automatically. Clear the base URL and model together to disable the assistant entirely (including the partner endpoint).",
 	"cards.ai.model": "Model",
 	"cards.ai.modelHint":
 		"The model must support tool calls (function/tool calling) so the assistant can access the app data. For attached images, a multimodal (\"vision\"-capable) model is additionally required.",
@@ -334,6 +348,7 @@ export const settings: typeof deSettings = {
 	"cards.ai.errors.invalidBaseUrl": "The base URL must start with http:// or https:// (e.g. https://api.openai.com/v1).",
 	"cards.ai.errors.modelRequired": "Please also specify a model (e.g. gpt-4o-mini).",
 	"cards.ai.errors.baseUrlRequired": "Please also specify the base URL (or clear both fields to disable the AI assistant).",
+	"cards.ai.errors.partnerApiKeyRequired": "Please enter the arbeitskraft.app API key.",
 	"cards.ai.errors.saveFailed": "The AI settings could not be saved.",
 
 	// Backup API routes (/api/backup/*)

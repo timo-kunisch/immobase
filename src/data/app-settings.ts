@@ -53,8 +53,8 @@ const SECRET_TAG_LENGTH = 16;
  * MCP: die Zugriffs-Token des optionalen MCP-Servers (Admin-Token mit
  * Vollzugriff, Nutzer-Token mit eingeschränktem Werkzeug-Scope, siehe
  * src/lib/mcp/auth.ts).
- * KI-Assistent: der API-Schlüssel des konfigurierten OpenAI-kompatiblen
- * Endpunkts (src/lib/ai/config.ts).
+ * KI-Assistent: der API-Schlüssel des konfigurierten KI-Endpunkts - Partner
+ * arbeitskraft.app oder benutzerdefinierter Endpunkt (src/lib/ai/config.ts).
  */
 const SECRET_SETTING_KEYS = new Set([
 	"smtp.pass",

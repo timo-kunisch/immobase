@@ -5,7 +5,8 @@ export const chat: typeof deChat = {
 	title: "AI assistant",
 	description:
 		"Answers questions about your data and can make changes on request (via the MCP server tools). Files (PDF, Office documents, Excel, images, text/code) can be attached.",
-	disabledHint: "The AI assistant is disabled - an administrator can configure an endpoint under Settings → AI assistant",
+	disabledHint:
+		"The AI assistant is disabled - an administrator can set it up under Settings → Integrations & AI → AI assistant (default: our partner arbeitskraft.app, API key only)",
 	loadingHistory: "Loading the saved chat history…",
 	emptyGreeting:
 		"Ask a question about your data or request changes,\ne.g. \"Which leases expire in 2026?\" or \"Create the tenants from the attached Excel spreadsheet\".",
@@ -49,7 +50,7 @@ export const chat: typeof deChat = {
 	closeNotice: "Close notification",
 	// Route /api/chat (+ /api/chat/history): error messages to the client
 	"route.unauthorized": "Not signed in.",
-	"route.notConfigured": "No AI endpoint is configured. Setup: Settings → AI assistant.",
+	"route.notConfigured": "No AI endpoint is configured. Setup: Settings → Integrations & AI → AI assistant.",
 	"route.invalidJson": "The request body is not valid JSON.",
 	"route.bodyNotObject": "The request body must be a JSON object.",
 	"route.messageInvalid": "Expected a non-empty message with at most {max} characters.",
