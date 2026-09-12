@@ -35,6 +35,8 @@ export const admin = {
 	"logs.title": "Aktivitätsprotokoll",
 	"logs.description": "Nachvollziehen, welcher Nutzer wann welche Änderungen in der App vorgenommen hat.",
 	"logs.empty.unfiltered": "Noch keine Aktivitäten protokolliert.",
+	"logs.empty.filtered": "Keine Aktivitäten für die gewählten Filter.",
+	"logs.filter.apply": "Anwenden",
 	"logs.table.time": "Zeitpunkt",
 	"logs.table.user": "Nutzer",
 	"logs.table.action": "Aktion",

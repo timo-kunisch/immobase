@@ -909,35 +909,38 @@ export type AuditAction = "CREATE" | "UPDATE" | "DELETE" | "LOGIN" | "LOGOUT";
  * Stabiler Modul-Schlüssel eines Log-Eintrags (für die Filterung in der
  * Admin-UI; die deutschen Anzeige-Labels liegen dort).
  */
-export type AuditCategory =
-	| "auth"
-	| "liegenschaften"
-	| "einheiten"
-	| "tickets"
-	| "dokumente"
-	| "kalender"
-	| "wissen"
-	| "mieter"
-	| "vertraege"
-	| "finanzen"
-	| "buchhaltung"
-	| "abrechnung"
-	| "vorlagen"
-	| "weg"
-	| "eigentuemer"
-	| "eigentumsverhaeltnisse"
-	| "verteilerschluessel"
-	| "wirtschaftsplan"
-	| "jahresabrechnung"
-	| "hausgeld"
-	| "ruecklage"
-	| "versammlungen"
-	| "beschluesse"
-	| "admin"
-	| "einstellungen"
-	| "postversand"
-	| "postfach"
-	| "system";
+export const AUDIT_CATEGORIES = [
+	"auth",
+	"liegenschaften",
+	"einheiten",
+	"tickets",
+	"dokumente",
+	"kalender",
+	"wissen",
+	"mieter",
+	"vertraege",
+	"finanzen",
+	"buchhaltung",
+	"abrechnung",
+	"vorlagen",
+	"weg",
+	"eigentuemer",
+	"eigentumsverhaeltnisse",
+	"verteilerschluessel",
+	"wirtschaftsplan",
+	"jahresabrechnung",
+	"hausgeld",
+	"ruecklage",
+	"versammlungen",
+	"beschluesse",
+	"admin",
+	"einstellungen",
+	"postversand",
+	"postfach",
+	"system",
+] as const;
+
+export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 /**
  * Ein Eintrag im Aktivitätsprotokoll. Append-only (kein updatedAt);

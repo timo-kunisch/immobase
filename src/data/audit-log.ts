@@ -40,6 +40,8 @@ export function createAuditLogEntry(input: CreateAuditLogEntryInput): AuditLogEn
 /** Filter für die Admin-Übersicht (alle Kriterien optional, UND-verknüpft). */
 export interface AuditLogFilter {
 	userId?: string;
+	/** Filter nach dem denormalisierten E-Mail-Snapshot (Admin-UI, URL-Param `?user=`). */
+	userEmail?: string;
 	category?: AuditCategory;
 }
 
@@ -49,6 +51,10 @@ function buildFilterWhere(filter: AuditLogFilter): { where: string; params: stri
 	if (filter.userId) {
 		conditions.push("user_id = ?");
 		params.push(filter.userId);
+	}
+	if (filter.userEmail) {
+		conditions.push("user_email = ?");
+		params.push(filter.userEmail);
 	}
 	if (filter.category) {
 		conditions.push("category = ?");
@@ -94,4 +100,15 @@ export function listAuditLogCategories(): AuditCategory[] {
 		category: AuditCategory;
 	}[];
 	return rows.map((row) => row.category);
+}
+
+/**
+ * Alle tatsächlich vorkommenden Nutzer-E-Mail-Snapshots (für das Filter-
+ * Dropdown der Admin-Seite; enthält auch bereits gelöschte Konten).
+ */
+export function listAuditLogUserEmails(): string[] {
+	const rows = getDb().prepare("SELECT DISTINCT user_email FROM audit_log_entries ORDER BY user_email ASC").all() as {
+		user_email: string;
+	}[];
+	return rows.map((row) => row.user_email);
 }

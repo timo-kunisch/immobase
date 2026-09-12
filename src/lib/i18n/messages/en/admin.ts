@@ -30,6 +30,8 @@ export const admin: typeof deAdmin = {
 	"logs.title": "Activity log",
 	"logs.description": "Track which user made which changes in the app, and when.",
 	"logs.empty.unfiltered": "No activities logged yet.",
+	"logs.empty.filtered": "No activities match the selected filters.",
+	"logs.filter.apply": "Apply",
 	"logs.table.time": "Time",
 	"logs.table.user": "User",
 	"logs.table.action": "Action",
