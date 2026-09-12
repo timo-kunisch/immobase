@@ -35,7 +35,7 @@ import { createLease, createRentAdjustment, listLeasesWithDetails } from "@/data
 import { createProperty, deleteProperty, getProperty, getPropertyStats, listProperties, updateProperty } from "@/data/properties";
 import { insertSession, deleteAllSessionsForUser, getSessionByToken } from "@/data/sessions";
 import { createTenant, getTenant, listTenants, updateTenant } from "@/data/tenants";
-import { listRentArrearAmounts } from "@/data/dashboard";
+import { getDashboardCounts, listAllReserveFundBookings, listHousingChargeArrearAmounts, listRentArrearAmounts } from "@/data/dashboard";
 import { createTransaction, generateDueTransactions, listOpenTransactionArrearAmounts, listOpenTransactionsForProperty, listTransactions, markTransactionPaid } from "@/data/transactions";
 import { createUnit } from "@/data/units";
 import { countUsers, createUser, getUserByEmail, listAdminEmails, listUserDisplayNameByEmail, updateUserApproval, updateUserName } from "@/data/users";
@@ -51,6 +51,11 @@ import {
 import { createHoa } from "@/data/hoas";
 import { createHousingCharge, getHousingCharge, listOpenHousingChargesForProperty, markHousingChargePaid } from "@/data/housing-charges";
 import { createOwner } from "@/data/owners";
+import { createEconomicPlan, finalizeEconomicPlan } from "@/data/economic-plans";
+import { createReserveFundBooking } from "@/data/reserve-fund";
+import { createDocument } from "@/data/documents";
+import { createTicket } from "@/data/tickets";
+import { calculateReserveFundBalanceCents } from "@/lib/hoa-reserve";
 
 /**
  * Repository-Layer-Tests gegen eine echte (temporäre) better-sqlite3-
@@ -884,5 +889,109 @@ describe("WEG-Buchhaltung und Jahresabrechnung", () => {
 		const shipmentCount = getDb().prepare("SELECT COUNT(*) AS c FROM postal_shipments WHERE source_id = ?").get(unitResultId.id) as { c: number };
 		expect(resultCount.c).toBe(0);
 		expect(shipmentCount.c).toBe(0);
+	});
+});
+
+describe("Dashboard-Aggregationen", () => {
+	it("zählt Kennzahlen aller Fachbereiche und summiert Hausgeld-Rückstände/Rücklagensaldo", () => {
+		const { property, unit, tenant } = seedPropertyUnitTenantLease();
+		const hoa = createHoa({ propertyId: property.id, name: "WEG Testhaus", totalShares: 1000, bankIban: null, bankBic: null, notes: null });
+		const owner = createOwner({
+			firstName: "Erika",
+			lastName: "Eigentümer",
+			isCompany: false,
+			companyName: null,
+			street: "Weg 2",
+			zipCode: "12345",
+			city: "Berlin",
+			country: "Deutschland",
+			email: null,
+			phone: null,
+			notes: null,
+		});
+
+		// Hausgeld: eine fällige offene + eine bezahlte + eine erst künftig
+		// fällige Sollstellung (nur die erste ist Rückstand).
+		createHousingCharge({
+			unitId: unit.id,
+			ownerId: owner.id,
+			amount: "300.00",
+			dueDate: "2026-02-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Hausgeld Februar 2026",
+			status: "OPEN",
+		});
+		createHousingCharge({
+			unitId: unit.id,
+			ownerId: owner.id,
+			amount: "250.00",
+			dueDate: "2026-03-01T00:00:00.000Z",
+			paidDate: "2026-03-02T00:00:00.000Z",
+			purpose: "Hausgeld März 2026",
+			status: "PAID",
+		});
+		createHousingCharge({
+			unitId: unit.id,
+			ownerId: owner.id,
+			amount: "250.00",
+			dueDate: "2027-01-01T00:00:00.000Z",
+			paidDate: null,
+			purpose: "Hausgeld Januar 2027",
+			status: "OPEN",
+		});
+
+		// Erhaltungsrücklage: 500 € Zuführung, 120 € Entnahme -> 380 € Saldo.
+		createReserveFundBooking({ hoaId: hoa.id, bookingDate: "2026-01-15", type: "CONTRIBUTION", amount: "500.00", description: "Jahreszuführung", notes: null });
+		createReserveFundBooking({ hoaId: hoa.id, bookingDate: "2026-03-20", type: "WITHDRAWAL", amount: "120.00", description: "Dachreparatur", notes: null });
+
+		// Entwürfe: Abrechnungsperiode (Miete), Wirtschaftsplan + Jahresabrechnung (WEG).
+		createBillingPeriod({ propertyId: property.id, periodFrom: "2026-01-01", periodTo: "2026-12-31", notes: null });
+		const economicPlan = createEconomicPlan({ hoaId: hoa.id, fiscalYearFrom: "2026-01-01", fiscalYearTo: "2026-12-31", notes: null });
+		createAnnualStatement({ hoaId: hoa.id, periodFrom: "2026-01-01", periodTo: "2026-12-31", notes: null });
+
+		// DMS-Dokument + offenes Ticket.
+		createDocument({
+			propertyId: property.id,
+			unitId: unit.id,
+			tenantId: tenant.id,
+			type: "CONTRACT",
+			fileName: "mietvertrag.pdf",
+			filePath: "documents/test.pdf",
+			mimeType: "application/pdf",
+			fileSize: 42,
+		});
+		createTicket({ propertyId: property.id, unitId: unit.id, title: "Fenster klemmt", description: null, status: "OPEN", resolvedAt: null });
+
+		const now = new Date("2026-06-15T00:00:00.000Z");
+		expect(getDashboardCounts(now)).toEqual({
+			propertiesCount: 1,
+			unitsCount: 1,
+			tenantsCount: 1,
+			openTicketsCount: 1,
+			occupiedUnitsCount: 1,
+			activeLeasesCount: 1,
+			draftBillingPeriodsCount: 1,
+			hoasCount: 1,
+			ownersCount: 1,
+			draftEconomicPlansCount: 1,
+			draftAnnualStatementsCount: 1,
+			documentsCount: 1,
+		});
+
+		// Nur die fällige offene Hausgeld-Sollstellung ist Rückstand (volle
+		// 300 € - Teilzuordnungen aus der Buchhaltung werden, wie auf
+		// /weg/hausgeld, nicht abgezogen).
+		expect(listHousingChargeArrearAmounts(now)).toEqual(["300.00"]);
+
+		// Rücklagensaldo über alle WEGs (gleiche Berechnung wie /weg/ruecklage).
+		expect(calculateReserveFundBalanceCents(listAllReserveFundBookings(), now)).toBe(38000);
+
+		// Finalisierte Entwürfe verschwinden aus den Zählern.
+		finalizeEconomicPlan(economicPlan.id, [{ unitId: unit.id, annualAmount: "600.00", monthlyAmount: "50.00" }]);
+		expect(getDashboardCounts(now).draftEconomicPlansCount).toBe(0);
+
+		// Bezahlte Hausgelder und Mietrückstände bleiben getrennte Kreise:
+		// Der laufende Mietvertrag hat keine Sollstellung -> keine Mietrückstände.
+		expect(listRentArrearAmounts(now)).toEqual([]);
 	});
 });

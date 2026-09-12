@@ -1,7 +1,7 @@
 import { activeLeaseWhere } from "@/lib/lease-status";
 
 import { getDb } from "./db";
-import type { Ticket } from "./types";
+import type { ReserveFundBookingType, Ticket } from "./types";
 
 /**
  * Repository für die Dashboard-Aggregationen (Startseite). Bündelt bewusst
@@ -9,10 +9,12 @@ import type { Ticket } from "./types";
  * über die Fach-Repositories zu verteilen - Aufrufer:
  * src/app/(app)/actions/dashboard.ts.
  *
- * Die fachliche Auswertung (Leerstandsquote, aktuell gültige Miete über
- * getRentForDate, Summen) bleibt im Aufrufer - hier liegen nur die rohen
- * Zeilen/Zähler. Geldbeträge kommen als Decimal-Strings aus der DB und
- * werden (wie bisher) im Aufrufer in JS summiert.
+ * Das Dashboard bildet ALLE Fachbereiche ab (allgemeine Stammdaten,
+ * Mietverwaltung, WEG-Verwaltung) - daher liegen hier auch die WEG-Zähler
+ * und -Summen. Die fachliche Auswertung (Leerstandsquote, aktuell gültige
+ * Miete über getRentForDate, Summen) bleibt im Aufrufer - hier liegen nur
+ * die rohen Zeilen/Zähler. Geldbeträge kommen als Decimal-Strings aus der
+ * DB und werden (wie bisher) im Aufrufer in JS summiert.
  */
 
 /** Zähler für die Kennzahlen-Karten der Startseite. */
@@ -23,6 +25,20 @@ export interface DashboardCounts {
 	openTicketsCount: number;
 	/** Anzahl unterschiedlicher Einheiten mit aktuell laufendem Mietvertrag. */
 	occupiedUnitsCount: number;
+	/** Anzahl aktuell laufender Mietverträge (Stand `date`). */
+	activeLeasesCount: number;
+	/** Nebenkostenabrechnungs-Perioden im Entwurf (noch nicht finalisiert). */
+	draftBillingPeriodsCount: number;
+	/** WEGs (Wohnungseigentümergemeinschaften). */
+	hoasCount: number;
+	/** Eigentümer der WEG-Verwaltung. */
+	ownersCount: number;
+	/** Wirtschaftspläne im Entwurf (noch nicht finalisiert). */
+	draftEconomicPlansCount: number;
+	/** WEG-Jahresabrechnungen im Entwurf (noch nicht finalisiert). */
+	draftAnnualStatementsCount: number;
+	/** Aktive Dokumente im DMS (hochgeladene Dokumente + erzeugte Schreiben, ohne Papierkorb). */
+	documentsCount: number;
 }
 
 /** Flache Join-Zeile für listActiveLeasesForRent (Tabelle `leases`). */
@@ -67,7 +83,10 @@ interface DashboardTicketJoinRow extends Ticket {
 /**
  * Zählt Liegenschaften, Einheiten, Mieter, offene Tickets (OPEN/IN_PROGRESS)
  * sowie die Anzahl unterschiedlicher vermieteter Einheiten (distinct unitId
- * der aktuell laufenden Mietverträge, Stand `date`).
+ * der aktuell laufenden Mietverträge, Stand `date`) - dazu die Zähler der
+ * übrigen Fachbereiche: laufende Mietverträge, Abrechnungs-Entwürfe und die
+ * WEG-Verwaltung (WEGs, Eigentümer, Plan-/Abrechnungs-Entwürfe) sowie die
+ * aktiven Dokumente des DMS.
  */
 export function getDashboardCounts(date: Date): DashboardCounts {
 	const db = getDb();
@@ -85,6 +104,15 @@ export function getDashboardCounts(date: Date): DashboardCounts {
 			`SELECT COUNT(*) AS value FROM (SELECT unit_id FROM leases WHERE ${active.sql} GROUP BY unit_id)`,
 			...active.params
 		),
+		activeLeasesCount: count(`SELECT COUNT(*) AS value FROM leases WHERE ${active.sql}`, ...active.params),
+		draftBillingPeriodsCount: count("SELECT COUNT(*) AS value FROM billing_periods WHERE status = 'DRAFT'"),
+		hoasCount: count("SELECT COUNT(*) AS value FROM hoas"),
+		ownersCount: count("SELECT COUNT(*) AS value FROM owners"),
+		draftEconomicPlansCount: count("SELECT COUNT(*) AS value FROM economic_plans WHERE status = 'DRAFT'"),
+		draftAnnualStatementsCount: count("SELECT COUNT(*) AS value FROM annual_statements WHERE status = 'DRAFT'"),
+		documentsCount:
+			count("SELECT COUNT(*) AS value FROM documents WHERE deleted_at IS NULL") +
+			count("SELECT COUNT(*) AS value FROM generated_documents WHERE deleted_at IS NULL"),
 	};
 }
 
@@ -159,6 +187,41 @@ export function listRentArrearAmounts(date: Date): string[] {
 		if (remainderCents > 0) remainders.push((remainderCents / 100).toFixed(2));
 	}
 	return remainders;
+}
+
+/**
+ * Offene Hausgeld-Rückstände (Decimal-Strings) über ALLE WEGs: volle
+ * Beträge der fälligen/überfälligen Hausgeld-Sollstellungen (Status
+ * OPEN/OVERDUE, Fälligkeit <= `date`) - identisch zur Rückstands-Karte auf
+ * /weg/hausgeld (dort ohne Teilzahlungs-Abzug: eine Sollstellung gilt erst
+ * bei vollständiger Zuordnung als bezahlt, siehe bank-transactions.ts).
+ * Die Summe wird im Aufrufer gebildet.
+ */
+export function listHousingChargeArrearAmounts(date: Date): string[] {
+	const rows = getDb()
+		.prepare("SELECT amount FROM housing_charges WHERE status IN ('OPEN', 'OVERDUE') AND due_date <= ?")
+		.all(date.toISOString()) as { amount: string }[];
+	return rows.map((row) => row.amount);
+}
+
+/** Rücklagenbuchungs-Teilmenge, wie sie calculateReserveFundBalanceCents benötigt. */
+export interface DashboardReserveFundBooking {
+	bookingDate: string;
+	type: ReserveFundBookingType;
+	amount: string;
+}
+
+/**
+ * Alle Rücklagenbuchungen aller WEGs (unsortiert) - Grundlage für den
+ * Gesamt-Saldo der Erhaltungsrücklagen auf der Startseite. Die Berechnung
+ * (Vorzeichen je Buchungsart, Stichtag) läuft im Aufrufer über
+ * calculateReserveFundBalanceCents (src/lib/hoa-reserve.ts) - das gleiche
+ * Muster wie auf /weg/ruecklage.
+ */
+export function listAllReserveFundBookings(): DashboardReserveFundBooking[] {
+	return getDb()
+		.prepare("SELECT booking_date AS bookingDate, type, amount FROM reserve_fund_bookings")
+		.all() as DashboardReserveFundBooking[];
 }
 
 /**
